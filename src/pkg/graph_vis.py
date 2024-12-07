@@ -6,7 +6,7 @@ from matplotlib.patches import Patch
 class GraphVisualizer:
     def __init__(self):
         self.G = nx.Graph()
-        self.primary_indications = set()
+        # self.primary_indications = set()
         self.color_map = {}
         self.labels = {}
         self.node_colors = []
@@ -24,12 +24,7 @@ class GraphVisualizer:
         self.labels[population_node] = 'Population'
 
         for patient in patient_registry.values():
-            chars = patient.chars
-            primary_indication = self.get_primary_indication(chars)
-            if primary_indication is None:
-                continue
-            self.primary_indications.add(primary_indication)
-            self.add_patient_to_graph(patient, primary_indication, population_node)
+            self.add_patient_to_graph(patient, population_node)
 
     def get_primary_indication(self, chars):
         for char, *_ in chars:
@@ -37,46 +32,55 @@ class GraphVisualizer:
                 return char.name
         return None
 
-    def add_patient_to_graph(self, patient, primary_indication, population_node):
-        prev_node_id = None
+    def add_patient_to_graph(self, patient, population_node):
+        # prev_node_id = None
         chars = patient.chars
-        primary_indication_node = primary_indication
-        if not self.G.has_node(primary_indication_node):
-            self.G.add_node(primary_indication_node, size=1, primary_indication=primary_indication)
-            self.labels[primary_indication_node] = primary_indication
-            self.G.add_edge(population_node, primary_indication_node)
+        prev_node_id = population_node
+        primary_indication = self.get_primary_indication(chars)
 
-        prev_node_id = primary_indication_node
+        if primary_indication is None:
+            return
 
-        for i, (char, size, rate) in enumerate(chars):
+        for char, size, rate in chars:
 
-            if char.type == 'Population':
-                continue
-                
-            node_id = (primary_indication, char.name)
-            self.G.add_node(node_id, size=size, rate=rate, primary_indication=primary_indication)
-            self.labels[node_id] = char.name
+            if char.type == 'Primary Indication':
+                node_id = char.name
 
-            if prev_node_id is not None:
-                self.G.add_edge(prev_node_id, node_id)
+                if not self.G.has_node(node_id):
+                    self.G.add_node(node_id, size=size, rate=rate, primary_indication=char.name)
+                    self.labels[node_id] = char.name
+            
+            else:
+                node_id = (primary_indication, char.name)
+                if not self.G.has_node(node_id):
+                    self.G.add_node(node_id, size=size, rate=rate, )
+                    self.labels[node_id] = char.name
+            self.G.add_edge(prev_node_id, node_id)
             prev_node_id = node_id
 
     def assign_colors_sizes(self):
-        primary_indications = list(self.primary_indications) + ['Population']
-        colors = plt.cm.get_cmap('Set1', len(primary_indications))
+        primary_indications = set()
+        for _, attr in self.G.nodes(data=True):
+            primary_indications.add(attr['primary_indication'])
+        primary_indications.discard('Population')
 
-        for i, pi in enumerate(primary_indications):
+        colors = plt.cm.get_cmap('Set1', len(primary_indications)+1)
+
+        for i, pi in enumerate(sorted(primary_indications)):
             self.color_map[pi] = colors(i)
-        
+        self.color_map['Population'] = colors(len(primary_indications))
+
         sizes = [attr['size'] for _, attr in self.G.nodes(data=True)]
         min_s = min(sizes)
         max_s = max(sizes)
         range = max_s - min_s if max_s != min_s else 1
 
-        for _, attr in self.G.nodes(data=True):
+        for node_id, attr in self.G.nodes(data=True):
             pi = attr['primary_indication']
-            self.node_colors.append(self.color_map[pi])
-            norm_size = ((attr['size'] - min_s) / range) * 600 + 200
+            if node_id == 'Population':
+                norm_size = 1500
+            else:
+                norm_size = ((attr['size'] - min_s) / range) * 600 + 200
             self.node_sizes.append(norm_size)
 
     def set_positions(self):
