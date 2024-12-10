@@ -1,20 +1,19 @@
-from ZODB_manager import RegistryManager
 import networkx as nx
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from collections import deque
+from ZODB_manager import RegistryManager
 
 class GraphVisualizer:
     def __init__(self):
-        self.G = nx.Graph()
+        self.G = nx.DiGraph()
         self.labels = {}
         self.node_map = {}
         # self.primary_indications = set()
         self.node_colors = []
         self.node_sizes = []
         self.pos = {}
-        self.branch = {}
-        self.population_branches = []
+        self.pi_nodes = []
     
     def load_data(self):
         with RegistryManager() as rm:
@@ -49,31 +48,28 @@ class GraphVisualizer:
                     rate=rate
                     )
                 self.labels[node_id] = char.name
+                if char.type == 'Primary Indication':
+                    self.pi_nodes.append(node_id)
             else:
                 node_id = self.node_map[node_key]
             if prev_node_id is not None:
                 self.G.add_edge(prev_node_id, node_id)
             prev_node_id = node_id
 
-    def identify_branch(self):
-        for node_id, attr in self.G.nodes(data=True):
-            if attr['type'] == 'Population':
-                self.population_branches.append(node_id)
-    
-    def color_branch(self):
-        branch_count = len(self.population_branches)
+    def color_branches(self):
+        branch_count = len(self.pi_nodes)
         cmap = plt.cm.get_cmap('Set1', branch_count)
         visited = set()
-        for i, pop_node in enumerate(self.population_branches):
+        for i, pi_node in enumerate(self.pi_nodes):
             branch_color = cmap(i)
-            queue = deque([pop_node])
+            queue = deque([pi_node])
             while queue:
-                current = queue.popleft()
+                current= queue.popleft()
                 if current in visited:
                     continue
                 visited.add(current)
                 self.G.nodes[current]['branch_color'] = branch_color
-                for nbr in self.G.neighbors(current):
+                for nbr in self.G.successors(current):
                     if nbr not in visited:
                         queue.append(nbr)
 
@@ -84,7 +80,7 @@ class GraphVisualizer:
         size_range = max_size - min_size if max_size != min_size else 1
 
         for node_id, attr in self.G.nodes(data=True):
-            branch_color = attr.get('branch_color', 'grey')
+            branch_color = attr.get('branch_color', 'green')
             self.node_colors.append(branch_color)
             norm_size = ((attr['size'] - min_size) / size_range) * (800 - 200) + 200
             self.node_sizes.append(norm_size)
@@ -116,14 +112,14 @@ class GraphVisualizer:
             font_size=8
             )
         
-        branch_colors = []
-        for pop_node in self.population_branches:
-            c = self.G.nodes[pop_node]['branch_color']
+        branch_colors = {}
+        for pi_node in self.pi_nodes:
+            c = self.G.nodes[pi_node].get('branch_color')
             if c not in branch_colors:
-                branch_colors.append(c)
+                branch_colors[pi_node] = c
 
         legend_handles = [
-            Patch(color=c, label=f"Branch {i+1}") for i, c in enumerate(branch_colors)
+            Patch(color=c, label=f"{pi_node[1]}") for pi_node, c in branch_colors.items()
             ]
         plt.legend(handles=legend_handles, title='Population branches')
 
@@ -132,8 +128,7 @@ class GraphVisualizer:
         plt.show()
 
     def visualize(self):
-        self.identify_branch()
-        self.color_branch()
+        self.color_branches()
         self.assign_colors_sizes()
         self.set_positions()
         self.draw_graph()
