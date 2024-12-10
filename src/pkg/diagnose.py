@@ -1,4 +1,4 @@
-from pkg.ZODB_manager import RegistryManager
+from ZODB_manager import RegistryManager
 import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

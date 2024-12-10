@@ -1,4 +1,4 @@
-from pkg.ZODB_manager import RegistryManager
+from ZODB_manager import RegistryManager
 from persistent.mapping import PersistentMapping
 from utils import commit
 import logging

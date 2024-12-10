@@ -1,17 +1,20 @@
-from pkg.ZODB_manager import RegistryManager
+from ZODB_manager import RegistryManager
 import networkx as nx
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+from collections import deque
 
 class GraphVisualizer:
     def __init__(self):
         self.G = nx.Graph()
-        # self.primary_indications = set()
-        self.color_map = {}
         self.labels = {}
+        self.node_map = {}
+        # self.primary_indications = set()
         self.node_colors = []
         self.node_sizes = []
         self.pos = {}
+        self.branch = {}
+        self.population_branches = []
     
     def load_data(self):
         with RegistryManager() as rm:
@@ -19,12 +22,8 @@ class GraphVisualizer:
             self.build_graph(patient_registry)
 
     def build_graph(self, patient_registry):
-        population_node = 'Population'
-        self.G.add_node(population_node, size=1, primary_indication='Population')
-        self.labels[population_node] = 'Population'
-
         for patient in patient_registry.values():
-            self.add_patient_to_graph(patient, population_node)
+            self.add_patient(patient)
 
     def get_primary_indication(self, chars):
         for char, *_ in chars:
@@ -32,55 +31,62 @@ class GraphVisualizer:
                 return char.name
         return None
 
-    def add_patient_to_graph(self, patient, population_node):
+    def add_patient(self, patient):
         # prev_node_id = None
         chars = patient.chars
-        prev_node_id = population_node
-        primary_indication = self.get_primary_indication(chars)
-
-        if primary_indication is None:
-            return
+        prev_node_id = None
 
         for char, size, rate in chars:
-
-            if char.type == 'Primary Indication':
-                node_id = char.name
-
-                if not self.G.has_node(node_id):
-                    self.G.add_node(node_id, size=size, rate=rate, primary_indication=char.name)
-                    self.labels[node_id] = char.name
-            
+            node_key = (char.type, char.name, size, rate)
+            if node_key not in self.node_map:
+                node_id = node_key
+                self.node_map[node_key] = node_id
+                self.G.add_node(
+                    node_id, 
+                    type=char.type,
+                    name=char.name,
+                    size=size,
+                    rate=rate
+                    )
+                self.labels[node_id] = char.name
             else:
-                node_id = (primary_indication, char.name)
-                if not self.G.has_node(node_id):
-                    self.G.add_node(node_id, size=size, rate=rate, )
-                    self.labels[node_id] = char.name
-            self.G.add_edge(prev_node_id, node_id)
+                node_id = self.node_map[node_key]
+            if prev_node_id is not None:
+                self.G.add_edge(prev_node_id, node_id)
             prev_node_id = node_id
 
+    def identify_branch(self):
+        for node_id, attr in self.G.nodes(data=True):
+            if attr['type'] == 'Population':
+                self.population_branches.append(node_id)
+    
+    def color_branch(self):
+        branch_count = len(self.population_branches)
+        cmap = plt.cm.get_cmap('Set1', branch_count)
+        visited = set()
+        for i, pop_node in enumerate(self.population_branches):
+            branch_color = cmap(i)
+            queue = deque([pop_node])
+            while queue:
+                current = queue.popleft()
+                if current in visited:
+                    continue
+                visited.add(current)
+                self.G.nodes[current]['branch_color'] = branch_color
+                for nbr in self.G.neighbors(current):
+                    if nbr not in visited:
+                        queue.append(nbr)
+
     def assign_colors_sizes(self):
-        primary_indications = set()
-        for _, attr in self.G.nodes(data=True):
-            primary_indications.add(attr['primary_indication'])
-        primary_indications.discard('Population')
-
-        colors = plt.cm.get_cmap('Set1', len(primary_indications)+1)
-
-        for i, pi in enumerate(sorted(primary_indications)):
-            self.color_map[pi] = colors(i)
-        self.color_map['Population'] = colors(len(primary_indications))
-
-        sizes = [attr['size'] for _, attr in self.G.nodes(data=True)]
-        min_s = min(sizes)
-        max_s = max(sizes)
-        range = max_s - min_s if max_s != min_s else 1
+        sizes = [attr['size'] for _,attr in self.G.nodes(data=True)]
+        min_size = min(sizes) if sizes else 1
+        max_size = max(sizes) if sizes else 1
+        size_range = max_size - min_size if max_size != min_size else 1
 
         for node_id, attr in self.G.nodes(data=True):
-            pi = attr['primary_indication']
-            if node_id == 'Population':
-                norm_size = 1500
-            else:
-                norm_size = ((attr['size'] - min_s) / range) * 600 + 200
+            branch_color = attr.get('branch_color', 'grey')
+            self.node_colors.append(branch_color)
+            norm_size = ((attr['size'] - min_size) / size_range) * (800 - 200) + 200
             self.node_sizes.append(norm_size)
 
     def set_positions(self):
@@ -110,19 +116,24 @@ class GraphVisualizer:
             font_size=8
             )
         
+        branch_colors = []
+        for pop_node in self.population_branches:
+            c = self.G.nodes[pop_node]['branch_color']
+            if c not in branch_colors:
+                branch_colors.append(c)
+
         legend_handles = [
-            Patch(color=self.color_map[pi], label=pi) for pi in self.primary_indications
+            Patch(color=c, label=f"Branch {i+1}") for i, c in enumerate(branch_colors)
             ]
-        legend_handles.append(
-            Patch(color=self.color_map['Population'], label='Population')
-            )
-        plt.legend(handles=legend_handles, title='Primary Indication')
+        plt.legend(handles=legend_handles, title='Population branches')
 
         plt.axis('off')
         plt.title('Patient Characteristics Graph')
         plt.show()
 
     def visualize(self):
+        self.identify_branch()
+        self.color_branch()
         self.assign_colors_sizes()
         self.set_positions()
         self.draw_graph()
