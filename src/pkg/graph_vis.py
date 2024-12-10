@@ -1,4 +1,5 @@
 import networkx as nx
+from networkx.drawing.nx_agraph import graphviz_layout
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from collections import deque
@@ -86,9 +87,14 @@ class GraphVisualizer:
             self.node_sizes.append(norm_size)
 
     def set_positions(self):
-        self.pos = nx.spring_layout(self.G, k=0.5, seed=42)
-        if 'Population' in self.pos:
-            self.pos['Population'] = [0, 0]
+        self.pos = graphviz_layout(self.G, prog='dot', args='-Grankdir=TB')
+        population_node = None
+        # for node_id, attr in self.G.nodes(data=True):
+        #     if attr['type'] == 'Population':
+        #         population_node = node_id
+        #         break
+        # if population_node and population_node in self.pos:
+        #     self.pos[population_node] = (0, 0)
 
     def draw_graph(self):
         plt.figure(figsize=(12, 8))
