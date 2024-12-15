@@ -34,7 +34,7 @@ class MongoManager:
         collection = self.get_collection('patients')
         result = collection.delete_one({'_id': patient_id})
         if result.deleted_count:
-            logging.info(f'Patien {patient_id} deleted from MongoDB.')
+            logging.info(f'Patient {patient_id} deleted from MongoDB.')
         else:
             logging.warning(f'Patient {patient_id} not found in MongoDB.')    
 
