@@ -1,6 +1,7 @@
 import transaction
 import logging
 from mongo_manager import MongoManager
+from ZODB_manager import RegistryManager
 from med_core import Patient
 
 def commit(patient: Patient=None):
@@ -41,3 +42,20 @@ def serialize_patient(patient: Patient):
             for t in patient.treatment
         ]
     }
+
+def sync_patients():
+    """Synchronize all patients in the ZODB to MongoDB"""
+    try:
+        with RegistryManager() as rm:
+            patient_registry = rm.get_registry('patient_registry')
+            mongo_manager = MongoManager()
+            for patient in patient_registry.values():
+                patient_id = generate_patient_id(patient)
+                patient_data = serialize_patient(patient)
+                mongo_manager.insert_update_patient(patient_id, patient_data)
+
+            mongo_manager.close()
+            logging.info('All patients synchronized to MongoDB successfully.')
+    except Exception as e:
+        logging.error(f'Failed to synchronize patients to MongoDB: {str(e)}')
+        raise RuntimeError(f'Failed to synchronize patients: {str(e)}')
