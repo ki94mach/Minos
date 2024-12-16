@@ -2,28 +2,31 @@ import transaction
 import logging
 from mongo_manager import MongoManager
 from ZODB_manager import RegistryManager
-from med_core import Patient
+from med_core import Patient, Characteristic, Drug, Treatment, FollowUp
 
-def commit(patient: Patient=None):
+def commit(*instances):
     try:
         transaction.commit()
         logging.info("Transaction committed successfully.")
-        if patient:
-            mongo_manager = MongoManager()
-            patient_id = generate_patient_id(patient)
-            patient_data = serialize_patient(patient)
-            mongo_manager.insert_update_patient(patient_id, patient_data)
-            mongo_manager.close()
+        mongo_manager = MongoManager()
+        for instance in instances:
+            instance_id = generate_hash(instance)
+            mongo_manager.insert_update(instance_id, instance.to_dict())
+        mongo_manager.close()
+        
     except Exception as e:
         transaction.abort()
         logging.error(f"Failed to commit transaction: {str(e)}")
         raise RuntimeError(f"Failed to commit transaction: {str(e)}")
     
 
-def generate_patient_id(patient: Patient):
-    """Generate a consistent patient ID based on patient chracteristics and size"""
-    char_hash = tuple((char.type, char.name, size, rate) for char, size, rate in patient.chars)
-    return hash((char_hash, patient.size))
+def generate_hash(instance):
+    """Generate a consistent ID"""
+    import hashlib
+    import json
+
+    instance_data = json.dump(instance.to_dict())
+    return hashlib.sha256(instance_data.encode('utf-8')).hexdigest()
 
 def serialize_patient(patient: Patient):
     """Serialize patient data to a dictionary for MangoDB"""

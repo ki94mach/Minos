@@ -13,7 +13,7 @@ class MongoManager:
         """Collect a MongoDB collection."""
         return self.db[collection_name]    
     
-    def insert_update_patient(self, patient_id, patient_data):
+    def insert_update(self, patient_id, patient_data):
         """Insert or update patient data in MongoDB"""
         collection = self.get_collection('patients')
         try:
