@@ -67,6 +67,12 @@ class Characteristic(Persistent):
     def name(self, value:str):
         self._name = self._title_with_exception(value)
 
+    def to_dict(self):
+        return {
+            'type': self._type,
+            'name': self._name,
+        }
+    
     def __repr__(self):
         return f"\nCharacteristic('type: {self.type}, name: {self.name}')"
 
@@ -146,6 +152,13 @@ class Drug(Persistent):
                 (e.g. '450 mg', '1 g', '10 IU')
             """
             )
+    
+    def to_dict(self):
+        return{
+            'name': self._name,
+            'strength': self._strength,
+        }
+    
     def __repr__(self):
         return f"Drug('{self.name}', strength='{self.strength}')"
 
@@ -180,6 +193,11 @@ class Treatment(Persistent):
         """
         self.alts.append((treatment, rate))
 
+    def to_dict(self):
+        return {
+            'name': self.name,
+        }
+    
     def __repr__(self):
         return f"Treatment('{self.name}')"
 
@@ -213,6 +231,15 @@ class MedicalTreatment(Treatment):
         """
         self.drugs.append((drug, annual_patient_con))
 
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'drugs': [{
+                'drug': drug.to_dict(),
+                'annual_patient_con': annual_patient_con,
+            } for drug, annual_patient_con in self.drugs]
+        }
+    
     def __repr__(self):
         return f"\nMedicalTreatment('{self.name}')"
 
@@ -265,7 +292,13 @@ class AlternativeTreatments(Treatment):
         self.alternatives = PersistentList(zip(alternatives, rates))
         self.name = " / ".join(treatment.name for treatment in alternatives)
         super().__init__(self.name)
- 
+    
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'alternatives': [alt.to_dict() for alt in self.alternatives]
+        }
+    
     def __repr__(self):
         return f"\nAlternative Treatments('{self.name}')"
     
@@ -417,6 +450,17 @@ class Patient(Persistent):
         new_patient = Patient(size=new_size, chars=new_chars, treatments=new_treatments)
         return new_patient
     
+    def to_dict(self):
+        return {
+            'size': self.size,
+            'chars': [{
+                'characteristic': char.to_dict(),
+                'size': size,
+                'rate': rate,
+            }for char, size, rate in self.chars],
+            'treatments': [t.to_dict() for t in self.treatments]
+        }
+    
     def __repr__(self):
         return f"\nPatient(chars={self.get_char_names()}, Size={self.size}"
 
@@ -501,6 +545,12 @@ class FollowUp(Persistent):
         new_name = f'Follow up received: {self.treatment.name}'
         new_char = Characteristic('Follow Up', new_name)
         self._patient.add_characteristic(new_char, rate=self.os)
+    
+    def to_dict(self):
+        return {
+            'patient': self.patient.to_dict(),
+            'overall_survival': self.os,
+        }
     
     def __repr__(self):
         """Provides a string representation of the FollowUp instance.
