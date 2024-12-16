@@ -16,3 +16,4 @@ def reset_registry(registry_name):
 if __name__ == "__main__":
     # Example: Reset 'treatment_registry'
     reset_registry('treatment_registry')
+    

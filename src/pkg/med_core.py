@@ -11,6 +11,7 @@ class Characteristic(Persistent):
         type (str): The type of characteristic (e.g., Primary Indicatio, Biomarker).
         name (str): The name of the characteristic (e.g., Lung Cancer, KRAS G12C).
     """
+    _instances = []
     def __new__(cls, type: str=None, name: str=None):
         """Creates a unique instance of Characteristic.
 
@@ -38,6 +39,7 @@ class Characteristic(Persistent):
     def __init__(self, type: str, name: str):
         self._type = self._title_with_exception(type)
         self._name = self._title_with_exception(name)
+        self.__class__._instances.append(self)
     
     @staticmethod
     def _title_with_exception(value: str) -> str:
@@ -67,6 +69,10 @@ class Characteristic(Persistent):
     def name(self, value:str):
         self._name = self._title_with_exception(value)
 
+    @classmethod
+    def get_all_instances(cls):
+        return cls._instances
+    
     def to_dict(self):
         return {
             'type': self._type,
@@ -84,7 +90,7 @@ class Drug(Persistent):
         strength (str): The strength of the drug with unit (e.g., 450 mg, 1 g).
     """
 
-
+    _instances = []
     def __new__(cls, name: str=None, strength: str=None):
         """Creates a unique instance of Drug.
 
@@ -112,6 +118,11 @@ class Drug(Persistent):
     def __init__(self, name: str, strength: str):
         self._name = self._title_with_exception(name)
         self._strength = strength
+        self.__class__._instances.append(self)
+    
+    @classmethod
+    def get_all_instances(cls):
+        return cls._instances
     
     @staticmethod
     def _title_with_exception(value: str) -> str:
@@ -169,6 +180,8 @@ class Treatment(Persistent):
         name (str): The name of the treatment.
         alts (list): A list of alternative treatments represented as tuples (Treatment, rate).
     """
+
+    _instances = []
     @classmethod
     def get_or_create(cls, name:str):
         registry = RegistryManager().get_registry('treatment_registry')
@@ -183,6 +196,11 @@ class Treatment(Persistent):
     def __init__(self, name: str):
         self.name = name
         self.alts = PersistentList() # List of tuples (Treatment, rate)
+        self.__class__._instances.append(self)
+    
+    @classmethod
+    def get_all_instances(cls):
+        return cls._instances
             
     def add_alt(self, treatment, rate: float=1.0):
         """Adds an alternative treatment.
@@ -207,6 +225,8 @@ class MedicalTreatment(Treatment):
     Attributes:
         drugs (list): A list of drugs included in the treatment, represented as tuples (Drug, annual_patient_con).
     """
+
+    _instances = []
     @classmethod
     def get_or_create(cls, name: str):
         registry = RegistryManager().get_registry('treatment_registry')
@@ -221,7 +241,12 @@ class MedicalTreatment(Treatment):
     def __init__(self, name: str):
         super().__init__(name)
         self.drugs = PersistentList()
+        self.__class__._instances.append(self)
 
+    @classmethod
+    def get_all_instances(cls):
+        return cls._instances
+    
     def add_drug(self, drug: Drug, annual_patient_con: int):
         """Adds a drug to the treatment.
 
@@ -250,6 +275,8 @@ class AlternativeTreatments(Treatment):
         alternatives (list): A list of treatments considered as alternatives.
         rates (list): A list of rates corresponding to the treatments.
     """
+
+    _instances = []
     @classmethod
     def get_or_create(cls, *alternatives: Treatment, rates: list=None):
         combined_name = " / ".join(treatment.name for treatment in alternatives)
@@ -292,6 +319,11 @@ class AlternativeTreatments(Treatment):
         self.alternatives = PersistentList(zip(alternatives, rates))
         self.name = " / ".join(treatment.name for treatment in alternatives)
         super().__init__(self.name)
+        self.__class__._instances.append(self)
+
+    @classmethod
+    def get_all_instances(cls):
+        return cls._instances
     
     def to_dict(self):
         return {
@@ -311,6 +343,8 @@ class Patient(Persistent):
         treatments (list): A list of treatments applied to the patient group.
         next_groups (list): A list of child patient groups representing evolution from this group.
     """
+
+    _instances = []
     def __init__(self,size: float, char: Characteristic=None, chars: list=None, treatments: list=None):
         """Initializes a Patient group.
 
@@ -335,6 +369,11 @@ class Patient(Persistent):
         else:
             raise ValueError("Either 'char' or 'chars' must be provided")
         self.treatments = PersistentList(treatments) if treatments else PersistentList()
+        self.__class__._instances.append(self)
+
+    @classmethod
+    def get_all_instances(cls):
+        return cls._instances
 
     def register_patient(self):
         registry = RegistryManager().get_registry('patient_registry')
@@ -473,6 +512,8 @@ class FollowUp(Persistent):
         os (float): The overall survival rate after treatment.
         new_patient (Patient): The new patient group after adding the follow-up characteristic.
     """
+
+    _instances = []
     def __new__(cls, patient: Patient=None, overall_survival: float=None):
         if patient is None or overall_survival is None:
             return super().__new__(cls)
@@ -496,6 +537,11 @@ class FollowUp(Persistent):
         self._patient = patient
         self.treatment = FollowUp._get_latest_treatment(self._patient)
         self.os = overall_survival
+        self.__class__._instances.append(self)
+
+    @classmethod
+    def get_all_instances(cls):
+        return cls._instances
 
     @property
     def patient(self):
