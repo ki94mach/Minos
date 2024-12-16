@@ -13,15 +13,15 @@ class MongoManager:
         """Collect a MongoDB collection."""
         return self.db[collection_name]    
     
-    def insert_update(self, patient_id, patient_data):
-        """Insert or update patient data in MongoDB"""
-        collection = self.get_collection('patients')
+    def insert_update(self, instance_id, collection_name, instance_data):
+        """Insert or update instnace data in MongoDB"""
+        collection = self.get_collection(collection_name)
         try:
-            collection.replace_one({'_id': patient_id}, patient_data, upsert=True)
-            logging.info(f'Patient {patient_id} synchronized to MongoDB.')
+            collection.replace_one({'_id': instance_id}, instance_data, upsert=True)
+            logging.info(f'Instance {instance_id} synchronized to {collection_name} in MongoDB.')
         
         except Exception as e:
-            logging.error(f'Error synchronizing patient {patient_id} to MongoDB: {str(e)}')
+            logging.error(f'Error synchronizing instance {instance_id} to MongoDB: {str(e)}')
             raise
     
     def find_patient(self, query={}):
