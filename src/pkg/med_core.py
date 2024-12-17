@@ -328,7 +328,13 @@ class AlternativeTreatments(Treatment):
     def to_dict(self):
         return {
             'name': self.name,
-            'alternatives': [alt.to_dict() for alt in self.alternatives]
+            'alternatives': [
+                {
+                    'treatment': t.to_dict(),
+                    'rate': rate,
+                }
+                for t, rate in self.alternatives
+            ]
         }
     
     def __repr__(self):

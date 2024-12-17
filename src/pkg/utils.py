@@ -1,18 +1,19 @@
 import transaction
 import logging
-from mongo_manager import MongoManager
-from ZODB_manager import RegistryManager
-from med_core import Patient, Characteristic, Drug, Treatment, FollowUp, MedicalTreatment, AlternativeTreatments
 
 def commit(*instances):
     try:
         transaction.commit()
-        logging.info("Transaction committed successfully.")
+        logging.info("Transaction committed successfully to ZODB.")
+
+        from mongo_manager import MongoManager
+
         mongo_manager = MongoManager()
         for instance in instances:
             colloction_name = get_collection_name(instance)
             instance_id = generate_hash(instance)
             mongo_manager.insert_update(instance_id, colloction_name, instance.to_dict())
+        logging.info("Transaction committed successfully to MongoDB.")
         mongo_manager.close()
 
     except Exception as e:
@@ -26,10 +27,13 @@ def generate_hash(instance):
     import hashlib
     import json
 
-    instance_data = json.dump(instance.to_dict())
+    instance_data = json.dumps(instance.to_dict())
     return hashlib.sha256(instance_data.encode('utf-8')).hexdigest()
 
 def get_collection_name(instance):
+
+    from med_core import Patient, Characteristic, Drug, Treatment, FollowUp, MedicalTreatment, AlternativeTreatments
+
     """Return the collection name based on the instance's class type."""
     if isinstance(instance, Characteristic):
         return 'characteristics'
@@ -48,6 +52,9 @@ def get_collection_name(instance):
 def sync_patients():
     """Synchronize all registries in the ZODB to MongoDB"""
     try:
+        from ZODB_manager import RegistryManager
+        from mongo_manager import MongoManager
+
         with RegistryManager() as rm:
             mongo_manager = MongoManager()
             registries = {
