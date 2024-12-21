@@ -1,3 +1,4 @@
+from flask import Flask
 from web_app import create_app
 
 app = create_app()

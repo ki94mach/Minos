@@ -1,6 +1,6 @@
 from persistent.mapping import PersistentMapping
 import ZODB, ZODB.FileStorage
-from utils import commit
+from pkg.utils import commit
 import logging
 
 class RegistryManager:

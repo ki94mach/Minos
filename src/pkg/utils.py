@@ -53,7 +53,7 @@ def sync_patients():
     """Synchronize all registries in the ZODB to MongoDB"""
     try:
         from ZODB_manager import RegistryManager
-        from mongo_manager import MongoManager
+        from pkg.mongo_manager import MongoManager
 
         with RegistryManager() as rm:
             mongo_manager = MongoManager()

@@ -7,6 +7,6 @@ def create_app():
     from .routes import main
     app.register_blueprint(main)
 
-    from ..pkg.ZODB_manager import RegistryManager
+    from pkg.ZODB_manager import RegistryManager
 
     return app

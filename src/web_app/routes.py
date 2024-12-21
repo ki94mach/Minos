@@ -29,7 +29,7 @@ def patients():
         
         except Exception as e:
             flash(f'Error adding patient: {e}', 'danger')
-    return render_template['patient.html']
+    return render_template('patients.html')
 
 
 @main.route('/drug', methods=['GET', 'POST'])
@@ -78,7 +78,7 @@ def add_general_treatment():
     return redirect(url_for('main.treatments'))
 
 
-@main.routs('/treatments/regimen', methods=['POST'])
+@main.route('/treatments/regimen', methods=['POST'])
 def add_medical_regimen():
     try:
         name = request.form['medical_regimen_name']
@@ -98,10 +98,10 @@ def add_medical_regimen():
     return redirect(url_for('main.treatments'))
 
 
-@main.route('/treatments/alternative', methods='POST')
+@main.route('/treatments/alternative', methods=['POST'])
 def add_alt_treatment():
     try:
-        name = request.form('alt_name')
+        name = request.form['alt_name']
         selelcted_treatments = request.form.getlist('alternative_treatments')
         rates = [
             float(request.form.get(f'rate_{treatment_name}', 1.0))
@@ -116,3 +116,23 @@ def add_alt_treatment():
     except Exception as e:
         flash(f'Error adding alternative treatment: {e}', 'danger')
     return redirect(url_for('main.treatments'))
+
+
+@main.route('/followups', methods=['GET', 'POST'])
+def followups():
+    if request.method == 'POST':
+        try:
+            patient_id = request.form['patient_id']
+            os_rate = float(request.form['os_rate'])
+
+            # Retrieve Patient and Create Follow-Up
+            # Assuming patient retrieval logic is defined
+            patient = Patient.get(patient_id)
+            followup = FollowUp(patient, os_rate)
+            followup.add_to_patient()
+            commit(followup)
+            flash('Follow-Up added successfully!', 'success')
+        except Exception as e:
+            flash(f'Error adding follow-up: {e}', 'danger')
+
+    return render_template('followups.html')
