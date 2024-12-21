@@ -219,7 +219,7 @@ class Treatment(Persistent):
     def __repr__(self):
         return f"Treatment('{self.name}')"
 
-class MedicalTreatment(Treatment):
+class MedicationRegimen(Treatment):
     """Represents a medical treatment consisting of multiple drugs.
 
     Attributes:
@@ -266,7 +266,7 @@ class MedicalTreatment(Treatment):
         }
     
     def __repr__(self):
-        return f"\nMedicalTreatment('{self.name}')"
+        return f"\nMedicationRegimen('{self.name}')"
 
 class AlternativeTreatments(Treatment):
     """Represents a combined treatment consisting of multiple alternative treatments.
@@ -456,7 +456,7 @@ class Patient(Persistent):
         Returns:
             Patient: The new patient group after the treatment.
         """
-        new_char = Characteristic('Medication', f'Received: {treatment.name}')
+        new_char = Characteristic(treatment.__class__.__name__, f'Received: {treatment.name}')
         self.add_characteristic(new_char, rate)
         self.treatments.append(treatment)
 
@@ -490,7 +490,7 @@ class Patient(Persistent):
         new_chars = list(self.chars[:branch_index + 1])
         new_size = new_chars[-1][1] * rate
         new_chars.append((new_char, new_size, rate))
-        med_count = sum(1 for char, *_ in new_chars if char.type == 'Medication')
+        med_count = sum(1 for char, *_ in new_chars if char.type == 'MedicationRegimen')
         new_treatments = list(self.treatments[:med_count])
         new_patient = Patient(size=new_size, chars=new_chars, treatments=new_treatments)
         return new_patient
@@ -583,7 +583,8 @@ class FollowUp(Persistent):
         Raises:
             ValueError: If the latest characteristic is not a treatment.
         """
-        if not patient.chars or not patient.chars[-1][0].type == 'Medication':
+        treatments_list = ['Treatment', 'MedicationRegimen', 'Alternativetreatments']
+        if not patient.chars or patient.chars[-1][0].type not in treatments_list:
             raise ValueError('Follow Up can only be created for a patient who has received a treatment immediately.')
         
     def add_to_patient(self):

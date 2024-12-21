@@ -32,14 +32,14 @@ def generate_hash(instance):
 
 def get_collection_name(instance):
 
-    from med_core import Patient, Characteristic, Drug, Treatment, FollowUp, MedicalTreatment, AlternativeTreatments
+    from med_core import Patient, Characteristic, Drug, Treatment, FollowUp, MedicationRegimen, AlternativeTreatments
 
     """Return the collection name based on the instance's class type."""
     if isinstance(instance, Characteristic):
         return 'characteristics'
     elif isinstance(instance, Drug):
         return 'drugs'
-    elif isinstance(instance, (Treatment, MedicalTreatment, AlternativeTreatments)):
+    elif isinstance(instance, (Treatment, MedicationRegimen, AlternativeTreatments)):
         return 'treatments'
     elif isinstance(instance, Patient):
         return 'patients'
