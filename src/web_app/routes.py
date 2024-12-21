@@ -20,7 +20,7 @@ def patients():
             size = float(request.form['size'])
 
             population_char = Characteristic('Population', population)
-            patient = Patient(size, population)
+            patient = Patient(size, population_char)
             pi_char = Characteristic('Primary Indication', primary_indication)
             patient.add_characteristic(pi_char)
 
@@ -49,15 +49,20 @@ def drugs():
 
 @main.route('/treatments', methods=['GET'])
 def treatments():
-    with RegistryManager() as rm:
-        drugs = list(rm.get_registry('drug_registry').values())
-        treatments = list(rm.get_registry('treatment_registry').values())
-        noalt_treatments = [t for t in treatments if not isinstance(t, AlternativeTreatments)]
-    return render_template(
-        'treatments.html',
-        drugs = drugs,
-        noalt_treatments = noalt_treatments
-        )
+    try:
+        with RegistryManager() as rm:
+            drug_registry = rm.get_registry('drug_registry')
+            drugs = [drug.to_dict() for drug in drug_registry.values()]
+            
+            treatment_registry = rm.get_registry('treatment_registry')
+            medical_treatments = [treatment.to_dict() for treatment in treatment_registry.values()]
+
+        return render_template('treatments.html', drugs=drugs, medical_treatments=medical_treatments)
+    
+    except Exception as e:
+        flash(f"Error fetching registries: {e}", 'danger')
+        return render_template('treatments.html', drugs=[], medical_treatments=[])
+
 
 
 @main.route('/treatments/general', methods=['POST'])

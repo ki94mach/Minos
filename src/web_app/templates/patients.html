@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Patient Management</h1>
+
+<form action="{{ url_for('main.patients') }}" method="POST">
+    <label for="population">Population:</label>
+    <input type="text" id="population" name="population" required>
+
+    <label for="primary_indication">Primary Indication:</label>
+    <select id="primary_indication" name="primary_indication" required>
+        {% for char in characteristics %}
+        <option value="{{ char.name }}">{{ char.name }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="size">Population Size:</label>
+    <input type="number" id="size" name="size" required step="1" min="1">
+
+    <button type="submit">Add Patient</button>
+</form>
+{% endblock %}
