@@ -1,53 +1,57 @@
-/* General body styling */
+/* Reset some default styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Set up the container to be a flexbox */
+.container {
+    display: flex;
+    justify-content: center; /* Center everything horizontally */
+    align-items: center;     /* Center everything vertically */
+    height: 100vh;           /* Full height of the viewport */
+}
+
+/* Style the image section */
+.image-section img {
+    width: 400px;         /* Set a fixed size for the image */
+    height: auto;         /* Maintain aspect ratio */
+    border-radius: 10px;  /* Optional: rounded corners for the image */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Optional: add a shadow */
+}
+
+/* Style the navigation section */
+.navigation-section {
+    margin-left: 20px;  /* Space between the image and navigation */
+}
+
+.navigation-section ul {
+    list-style: none;   /* Remove default list styling */
+}
+
+.navigation-section li {
+    margin: 10px 0;     /* Space between each navigation item */
+}
+
+.navigation-title {
+    font-size: 1.5em;
+    color: #333;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.navigation-section a {
+    text-decoration: none;  /* Remove underline from links */
+    color: #333;            /* Set text color */
+    font-size: 24px;        /* Set font size */
+    transition: color 0.2s ease; /* Smooth transition for hover effect */
+}
+
+.navigation-section a:hover {
+    color: #007bff;   /* Change color on hover */
+}
+
 body {
-  font-family: Arial, sans-serif;
-  margin: 0;
-  padding: 0;
-  background-color: #f4f4f4;
-}
-
-h1,
-h2 {
-  text-align: center;
-  color: #333333;
-}
-
-button {
-  background-color: #4caf50;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  cursor: pointer;
-  margin-top: 20px;
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-button:hover {
-  background-color: #45a049;
-}
-
-/* Form styling */
-form {
-  width: 60%;
-  margin: 0 auto;
-  padding: 20px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-label {
-  display: block;
-  margin-bottom: 8px;
-}
-
-input,
-select {
-  width: 100%;
-  padding: 8px;
-  margin-bottom: 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+    background-color: #d1d0d0aa; /* Set background color for the entire page */
 }
