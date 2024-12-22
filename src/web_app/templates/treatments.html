@@ -1,56 +1,71 @@
-{% extends "base.html" %}
-
-{% block content %}
+{% extends "base.html" %} {% block content %}
 <h1>Treatment Management</h1>
 
 <section>
-    <h2>Add General Treatment</h2>
-    <form action="{{ url_for('main.add_general_treatment') }}" method="POST">
-        <label for="treatment_name">Treatment Name:</label>
-        <input type="text" id="treatment_name" name="treatment_name" required>
-        <button type="submit">Add Treatment</button>
-    </form>
+  <h2>Add General Treatment</h2>
+  <form action="{{ url_for('main.add_general_treatment') }}" method="POST">
+    <label for="treatment_name">Treatment Name:</label>
+    <input type="text" id="treatment_name" name="treatment_name" required />
+    <button type="submit">Add Treatment</button>
+  </form>
 </section>
 
-<hr>
+<hr />
 
 <section>
-    <h2>Add Medical Regimen</h2>
-    <form action="{{ url_for('main.add_medical_regimen') }}" method="POST">
-        <label for="medical_regimen_name">Regimen Name:</label>
-        <input type="text" id="medical_regimen_name" name="medical_regimen_name" required>
+  <h2>Add Medical Regimen</h2>
+  <form action="{{ url_for('main.add_medical_regimen') }}" method="POST">
+    <label for="medical_regimen_name">Regimen Name:</label>
+    <input
+      type="text"
+      id="medical_regimen_name"
+      name="medical_regimen_name"
+      required
+    />
 
-        <label for="medical_regimen_drugs">Select Drugs:</label>
-        <select id="medical_regimen_drugs" name="medical_regimen_drugs" multiple required>
-            {% for drug in drugs %}
-            <option value="{{ drug['name'] }}|{{ drug['strength'] }}">{{ drug['name'] }} ({{ drug['strength'] }})</option>
-            {% endfor %}
-        </select>
+    <label for="medical_regimen_drugs">Select Drugs:</label>
+    <select
+      id="medical_regimen_drugs"
+      name="medical_regimen_drugs"
+      multiple
+      required
+    >
+      {% for drug in drugs %}
+      <option value="{{ drug['name'] }}|{{ drug['strength'] }}">
+        {{ drug['name'] }} ({{ drug['strength'] }})
+      </option>
+      {% endfor %}
+    </select>
 
-        <div id="drug_inputs"></div>
+    <div id="drug_inputs"></div>
 
-        <button type="submit">Add Regimen</button>
-    </form>
+    <button type="submit">Add Regimen</button>
+  </form>
 </section>
 
-<hr>
+<hr />
 
 <section>
-    <h2>Add Alternative Treatment</h2>
-    <form action="{{ url_for('main.add_alt_treatment') }}" method="POST">
-        <label for="alternative_name">Alternative Treatment Name:</label>
-        <input type="text" id="alternative_name" name="alternative_name" required>
+  <h2>Add Alternative Treatment</h2>
+  <form action="{{ url_for('main.add_alt_treatment') }}" method="POST">
+    <label for="alternative_name">Alternative Treatment Name:</label>
+    <input type="text" id="alternative_name" name="alternative_name" required />
 
-        <label for="alternative_treatments">Select Treatments:</label>
-        <select id="alternative_treatments" name="alternative_treatments" multiple required>
-            {% for treatment in medical_treatments %}
-            <option value="{{ treatment.name }}">{{ treatment.name }}</option>
-            {% endfor %}
-        </select>
+    <label for="alternative_treatments">Select Treatments:</label>
+    <select
+      id="alternative_treatments"
+      name="alternative_treatments"
+      multiple
+      required
+    >
+      {% for treatment in medical_treatments %}
+      <option value="{{ treatment.name }}">{{ treatment.name }}</option>
+      {% endfor %}
+    </select>
 
-        <div id="rate_inputs"></div>
+    <div id="rate_inputs"></div>
 
-        <button type="submit">Add Alternative</button>
-    </form>
+    <button type="submit">Add Alternative</button>
+  </form>
 </section>
 {% endblock %}

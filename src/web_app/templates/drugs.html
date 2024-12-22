@@ -1,15 +1,19 @@
-{% extends "base.html" %}
-
-{% block content %}
+{% extends "base.html" %} {% block content %}
 <h1>Drug Management</h1>
 
 <form action="{{ url_for('main.drugs') }}" method="POST">
-    <label for="name">Drug Name:</label>
-    <input type="text" id="name" name="name" required>
+  <label for="name">Drug Name:</label>
+  <input type="text" id="name" name="name" required />
 
-    <label for="strength">Strength:</label>
-    <input type="text" id="strength" name="strength" placeholder="e.g., 450 mg" required>
+  <label for="strength">Strength:</label>
+  <input
+    type="text"
+    id="strength"
+    name="strength"
+    placeholder="e.g., 450 mg"
+    required
+  />
 
-    <button type="submit">Add Drug</button>
+  <button type="submit">Add Drug</button>
 </form>
 {% endblock %}
