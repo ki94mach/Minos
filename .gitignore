@@ -6,3 +6,4 @@ src/__pycache__
 __pycache__/*
 src/pkg/__pycache__
 src/web_app/__init__.py
+web_app/__pycache__
