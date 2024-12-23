@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flask App with Background</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/styles.css') }}"
+    />
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  </head>
+  <body>
+    <!-- <h1>Minos for patient journey</h1> -->
+    <div class="container">
+      <div class="image-section">
+        <h2 class="navigation-title">Minos</h2>
+        <p class="navigation-title-desc">Patient Map Management System</p>
+        <img
+          src="{{ url_for('static', filename='images/maze-background.png') }}"
+          alt="Background Image"
+        />
+      </div>
+      <div class="navigation-section">
+        <ul>
+          <li><a href="{{ url_for('main.index') }}">Home</a></li>
+          <li><a href="{{ url_for('main.patients') }}">Patients</a></li>
+          <li><a href="{{ url_for('main.drugs') }}">Drugs</a></li>
+          <li><a href="{{ url_for('main.treatments') }}">Treatments</a></li>
+          <li><a href="{{ url_for('main.followups') }}">Follow-Ups</a></li>
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>

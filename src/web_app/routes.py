@@ -8,7 +8,7 @@ main = Blueprint('main', __name__)
 
 @main.route('/')
 def index():
-    return render_template('base.html')
+    return render_template('index.html')
 
 
 @main.route('/patients', methods=['GET', 'POST'])
@@ -32,7 +32,7 @@ def patients():
     return render_template('patients.html')
 
 
-@main.route('/drug', methods=['GET', 'POST'])
+@main.route('/drugs', methods=['GET', 'POST'])
 def drugs():
     if request.method == 'POST':
         try:
