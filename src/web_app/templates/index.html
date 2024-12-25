@@ -13,7 +13,7 @@
   <body>
     <div class="container">
       <div class="image-section">
-        <h2 class="navigation-title">Minos</h2>
+        <h1 class="navigation-title">Minos</h1>
         <p class="navigation-title-desc">Patient Map Management System</p>
         <img
           src="{{ url_for('static', filename='images/maze-background.png') }}"
@@ -23,9 +23,10 @@
       <div class="navigation-section">
         <ul>
           <li><a href="{{ url_for('main.index') }}">Home</a></li>
-          <li><a href="{{ url_for('main.patients') }}">Patients</a></li>
+          <li><a href="{{url_for('main.chars')}}">Characteristics</a></li>
           <li><a href="{{ url_for('main.drugs') }}">Drugs</a></li>
           <li><a href="{{ url_for('main.treatments') }}">Treatments</a></li>
+          <li><a href="{{ url_for('main.patients') }}">Patients</a></li>
         </ul>
       </div>
       <div class="form-section">{% block content %}{% endblock %}</div>

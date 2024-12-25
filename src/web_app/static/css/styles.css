@@ -80,7 +80,6 @@
     padding: 20px;
     overflow-y: auto;              /* Allow scrolling if form content overflows */
     height: 100%;                  /* Full height */
-    display: flex;
     justify-content: flex-start;   /* Align form content to the left */
     align-items: flex-start;       /* Align form content to the top */
     gap: 20px;                     /* Space between the form elements */

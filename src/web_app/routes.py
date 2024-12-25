@@ -136,3 +136,18 @@ def followups():
             flash(f'Error adding follow-up: {e}', 'danger')
 
     return render_template('followups.html')
+
+
+@main.route('/chars', methods=['GET', 'POST'])
+def chars():
+    if request.method == 'POST':
+        try:
+            type = request.form['type']
+            name = request.form['name']
+
+            char = Characteristic(type, name)
+            commit(char)
+            flash('Characteristic added successfully!', 'seccess')
+        except Exception as e:
+            flash(f'Error adding Characteristic: {e}', 'danger')
+    return render_template('chars.html')
