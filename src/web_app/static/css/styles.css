@@ -1,140 +1,142 @@
 /* Reset some default styles */
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: serif;
-  }
-  
-  /* Set up the container to be a flexbox */
-  .container {
-    display: flex;
-    justify-content: flex-start; /* Align the items to the left */
-    align-items: center;         /* Center everything vertically */
-    width: 100%;                 /* Full width */
-    min-height: 100vh;           /* Full height of the viewport */
-    padding: 20px;               /* Add some space around the container */
-    gap: 20px;                   /* Space between image and navigation section */
-  }
-  
-  /* Style the image section */
-  .image-section {
-    flex: 0 0 400px;              /* Fixed width for the image */
-    text-align: center;
-  }
-  
-  .image-section img {
-    width: 100%;                  /* Make the image responsive */
-    height: auto;                 /* Maintain aspect ratio */
-    border-radius: 10px;          /* Optional: rounded corners */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Optional: add a shadow */
-  }
-  
-  /* Style the navigation section */
-  .navigation-section {
-    flex: 0 0 250px;              /* Fixed width for the navigation */
-    padding: 20px;
-    height: auto;                 /* Make navigation height flexible */
-    overflow-y: auto;             /* Allow scrolling for nav if necessary */
-    display: flex;
-    flex-direction: column;
-    justify-content: center;      /* Vertically center navigation list */
-  }
-  
-  .navigation-title {
-    font-size: 34px;
-    color: #333;
-    text-align: center;
-  }
-  
-  .navigation-title-desc {
-    font-size: 12px;
-    color: #333;
-    text-align: center;
-    margin-bottom: 20px;
-  }
-  
-  .navigation-section ul {
-    list-style: none;
-    padding-left: 0;
-  }
-  
-  .navigation-section li {
-    margin: 10px 0;
-  }
-  
-  .navigation-section a {
-    text-decoration: none;
-    color: #333;
-    font-size: 18px;
-    transition: color 0.2s ease;
-  }
-  
-  .navigation-section a:hover {
-    color: #007bff;
-  }
-  
-  /* Style the form section */
-  .form-section {
-    flex: 1;                      /* Allow form section to take remaining space */
-    padding: 20px;
-    overflow-y: auto;              /* Allow scrolling if form content overflows */
-    height: 100%;                  /* Full height */
-    justify-content: flex-start;   /* Align form content to the left */
-    align-items: flex-start;       /* Align form content to the top */
-    gap: 20px;                     /* Space between the form elements */
-  }
-  
-  /* Flash messages */
-  .flashes {
-    margin-bottom: 20px;
-  }
-  
-  .flashes .success {
-    background-color: #d4edda;
-    color: #155724;
-  }
-  
-  .flashes .danger {
-    background-color: #f8d7da;
-    color: #721c24;
-  }
-  
-  form label {
-    display: flex;
-    flex-direction: column;
-  }
-  
-  form label {
-    margin-bottom: 5px;
-  }
-  
-  form input,
-  form select,
-  form button {
-    padding: 10px;
-    margin-bottom: 15px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-  }
-  
-  form button {
-    background-color: #007bff;
-    color: white;
-    cursor: pointer;
-  }
-  
-  form button:hover {
-    background-color: #0056b3;
-  }
-  
-  /* Ensure the page content doesn't force scrolling down */
-  body {
-    background-color: #d1d0d0aa; /* Set background color for the entire page */
-    overflow-y: auto;            /* Allow scrolling if content exceeds screen height */
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;     /* Align the content at the top */
-    height: 100vh;               /* Full screen height */
-  }
-  
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: serif;
+}
+
+/* Set up the container to be a flexbox */
+.container {
+  display: flex;
+  justify-content: center; /* Align the items to the left */
+  align-items: center; /* Center everything vertically */
+  width: 100%; /* Full width */
+  min-height: 100vh; /* Full height of the viewport */
+  padding: 20px; /* Add some space around the container */
+  gap: 20px;
+  transition: all 0.3s ease; /* Smooth transition for layout shifting */
+  max-width: 1400px; /* Limit the width of the container */
+  margin: 0 auto; /* Center the container horizontally */ /* Space between image and navigation section */
+}
+
+/* Style the image section */
+.image-section {
+  flex: 0 0 400px; /* Fixed width for the image */
+  text-align: center;
+}
+
+.image-section img {
+  width: 100%; /* Make the image responsive */
+  height: auto; /* Maintain aspect ratio */
+  border-radius: 10px; /* Optional: rounded corners */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Optional: add a shadow */
+}
+
+/* Style the navigation section */
+.navigation-section {
+  flex: 0 0 250px; /* Fixed width for the navigation */
+  padding: 20px;
+  height: auto; /* Make navigation height flexible */
+  overflow-y: auto; /* Allow scrolling for nav if necessary */
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Vertically center navigation list */
+}
+
+.navigation-title {
+  font-size: 34px;
+  color: #333;
+  text-align: center;
+}
+
+.navigation-title-desc {
+  font-size: 12px;
+  color: #333;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.navigation-section ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.navigation-section li {
+  margin: 10px 0;
+}
+
+.navigation-section a {
+  text-decoration: none;
+  color: #333;
+  font-size: 18px;
+  transition: color 0.2s ease;
+}
+
+.navigation-section a:hover {
+  color: #007bff;
+}
+
+/* Style the form section */
+.form-section {
+  flex: 1; /* Allow form section to take remaining space */
+  padding: 20px;
+  overflow-y: auto; /* Allow scrolling if form content overflows */
+  height: 100%; /* Full height */
+  justify-content: flex-start; /* Align form content to the left */
+  align-items: flex-start; /* Align form content to the top */
+  gap: 20px; /* Space between the form elements */
+}
+
+/* Flash messages */
+.flashes {
+  margin-bottom: 20px;
+}
+
+.flashes .success {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.flashes .danger {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+form label {
+  display: flex;
+  flex-direction: column;
+}
+
+form label {
+  margin-bottom: 5px;
+}
+
+form input,
+form select,
+form button {
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+form button {
+  background-color: #007bff;
+  color: white;
+  cursor: pointer;
+}
+
+form button:hover {
+  background-color: #0056b3;
+}
+
+/* Ensure the page content doesn't force scrolling down */
+body {
+  background-color: #d1d0d0aa; /* Set background color for the entire page */
+  overflow-y: auto; /* Allow scrolling if content exceeds screen height */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* Align the content at the top */
+  height: 100vh; /* Full screen height */
+}

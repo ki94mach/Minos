@@ -41,7 +41,7 @@ def drugs():
 
             drug = Drug(name, strength)
             commit(drug)
-            flash('Drug added successfully!', 'seccess')
+            flash('Drug added successfully!', 'success')
         except Exception as e:
             flash(f'Error adding drug: {e}', 'danger')
     return render_template('drugs.html')
@@ -94,7 +94,7 @@ def add_medical_regimen():
         commit(medication)
         flash(f'Medication Regimen add successfully!', 'success')
     except Exception as e:
-        flash(f'Error adding Medication Regimen')
+        flash(f'Error adding Medication Regimen: {e}', 'danger')
     return redirect(url_for('main.treatments'))
 
 
@@ -147,7 +147,7 @@ def chars():
 
             char = Characteristic(type, name)
             commit(char)
-            flash('Characteristic added successfully!', 'seccess')
+            flash('Characteristic added successfully!', 'success')
         except Exception as e:
             flash(f'Error adding Characteristic: {e}', 'danger')
     return render_template('chars.html')
