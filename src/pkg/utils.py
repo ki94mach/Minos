@@ -6,7 +6,7 @@ def commit(*instances):
         transaction.commit()
         logging.info("Transaction committed successfully to ZODB.")
 
-        from mongo_manager import MongoManager
+        from pkg.mongo_manager import MongoManager
 
         mongo_manager = MongoManager()
         for instance in instances:
@@ -32,7 +32,7 @@ def generate_hash(instance):
 
 def get_collection_name(instance):
 
-    from med_core import Patient, Characteristic, Drug, Treatment, FollowUp, MedicationRegimen, AlternativeTreatments
+    from pkg.med_core import Patient, Characteristic, Drug, Treatment, FollowUp, MedicationRegimen, AlternativeTreatments
 
     """Return the collection name based on the instance's class type."""
     if isinstance(instance, Characteristic):
@@ -52,7 +52,7 @@ def get_collection_name(instance):
 def sync_patients():
     """Synchronize all registries in the ZODB to MongoDB"""
     try:
-        from ZODB_manager import RegistryManager
+        from pkg.ZODB_manager import RegistryManager
         from pkg.mongo_manager import MongoManager
 
         with RegistryManager() as rm:
