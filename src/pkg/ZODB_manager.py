@@ -6,7 +6,10 @@ import logging
 class RegistryManager:
     _instance = None
 
-    def __new__(cls, db_path='C:/Users/Mohajeri.K/MyProjects/Minos/src/data/minos_data.fs'):
+    def __new__(
+            cls,
+            db_path='C:/Users/Mohajeri.K/MyProjects/Minos/src/data/minos_data.fs'
+            ):
         if cls._instance is None:
             cls._instance = super(RegistryManager, cls).__new__(cls)
             cls._instance._initialize(db_path)
@@ -63,7 +66,9 @@ class RegistryManager:
         self.storage.close()
         ## RegistryManager._instance = None
 
-    def open(self, db_path='C:/Users/Mohajeri.K/MyProjects/Minos/src/data/minos_data.fs'):
+    def open(self,
+             db_path='C:/Users/Mohajeri.K/MyProjects/Minos/src/data/minos_data.fs'
+             ):
         """Open a connection to the ZODB database if it is closed."""
         if not hasattr(self, 'connection') or self.connection is None:
             self._initialize(db_path)

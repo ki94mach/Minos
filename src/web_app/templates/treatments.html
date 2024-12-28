@@ -1,10 +1,11 @@
 {% extends "index.html" %} {% block content %}
 <h1>Treatments</h1>
 
+<!-- General Treatment Form -->
 <section>
-  <h2>Add General Treatment</h2>
+  <h2>General Treatment</h2>
   <form action="{{ url_for('main.add_general_treatment') }}" method="POST">
-    <label for="treatment_name">Treatment Name:</label>
+    <label for="treatment_name">Name:</label>
     <input type="text" id="treatment_name" name="treatment_name" required />
     <button type="submit">Add Treatment</button>
   </form>
@@ -12,10 +13,11 @@
 
 <hr />
 
+<!-- Medical Regimen Form -->
 <section>
-  <h2>Add Medical Regimen</h2>
+  <h2>Medical Regimen</h2>
   <form action="{{ url_for('main.add_medical_regimen') }}" method="POST">
-    <label for="medical_regimen_name">Regimen Name:</label>
+    <label for="medical_regimen_name">Name:</label>
     <input
       type="text"
       id="medical_regimen_name"
@@ -23,12 +25,13 @@
       required
     />
 
-    <label for="medical_regimen_drugs">Select Drugs:</label>
+    <label for="medical_regimen_drugs">Drugs:</label>
     <select
       id="medical_regimen_drugs"
       name="medical_regimen_drugs"
       multiple
       required
+      class="select2"
     >
       {% for drug in drugs %}
       <option value="{{ drug['name'] }}|{{ drug['strength'] }}">
@@ -37,6 +40,7 @@
       {% endfor %}
     </select>
 
+    <!-- Dynamic input fields for drug annual consumption -->
     <div id="drug_inputs"></div>
 
     <button type="submit">Add Regimen</button>
@@ -45,27 +49,31 @@
 
 <hr />
 
+<!-- Alternative Treatment Form -->
 <section>
-  <h2>Add Alternative Treatment</h2>
+  <h2>Alternative Treatment</h2>
   <form action="{{ url_for('main.add_alt_treatment') }}" method="POST">
-    <label for="alternative_name">Alternative Treatment Name:</label>
+    <label for="alternative_name">Name:</label>
     <input type="text" id="alternative_name" name="alternative_name" required />
 
-    <label for="alternative_treatments">Select Treatments:</label>
+    <label for="alternative_treatments">Treatments:</label>
     <select
       id="alternative_treatments"
       name="alternative_treatments"
       multiple
       required
+      class="select2"
     >
       {% for treatment in medical_treatments %}
       <option value="{{ treatment.name }}">{{ treatment.name }}</option>
       {% endfor %}
     </select>
 
+    <!-- Dynamic rate input fields -->
     <div id="rate_inputs"></div>
 
     <button type="submit">Add Alternative</button>
   </form>
 </section>
+
 {% endblock %}
