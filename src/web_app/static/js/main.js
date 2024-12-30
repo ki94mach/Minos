@@ -11,6 +11,19 @@ $(document).ready(function () {
       allowClear: true,             // Allow clearing selections
       width: '100%'                 // Full width of the dropdown
     });
+
+    // Initialize Select2 for Population and Primary Indication dropdowns
+    $('#population').select2({
+      placeholder: 'Select Population',
+      allowClear: true,
+      width: '100%'
+  });
+
+  $('#primary_indication').select2({
+      placeholder: 'Select Primary Indication',
+      allowClear: true,
+      width: '100%'
+  });
   
     // When drugs are selected, dynamically add inputs for annual consumption
     $('#medical_regimen_drugs').on('change', function () {
@@ -65,5 +78,29 @@ $(document).ready(function () {
         $rateInputsDiv.append($label, $input);
       });
     });
-  });
+
+      // When a Population is selected, dynamically load Primary Indications
+      $('#population').on('change', function () {
+        const populationId = $(this).val();
+
+        // Make an AJAX request to get the Primary Indications for the selected Population
+        $.ajax({
+            url: `/api/primary_indications/${populationId}`,
+            type: 'GET',
+            success: function (data) {
+                const $primaryIndicationSelect = $('#primary_indication');
+                $primaryIndicationSelect.empty(); // Clear existing options
+
+                // Populate Primary Indications dropdown with the fetched data
+                data.primary_indications.forEach(function (indication) {
+                    const option = $('<option>').val(indication.name).text(indication.name);
+                    $primaryIndicationSelect.append(option);
+                });
+            },
+            error: function () {
+                alert('Failed to fetch Primary Indications.');
+            }
+        });
+    });
+});
   
