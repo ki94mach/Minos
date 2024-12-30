@@ -13,23 +13,62 @@ def index():
 
 @main.route('/patients', methods=['GET', 'POST'])
 def patients():
-    if request.method == 'POST':
-        try:
-            population = request.form['population']
-            primary_indication = request.form['primary_indication']
-            size = float(request.form['size'])
+    try:
+        with RegistryManager() as rm:
+            patient_registry = rm.get_registry('patient_registry')
 
-            population_char = Characteristic('Population', population)
-            patient = Patient(size, population_char)
-            pi_char = Characteristic('Primary Indication', primary_indication)
-            patient.add_characteristic(pi_char)
+            all_pops = set()
+            all_pis = set()
+            all_chars = set()
 
-            commit(patient)
-            flash('Patient added successfully!', 'success')
-        
-        except Exception as e:
-            flash(f'Error adding patient: {e}', 'danger')
-    return render_template('patients.html')
+            for patient in patient_registry.values():
+                for char, *_ in patient.chars:
+                    if char.type == 'Population':
+                        all_pops.add(char.name)
+                    elif char.type == 'Primary Indication':
+                        all_pis.add(char.name)
+                    else:
+                        all_chars.add((char.type, char.name))
+                        
+        if request.method == 'POST':
+            try:
+                population = request.form['population']
+                primary_indication = request.form['primary_indication']
+                char_type = request.form['char_type']
+                char_name = request.form['char_name']
+
+                matching_patients = []
+                for patient in patient_registry.values():
+                    matches_pop = any(char.name == population for char, *_ in patient.chars) if population else True
+                    matches_pi = any(char.name == primary_indication for char, *_ in patient.chars) if primary_indication else True
+                    matches_char_type = any(char.type == char_type for char, *_ in patient.chars) if char_type else True
+                    matches_char_name = any(char.name == char_name for char, *_ in patient.chars) if char_name else True
+
+                    if (
+                        matches_pop and
+                        matches_pi and
+                        matches_char_type and
+                        matches_char_name
+                        ):
+                        matching_patients.append(patient)
+
+                size = float(request.form['size'])
+
+                population_char = Characteristic('Population', population)
+                patient = Patient(size, population_char)
+                pi_char = Characteristic('Primary Indication', primary_indication)
+                patient.add_characteristic(pi_char)
+
+                commit(patient)
+                flash('Patient added successfully!', 'success')
+            
+            except Exception as e:
+                flash(f'Error adding patient: {e}', 'danger')
+        return render_template('patients.html')
+    
+    except Exception as e:
+        flash(f'Error fetching patient data: {e}', 'danger')
+        return render_template('patients.html')
 
 
 @main.route('/drugs', methods=['GET', 'POST'])
