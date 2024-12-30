@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from pkg.utils import commit
 from pkg.med_core import Patient, Characteristic, Drug, Treatment, MedicationRegimen, AlternativeTreatments, FollowUp
 from pkg.ZODB_manager import RegistryManager
+from pkg.graph_vis import GraphVisualizer
 
 main = Blueprint('main', __name__)
 
@@ -52,6 +53,15 @@ def patients():
                         ):
                         matching_patients.append(patient)
 
+                # Visualize the graph
+                if matching_patients:
+                    graph_vis = GraphVisualizer()
+                    for patient in matching_patients:
+                        graph_vis.add_patient(patient)
+                    graph_vis.visualize()
+                    flash(f'Found {len(matching_patients)} matching patients.', 'success')
+                else:
+                    flash(f'No patiens found matching the filter criteria.', 'danger')
                 size = float(request.form['size'])
 
                 population_char = Characteristic('Population', population)
