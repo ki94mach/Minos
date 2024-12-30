@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from pkg.utils import commit
 from pkg.med_core import Patient, Characteristic, Drug, Treatment, MedicationRegimen, AlternativeTreatments, FollowUp
 from pkg.ZODB_manager import RegistryManager
@@ -12,24 +12,48 @@ def index():
     return render_template('index.html')
 
 
+
+def get_patient_characteristics():
+    """Helper function to fetch populations, primary indications, and other characteristics."""
+    with RegistryManager() as rm:
+        patient_registry = rm.get_registry('patient_registry')
+        
+        all_pops = set()
+        all_pis = set()
+        all_chars = set()
+
+        for patient in patient_registry.values():
+            for char, _, _ in patient.chars:
+                if char.type == 'Population':
+                    all_pops.add(char.name)
+                elif char.type == 'Primary Indication':
+                    all_pis.add(char.name)
+                else:
+                    all_chars.add((char.type, char.name))
+
+        return list(all_pops), list(all_pis), list(all_chars)
+                                                   
+
+@main.route('/api/characteristics', methods=['GET'])
+def fetch_charracteristics():
+    try:
+        all_pops, all_pis, all_chars = get_patient_characteristics()
+        return jsonify({
+            'population': list(all_pops),
+            'primary_indication': list(all_pis),
+            'other_characteristics': list(all_chars),
+        })
+    
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch characteristics: {str(e)}'}), 500
+
+        
+
 @main.route('/patients', methods=['GET', 'POST'])
 def patients():
     try:
-        with RegistryManager() as rm:
-            patient_registry = rm.get_registry('patient_registry')
-
-            all_pops = set()
-            all_pis = set()
-            all_chars = set()
-
-            for patient in patient_registry.values():
-                for char, *_ in patient.chars:
-                    if char.type == 'Population':
-                        all_pops.add(char.name)
-                    elif char.type == 'Primary Indication':
-                        all_pis.add(char.name)
-                    else:
-                        all_chars.add((char.type, char.name))
+        
+        all_pops, all_pis, all_chars = get_patient_characteristics()
                         
         if request.method == 'POST':
             try:
@@ -39,38 +63,40 @@ def patients():
                 char_name = request.form['char_name']
 
                 matching_patients = []
-                for patient in patient_registry.values():
-                    matches_pop = any(char.name == population for char, *_ in patient.chars) if population else True
-                    matches_pi = any(char.name == primary_indication for char, *_ in patient.chars) if primary_indication else True
-                    matches_char_type = any(char.type == char_type for char, *_ in patient.chars) if char_type else True
-                    matches_char_name = any(char.name == char_name for char, *_ in patient.chars) if char_name else True
+                with RegistryManager() as rm:
+                    patient_registry = rm.get_registry('patient_registry')
+                    for patient in patient_registry.values():
+                        matches_pop = any(char.name == population for char, *_ in patient.chars) if population else True
+                        matches_pi = any(char.name == primary_indication for char, *_ in patient.chars) if primary_indication else True
+                        matches_char_type = any(char.type == char_type for char, *_ in patient.chars) if char_type else True
+                        matches_char_name = any(char.name == char_name for char, *_ in patient.chars) if char_name else True
 
-                    if (
-                        matches_pop and
-                        matches_pi and
-                        matches_char_type and
-                        matches_char_name
+                        if (
+                            matches_pop and
+                            matches_pi and
+                            matches_char_type and
+                            matches_char_name
                         ):
-                        matching_patients.append(patient)
+                            matching_patients.append(patient)
 
-                # Visualize the graph
-                if matching_patients:
-                    graph_vis = GraphVisualizer()
-                    for patient in matching_patients:
-                        graph_vis.add_patient(patient)
-                    graph_vis.visualize()
-                    flash(f'Found {len(matching_patients)} matching patients.', 'success')
-                else:
-                    flash(f'No patiens found matching the filter criteria.', 'danger')
-                size = float(request.form['size'])
+                    # Visualize the graph
+                    if matching_patients:
+                        graph_vis = GraphVisualizer()
+                        for patient in matching_patients:
+                            graph_vis.add_patient(patient)
+                        graph_vis.visualize()
+                        flash(f'Found {len(matching_patients)} matching patients.', 'success')
+                    else:
+                        flash(f'No patiens found matching the filter criteria.', 'danger')
+                    size = float(request.form['size'])
 
-                population_char = Characteristic('Population', population)
-                patient = Patient(size, population_char)
-                pi_char = Characteristic('Primary Indication', primary_indication)
-                patient.add_characteristic(pi_char)
+                    population_char = Characteristic('Population', population)
+                    patient = Patient(size, population_char)
+                    pi_char = Characteristic('Primary Indication', primary_indication)
+                    patient.add_characteristic(pi_char)
 
-                commit(patient)
-                flash('Patient added successfully!', 'success')
+                    commit(patient)
+                    flash('Patient added successfully!', 'success')
             
             except Exception as e:
                 flash(f'Error adding patient: {e}', 'danger')
