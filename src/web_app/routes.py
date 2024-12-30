@@ -52,8 +52,6 @@ def fetch_charracteristics():
 @main.route('/patients', methods=['GET', 'POST'])
 def patients():
     try:
-        
-        all_pops, all_pis, all_chars = get_patient_characteristics()
                         
         if request.method == 'POST':
             try:
@@ -105,6 +103,13 @@ def patients():
     except Exception as e:
         flash(f'Error fetching patient data: {e}', 'danger')
         return render_template('patients.html')
+    
+
+@main.route('/filter_patient/<patient_id>', method=['GET'])
+def filter_patient(patient_id):
+    graph_vis = GraphVisualizer()
+    graph_vis.load_data()
+    graph_vis.filter_graph_by_patient(patient_id)
 
 
 @main.route('/drugs', methods=['GET', 'POST'])
