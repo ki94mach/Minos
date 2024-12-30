@@ -102,4 +102,21 @@ $('#primary_indication').select2({
           }
       });
   });
+
+  $('.patient-node').on('click', function () {
+    const patientId = $(this).data('patient-id'); // The patient ID can be stored in data attribute
+
+    // Make an AJAX call to filter the graph by patient ID
+    $.ajax({
+        url: `/filter_patient/${patientId}`,
+        type: 'GET',
+        success: function (response) {
+            console.log(response.message); // Log the success message
+            // You can update the page content here if necessary
+        },
+        error: function () {
+            alert('Failed to filter the graph for the selected patient.');
+        }
+    });
+});
 });
