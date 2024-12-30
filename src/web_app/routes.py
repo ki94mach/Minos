@@ -111,6 +111,8 @@ def filter_patient(patient_id):
     graph_vis.load_data()
     graph_vis.filter_graph_by_patient(patient_id)
 
+    return jsonify({"message": f"Graph updated for patient {patient_id}"})
+
 
 @main.route('/drugs', methods=['GET', 'POST'])
 def drugs():
