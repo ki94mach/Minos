@@ -144,7 +144,31 @@ class GraphVisualizer:
         self.assign_colors_sizes()
         self.set_positions()
         self.draw_graph()
-        
+
+    def filter_graph_by_patient(self, patient_id):
+        patient = self.get_patient_data(patient_id)
+        if patient:
+            # Filter the graph and display only the patient nodes and edges connected to the patient
+            patient_node_ids = self._get_patient_nodes(patient)
+            
+            # Remove non-matching nodes and edges
+            nodes_to_keep = set(patient_node_ids)
+            self.G = self.G.subgraph(nodes_to_keep).copy()  # Keep only the relevant nodes and edges
+            
+            # Now we can redraw the graph with only the relevant patient data
+            self.color_branches()  # Reapply coloring
+            self.assign_colors_sizes()  # Recalculate sizes
+            self.set_positions()  # Adjust positions
+            self.draw_graph()  # Redraw the graph
+
+    def _get_patient_nodes(self, patient):
+        # This method gets the nodes connected to the patient
+        nodes = []
+        for char, _, _ in patient.chars:
+            for node_key, node_id in self.node_map.items():
+                if char.name == node_key[1]:
+                    nodes.append(node_id)
+        return nodes
 def main():
     vis = GraphVisualizer()
     vis.load_data()
