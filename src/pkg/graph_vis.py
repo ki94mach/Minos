@@ -3,7 +3,7 @@ from networkx.drawing.nx_agraph import graphviz_layout
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from collections import deque
-from ZODB_manager import RegistryManager
+from pkg.ZODB_manager import RegistryManager
 
 class GraphVisualizer:
     def __init__(self):
@@ -15,6 +15,7 @@ class GraphVisualizer:
         self.node_sizes = []
         self.pos = {}
         self.pi_nodes = []
+        self.patient_data = {}
     
     def load_data(self):
         with RegistryManager() as rm:
@@ -56,6 +57,11 @@ class GraphVisualizer:
             if prev_node_id is not None:
                 self.G.add_edge(prev_node_id, node_id)
             prev_node_id = node_id
+
+        self.patient_data[patient._get_hash()] = patient
+    
+    def get_patient_data(self, patient_id):
+        return self.patient_data.get(patient_id, None)
 
     def color_branches(self):
         branch_count = len(self.pi_nodes)
