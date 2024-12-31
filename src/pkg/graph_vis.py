@@ -173,7 +173,7 @@ class GraphVisualizer:
     
     def visualize_interactive(
             self,
-            html_file='../static/template/pyvis_graph.html'
+            html_file='../static/pyvis_graph.html'
             ):
         self.color_branches()
         self.assign_colors_sizes()

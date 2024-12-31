@@ -85,7 +85,7 @@ def patients():
                         graph_vis = GraphVisualizer()
                         for patient in matching_patients:
                             graph_vis.add_patient(patient)
-                        graph_vis.visualize()
+                        graph_vis.visualize_interactive()
                         flash(f'Found {len(matching_patients)} matching patients.', 'success')
                     else:
                         flash(f'No patiens found matching the filter criteria.', 'danger')
@@ -248,3 +248,15 @@ def chars():
         except Exception as e:
             flash(f'Error adding Characteristic: {e}', 'danger')
     return render_template('chars.html')
+
+
+@main.route('/interactive_graph')
+def interactive_graph():
+    vis = GraphVisualizer()
+    vis.load_data()
+    vis.visualize_interactive()
+
+    return """
+    <h3>Graph</h3>
+    <iframe src="/static/pyvis_graph.html" width="100%" height="800"></iframe>
+    """
