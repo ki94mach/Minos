@@ -1,4 +1,5 @@
 import networkx as nx
+from pyvis.network import Network
 from networkx.drawing.nx_agraph import graphviz_layout
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
@@ -81,7 +82,7 @@ class GraphVisualizer:
                         queue.append(nbr)
 
     def assign_colors_sizes(self):
-        sizes = [attr['size'] for _,attr in self.G.nodes(data=True)]
+        sizes = [attr['size'] for _, attr in self.G.nodes(data=True)]
         min_size = min(sizes) if sizes else 1
         max_size = max(sizes) if sizes else 1
         size_range = max_size - min_size if max_size != min_size else 1
@@ -169,6 +170,34 @@ class GraphVisualizer:
                 if char.name == node_key[1]:
                     nodes.append(node_id)
         return nodes
+    
+    def visualize_interactive(
+            self,
+            html_file='../static/template/pyvis_graph.html'
+            ):
+        self.color_branches()
+        self.assign_colors_sizes()
+        self.set_positions()
+        net = Network(
+            height='750px',
+            width='100%',
+            directed=True,
+            notebook=False
+        )
+        net.barnes_hut()
+        net.from_nx(self.G)
+        
+        for node_id, attr in self.G.nodes(data=True):
+            net.nodes[node_id]['title'] = f'Click me to filter patient {node_id}'
+            net.nodes[node_id]['patient_id'] = self._extract_id(node_id, attr)
+
+        net.save_graph(html_file)
+    
+    @staticmethod
+    def _extract_id(node_id, attr):
+        return str(node_id)
+    
+
 def main():
     vis = GraphVisualizer()
     vis.load_data()
