@@ -14,27 +14,23 @@ $(document).ready(function () {
 
   // Initialize Select2 for Population and Primary Indication dropdowns
   $('#population').select2({
-    placeholder: 'Select Population',
-    allowClear: true,
-    width: '100%'
+    placeholder: 'Select',
+    allowClear: true
 });
 
 $('#primary_indication').select2({
-    placeholder: 'Select Primary Indication',
-    allowClear: true,
-    width: '100%'
+    placeholder: 'Select',
+    allowClear: true
 });
 
 $('#char_type').select2({
-  placeholder: 'Select Characteristic Type',
-  allowClear: true,
-  width: '100%'
+  placeholder: 'Select',
+  allowClear: true
 });
 
 $('#char_name').select2({
-  placeholder: 'Select Characteristic Name',
-  allowClear: true,
-  width: '100%'
+  placeholder: 'Select',
+  allowClear: true
 });
 
   // When drugs are selected, dynamically add inputs for annual consumption
