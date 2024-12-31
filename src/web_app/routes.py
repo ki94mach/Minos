@@ -20,7 +20,8 @@ def get_patient_characteristics():
         
         all_pops = set()
         all_pis = set()
-        all_chars = set()
+        all_chars_name = set()
+        all_chars_type = set()
 
         for patient in patient_registry.values():
             for char, _, _ in patient.chars:
@@ -29,19 +30,21 @@ def get_patient_characteristics():
                 elif char.type == 'Primary Indication':
                     all_pis.add(char.name)
                 else:
-                    all_chars.add((char.type, char.name))
+                    all_chars_name.add(char.name)
+                    all_chars_type.add(char.type)
 
-        return list(all_pops), list(all_pis), list(all_chars)
+        return list(all_pops), list(all_pis), list(all_chars_name), list(all_chars_type)
                                                    
 
 @main.route('/api/characteristics', methods=['GET'])
 def fetch_charracteristics():
     try:
-        all_pops, all_pis, all_chars = get_patient_characteristics()
+        all_pops, all_pis, all_chars_name, all_chars_type = get_patient_characteristics()
         return jsonify({
             'population': list(all_pops),
             'primary_indication': list(all_pis),
-            'other_characteristics': list(all_chars),
+            'other_characteristics_name': list(all_chars_name),
+            'other_characteristics_type': list(all_chars_type)
         })
     
     except Exception as e:
@@ -52,7 +55,7 @@ def fetch_charracteristics():
 @main.route('/patients', methods=['GET', 'POST'])
 def patients():
     try:
-                        
+        all_pops, all_pis, all_chars_name, all_chars_type = get_patient_characteristics()                 
         if request.method == 'POST':
             try:
                 population = request.form['population']
@@ -98,14 +101,26 @@ def patients():
             
             except Exception as e:
                 flash(f'Error adding patient: {e}', 'danger')
-        return render_template('patients.html')
+        return render_template(
+            'patients.html',
+            all_pops = all_pops,
+            all_pis = all_pis,
+            all_chars_name = all_chars_name,
+            all_chars_type = all_chars_type
+            )
     
     except Exception as e:
         flash(f'Error fetching patient data: {e}', 'danger')
-        return render_template('patients.html')
+        return render_template(
+            'patients.html',
+            all_pops = all_pops,
+            all_pis = all_pis,
+            all_chars_name = all_chars_name,
+            all_chars_type = all_chars_type
+            )
     
 
-@main.route('/filter_patient/<patient_id>', method=['GET'])
+@main.route('/filter_patient/<patient_id>', methods=['GET'])
 def filter_patient(patient_id):
     graph_vis = GraphVisualizer()
     graph_vis.load_data()

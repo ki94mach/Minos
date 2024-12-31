@@ -10,7 +10,7 @@
 .container {
   display: flex;
   justify-content: center; /* Align the items to the left */
-  align-items: center; /* Center everything vertically */
+  align-items: baseline; /* Center everything vertically */
   width: 100%; /* Full width */
   min-height: 100vh; /* Full height of the viewport */
   padding: 20px; /* Add some space around the container */
@@ -47,13 +47,13 @@
 .navigation-title {
   font-size: 34px;
   color: #333;
-  text-align: center;
+  text-align: left;
 }
 
 .navigation-title-desc {
   font-size: 12px;
   color: #333;
-  text-align: center;
+  text-align: left;
   margin-bottom: 20px;
 }
 

@@ -8,52 +8,80 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='css/styles_patient.css') }}"
     />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Include jQuery first -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <!-- Include Select2 -->
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+
+    <!-- Include vis.js Library -->
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/npm/vis-network@9.0.0/umd/vis-network.min.js"
+    ></script>
+
+    <!-- Now include your own JS script -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   </head>
   <body>
     <div class="container">
-      <div class="image-section">
+      <div class="navigation-section">
         <h2 class="navigation-title">Minos</h2>
         <p class="navigation-title-desc">Patient Map Management System</p>
-      </div>
-      <div class="navigation-section">
-        <ul>
-          <li><a href="{{ url_for('main.index') }}">Home</a></li>
-          <li><a href="{{url_for('main.chars')}}">Characteristics</a></li>
-          <li><a href="{{ url_for('main.drugs') }}">Drugs</a></li>
-          <li><a href="{{ url_for('main.treatments') }}">Treatments</a></li>
-        </ul>
+        <div>
+          <ul>
+            <li><a href="{{ url_for('main.index') }}">Home</a></li>
+            <li><a href="{{url_for('main.chars')}}">Characteristics</a></li>
+            <li><a href="{{ url_for('main.drugs') }}">Drugs</a></li>
+            <li><a href="{{ url_for('main.treatments') }}">Treatments</a></li>
+          </ul>
+        </div>
       </div>
 
       <!-- Patient Form Section -->
       <div class="form-section">
-        <h1>Patient Data Entry</h1>
+        <h1>Search</h1>
         <form action="{{ url_for('main.patients') }}" method="POST">
           <label for="population">Population:</label>
-          <select name="population" id="population" required>
+          <select name="population" id="population" required class="'select2">
+            <option value="" disabled selected hidden></option>
             {% for pop in all_pops %}
-              <option value="{{ pop.name }}">{{ pop.name }}</option>
+            <option value="{{ pop }}">{{ pop }}</option>
             {% endfor %}
           </select>
 
           <label for="primary_indication">Primary Indication:</label>
           <select name="primary_indication" id="primary_indication" required>
+            <option value="" disabled selected hidden></option>
             {% for pi in all_pis %}
-              <option value="{{ pi.name }}">{{ pi.name }}</option>
+            <option value="{{ pi }}">{{ pi }}</option>
             {% endfor %}
           </select>
 
-          <label for="characteristics">Characteristics:</label>
-          <select name="characteristics" id="characteristics" multiple>
-            {% for char in all_chars %}
-              <option value="{{ char.name }}">{{ char.name }}</option>
+          <label for="char_type">Characteristics type:</label>
+          <select name="char_type" id="char_type" required multiple>
+            {% for ctype in all_chars_type %}
+            <option value="{{ ctype }}">{{ ctype }}</option>
             {% endfor %}
           </select>
 
-          <label for="size">Size:</label>
+          <label for="char_name">Characteristics name:</label>
+          <select name="char_name" id="char_name" required multiple>
+            {% for cname in all_chars_name %}
+            <option value="{{ cname }}">{{ cname }}</option>
+            {% endfor %}
+          </select>
+
+          <!-- <label for="size">Size:</label>
           <input type="number" name="size" id="size" required />
 
-          <button type="submit">Add Patient</button>
+          <button type="submit">Add Patient</button> -->
         </form>
       </div>
     </div>

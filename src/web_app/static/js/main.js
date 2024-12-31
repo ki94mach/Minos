@@ -25,6 +25,18 @@ $('#primary_indication').select2({
     width: '100%'
 });
 
+$('#char_type').select2({
+  placeholder: 'Select Characteristic Type',
+  allowClear: true,
+  width: '100%'
+});
+
+$('#char_name').select2({
+  placeholder: 'Select Characteristic Name',
+  allowClear: true,
+  width: '100%'
+});
+
   // When drugs are selected, dynamically add inputs for annual consumption
   $('#medical_regimen_drugs').on('change', function () {
     console.log('Drug selection changed via jQuery');
