@@ -31,21 +31,33 @@
   </head>
   <body>
     <div class="container">
+      
+      <!-- Navigation Section at the Top -->
       <div class="navigation-section">
-        <h2 class="navigation-title">Minos</h2>
-        <p class="navigation-title-desc">Patient Map Management System</p>
-        <div>
-          <ul>
-            <li><a href="{{ url_for('main.index') }}">Home</a></li>
-            <li><a href="{{url_for('main.chars')}}">Characteristics</a></li>
-            <li><a href="{{ url_for('main.drugs') }}">Drugs</a></li>
-            <li><a href="{{ url_for('main.treatments') }}">Treatments</a></li>
-          </ul>
+        <!-- Hamburger Icon + Menu first -->
+        <div class="nav-container">
+          <div class="nav-icon">
+            <img src="{{ url_for('static', filename='images/hamburger-menu.png') }}" alt="Menu" />
+          </div>
+          <div class="nav-menu">
+            <ul>
+              <li><a href="{{ url_for('main.index') }}">Home</a></li>
+              <li><a href="{{url_for('main.chars')}}">Characteristics</a></li>
+              <li><a href="{{ url_for('main.drugs') }}">Drugs</a></li>
+              <li><a href="{{ url_for('main.treatments') }}">Treatments</a></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Title + Description second -->
+        <div class="nav-info">
+          <h2 class="navigation-title">Minos</h2>
+          <p class="navigation-title-desc">Patient Map Management System</p>
         </div>
       </div>
 
       <!-- Patient Form Section -->
-      <div class="form-section">
+      <div class="search-section">
         <h3>Search</h3>
         <form
           action="{{ url_for('main.patients') }}"

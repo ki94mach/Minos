@@ -1,162 +1,122 @@
-/* Reset some default styles */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: serif;
-}
-
-/* Set up the container to be a flexbox */
+/* Ensure the container stacks its children vertically */
 .container {
   display: flex;
-  justify-content: center; /* Align the items to the left */
-  align-items: baseline; /* Center everything vertically */
-  width: 100%; /* Full width */
-  min-height: 100vh; /* Full height of the viewport */
-  padding: 20px; /* Add some space around the container */
-  gap: 20px;
-  transition: all 0.3s ease; /* Smooth transition for layout shifting */
-  max-width: 1400px; /* Limit the width of the container */
-  margin: 0 auto; /* Center the container horizontally */ /* Space between image and navigation section */
-}
-
-/* Style the image section */
-.image-section {
-  flex: 0 0 400px; /* Fixed width for the image */
-  text-align: left;
-}
-
-.image-section img {
-  width: 100%; /* Make the image responsive */
-  height: auto; /* Maintain aspect ratio */
-  border-radius: 10px; /* Optional: rounded corners */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Optional: add a shadow */
-}
-
-/* Style the navigation section */
-.navigation-section {
-  flex: 0 0 250px; /* Fixed width for the navigation */
-  padding: 20px;
-  height: auto; /* Make navigation height flexible */
-  overflow-y: auto; /* Allow scrolling for nav if necessary */
-  display: flex;
   flex-direction: column;
-  justify-content: center; /* Vertically center navigation list */
+  gap: 20px; /* Space between child sections */
+  max-width: 1200px; /* Optional: limit overall width */
+  margin: 0 auto;     /* Center horizontally if you like */
+  padding: 20px;
 }
 
+/* Make .navigation-section a row, aligned to the top-right */
+.navigation-section {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; /* Title left, icon right */
+}
+
+
+/* A simple wrapper for title + description to appear side by side or stacked */
+.nav-header-left {
+  display: flex;           /* or block, if you prefer them stacked vertically */
+  flex-direction: column;  /* Title over description */
+  align-items: flex-start; /* Left-align within themselves */
+  text-align: left;        /* Ensure text doesn't shift right */
+}
+
+/* You can adjust spacing if needed */
 .navigation-title {
   font-size: 34px;
-  color: #333;
-  text-align: left;
+  margin-bottom: 0; /* reduce gap if you like */
 }
-
 .navigation-title-desc {
   font-size: 12px;
-  color: #333;
-  text-align: left;
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
-.navigation-section ul {
+/* Keep your existing .nav-container, .nav-icon, and .nav-menu styles */
+.nav-container {
+  position: relative;
+  width: 50px;
+  overflow: visible;
+}
+.nav-icon {
+  width: 50px;
+  height: 50px;
+  cursor: pointer;
+  background-color: #f8f8f8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-menu {
+  position: absolute;
+  top: 0;
+  left: 50px;
+  width: 200px;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  display: none;
+}
+.nav-container:hover .nav-menu {
+  display: block;
+}
+.nav-menu ul {
   list-style: none;
-  padding-left: 0;
+  margin: 0;
+  padding: 10px;
 }
-
-.navigation-section li {
-  margin: 10px 0;
+.nav-menu li {
+  margin: 8px 0;
 }
-
-.navigation-section a {
+.nav-menu a {
   text-decoration: none;
   color: #333;
-  font-size: 18px;
-  transition: color 0.2s ease;
+  font-size: 16px;
 }
-
-.navigation-section a:hover {
+.nav-menu a:hover {
   color: #007bff;
 }
 
-/* Style the form section */
-.form-section {
-  flex: 1; /* Allow form section to take remaining space */
-  padding: 20px;
-  overflow-y: auto; /* Allow scrolling if form content overflows */
-  height: 100%; /* Full height */
-  justify-content: flex-start; /* Align form content to the left */
-  align-items: flex-start; /* Align form content to the top */
-  gap: 20px; /* Space between the form elements */
+.nav-info {
+  margin-left: 15px;
+  display: flex; 
+  flex-direction: column; /* Title over desc */
 }
 
-/* Flash messages */
-.flashes {
-  margin-bottom: 20px;
+/* Style the search section */
+.search-section {
+  background-color: #f8f8f8; /* Light background, optional */
+  border: 1px solid #ccc;    /* Thin border, optional */
+  padding: 15px;             /* Some padding around content */
+  border-radius: 5px;        /* Slightly rounded corners, optional */
 }
 
-.flashes .success {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.flashes .danger {
-  background-color: #f8d7da;
-  color: #721c24;
-}
-
-form label {
-  display: flex;
-  flex-direction: column;
-}
-
-form label {
-  margin-bottom: 5px;
-}
-
-form input,
-form select,
-form button {
-  padding: 10px;
-  margin-bottom: 15px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-}
-
-form button {
-  background-color: #007bff;
-  color: white;
-  cursor: pointer;
-}
-
-form button:hover {
-  background-color: #0056b3;
-}
-
-/* Ensure the page content doesn't force scrolling down */
-body {
-  background-color: #d1d0d0aa; /* Set background color for the entire page */
-  overflow-y: auto; /* Allow scrolling if content exceeds screen height */
-  display: flex;
-  justify-content: center;
-  align-items: flex-start; /* Align the content at the top */
-  height: 100vh; /* Full screen height */
-}
-
+/* Flex container for your form fields to be side-by-side or wrap */
 .flex-search {
   display: flex;
-  flex-wrap: wrap; /* Allow wrapping if the screen is narrow */
-  gap: 20px;       /* Space between each label+select pair */
-  align-items: flex-end; /* Align them along the bottom if heights differ */
-}
-
-/* Keep label text above the select within each pair */
-.flex-search label {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 0; /* Remove extra spacing if you like */
+  flex-wrap: wrap;    /* Allows wrap if screen is narrow */
+  gap: 20px;          /* Space between form groups */
 }
 
 .search-group {
-  display: flex;        /* vertical stack of label + select */
-  flex-direction: column;
-  align-items: flex-start; /* left-align label text if desired */
+  display: flex;
+  flex-direction: column; /* label above the select */
+}
+
+/* Style the graph section to stand out */
+.graph-section {
+  background-color: #ffffff; /* White background, optional */
+  border: 1px solid #ccc;    /* Thin border, optional */
+  padding: 15px;             /* Spacing inside the section */
+  border-radius: 5px;        /* Slightly rounded corners */
+  margin-top: 0;             /* In case you want no extra top margin */
+}
+
+/* If you want the iframe to fill the container's width more neatly: */
+.graph-section iframe {
+  border: none;       /* Remove the default iframe border */
+  min-height: 600px;  /* Give a minimum height */
+  width: 100%;        /* Let it expand to the parent width */
+  /* height: 800px is already set in your HTML, so optional here */
 }
