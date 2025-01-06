@@ -4,21 +4,21 @@ from pkg.utils import commit
 import logging
 
 class RegistryManager:
-    _instance = None
+    # _instance = None
 
-    def __new__(
-            cls,
-            db_path='C:/Users/Mohajeri.K/MyProjects/Minos/src/data/minos_data.fs'
-            ):
-        if cls._instance is None:
-            cls._instance = super(RegistryManager, cls).__new__(cls)
-            cls._instance._initialize(db_path)
-        elif not hasattr(cls._instance, 'connection') or cls._instance.connection is None:
-            cls._instance._initialize(db_path)
-        return cls._instance
+    # def __new__(
+    #         cls,
+    #         db_path='C:/Users/Mohajeri.K/MyProjects/Minos/src/data/minos_data.fs'
+    #         ):
+    #     if cls._instance is None:
+    #         cls._instance = super(RegistryManager, cls).__new__(cls)
+    #         cls._instance._initialize(db_path)
+    #     elif not hasattr(cls._instance, 'connection') or cls._instance.connection is None:
+    #         cls._instance._initialize(db_path)
+    #     return cls._instance
     
-    # def __init__(self, db_path='C:/Users/Mohajeri.K/MyProjects/Minos/src/data/minos_data.fs'):
-    #     self._initialize(db_path)
+    def __init__(self, db_path='C:/Users/Mohajeri.K/MyProjects/Minos/src/data/minos_data.fs'):
+        self._initialize(db_path)
 
     def _initialize(self, db_path):
         self.storage = ZODB.FileStorage.FileStorage(db_path)

@@ -54,6 +54,7 @@ def fetch_charracteristics():
 
 @main.route('/patients', methods=['GET', 'POST'])
 def patients():
+    all_pops, all_pis, all_chars_name, all_chars_type = [], [], [], []
     try:
         all_pops, all_pis, all_chars_name, all_chars_type = get_patient_characteristics()                 
         if request.method == 'POST':
@@ -79,6 +80,8 @@ def patients():
                             matches_char_name
                         ):
                             matching_patients.append(patient)
+                    
+                    print("patient_registry size:", len(patient_registry))
 
                     # Visualize the graph
                     if matching_patients:
@@ -89,15 +92,15 @@ def patients():
                         flash(f'Found {len(matching_patients)} matching patients.', 'success')
                     else:
                         flash(f'No patiens found matching the filter criteria.', 'danger')
-                    size = float(request.form['size'])
+                    # size = float(request.form['size'])
 
-                    population_char = Characteristic('Population', population)
-                    patient = Patient(size, population_char)
-                    pi_char = Characteristic('Primary Indication', primary_indication)
-                    patient.add_characteristic(pi_char)
+                    # population_char = Characteristic('Population', population)
+                    # patient = Patient(size, population_char)
+                    # pi_char = Characteristic('Primary Indication', primary_indication)
+                    # patient.add_characteristic(pi_char)
 
-                    commit(patient)
-                    flash('Patient added successfully!', 'success')
+                    # commit(patient)
+                    # flash('Patient added successfully!', 'success')
             
             except Exception as e:
                 flash(f'Error adding patient: {e}', 'danger')
@@ -260,3 +263,34 @@ def interactive_graph():
     <h3>Graph</h3>
     <iframe src="/static/pyvis_graph.html" width="100%" height="800"></iframe>
     """
+
+@main.route('/api/primary_indications/<population_name>')
+def fetch_primary_indications_for_population(population_name):
+    """
+    Return all primary indications for patients who have a given population characteristic.
+    """
+    try:
+        with RegistryManager() as rm:
+            patient_registry = rm.get_registry('patient_registry')
+
+            pi_set = set()
+            for patient in patient_registry.values():
+                # Check if this patient has the chosen population
+                has_pop = any(
+                    char.type == 'Population' and char.name == population_name
+                    for char, *_ in patient.chars
+                )
+                if has_pop:
+                    # If so, collect the patient's Primary Indication(s)
+                    for char, *_ in patient.chars:
+                        if char.type == 'Primary Indication':
+                            pi_set.add(char.name)
+
+            # Build JSON response
+            data = {
+                'primary_indications': [{'name': pi} for pi in pi_set]
+            }
+            return jsonify(data)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

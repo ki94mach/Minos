@@ -173,7 +173,7 @@ class GraphVisualizer:
     
     def visualize_interactive(
             self,
-            html_file='../static/pyvis_graph.html'
+            html_file='C:/Users/Mohajeri.K/MyProjects/Minos/src/web_app/staticpyvis_graph.html'
             ):
         self.color_branches()
         self.assign_colors_sizes()
@@ -201,7 +201,7 @@ class GraphVisualizer:
 def main():
     vis = GraphVisualizer()
     vis.load_data()
-    vis.visualize()
+    vis.visualize_interactive()
 
 if __name__ == '__main__':
     main()

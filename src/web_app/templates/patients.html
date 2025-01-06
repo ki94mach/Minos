@@ -66,7 +66,7 @@
         >
           <div class="search-group">
             <label for="population">Population:</label>
-            <select name="population" id="population" required class="'select2">
+            <select name="population" id="population" class="select2">
               <option value="" disabled selected hidden></option>
               {% for pop in all_pops %}
               <option value="{{ pop }}">{{ pop }}</option>
@@ -79,7 +79,6 @@
             <select
               name="primary_indication"
               id="primary_indication"
-              required
               class="'select2"
             >
               <option value="" disabled selected hidden></option>
@@ -91,7 +90,7 @@
 
           <div class="search-group">
             <label for="char_type">Characteristics type:</label>
-            <select name="char_type" id="char_type" required class="'select2">
+            <select name="char_type" id="char_type" class="'select2">
               <option value="" disabled selected hidden></option>
               {% for ctype in all_chars_type %}
               <option value="{{ ctype }}">{{ ctype }}</option>
@@ -101,14 +100,14 @@
 
           <div class="search-group">
             <label for="char_name">Characteristics name:</label>
-            <select name="char_name" id="char_name" required class="'select2">
+            <select name="char_name" id="char_name" class="'select2">
               <option value="" disabled selected hidden></option>
               {% for cname in all_chars_name %}
               <option value="{{ cname }}">{{ cname }}</option>
               {% endfor %}
             </select>
           </div>
-
+          <button type="submit">Search</button>
           <!-- <label for="size">Size:</label>
           <input type="number" name="size" id="size" required />
           
