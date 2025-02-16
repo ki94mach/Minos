@@ -1,9 +1,6 @@
-src/data
-src/pkg/data_entry.py
 src/pkg/test.ipynb
 docs
 src/__pycache__
 __pycache__/*
 src/pkg/__pycache__
-src/web_app/__init__.py
 src/web_app/__pycache__
