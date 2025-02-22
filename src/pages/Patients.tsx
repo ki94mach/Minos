@@ -12,6 +12,7 @@ import {
     MenuItem,
 } from "@mui/material";
 import axios from "axios";
+import BackButton from "../components/BackButton";
 
 const Patients: React.FC = () => {
     const [populations, setPopulations] = useState<string[]>([]);
@@ -59,6 +60,7 @@ const Patients: React.FC = () => {
 
     return (
         <Container maxWidth="md" sx={{ mt: 5 }}>
+            <BackButton />
             <Typography variant="h3" align="center" sx={{ mb: 4 }}>
                 Patient Map Management
             </Typography>
@@ -130,7 +132,7 @@ const Patients: React.FC = () => {
 
                             <Grid item xs={12}>
                                 <Button type="submit" variant="contained" fullWidth>
-                                    Search Patients
+                                    Search
                                 </Button>
                             </Grid>
                         </Grid>

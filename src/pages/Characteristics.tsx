@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { TextField, Button, Typography, Container, Card, CardContent } from "@mui/material";
 import axios from "axios";
+import BackButton from "../components/BackButton";
 
 const Characteristics: React.FC = () => {
     const [type, setType] = useState("");
@@ -9,7 +10,7 @@ const Characteristics: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await axios.post("http://localhost:5000/chars", { type, name });
+            await axios.post("http://localhost:3000/chars", { type, name });
             setType("");
             setName("");
             alert("Characteristic added successfully!");
@@ -21,6 +22,7 @@ const Characteristics: React.FC = () => {
 
     return (
         <Container maxWidth="sm" sx={{ mt: 5 }}>
+            <BackButton />
             <Card>
                 <CardContent>
                     <Typography variant="h4" gutterBottom>Characteristics</Typography>

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { TextField, Button, Typography, Container, Card, CardContent } from "@mui/material";
 import axios from "axios";
+import BackButton from "../components/BackButton";
 
 const Drugs: React.FC = () => {
     const [name, setName] = useState("");
@@ -21,6 +22,7 @@ const Drugs: React.FC = () => {
 
     return (
         <Container maxWidth="sm" sx={{ mt: 5 }}>
+            <BackButton />
             <Card>
                 <CardContent>
                     <Typography variant="h4" gutterBottom>Drugs</Typography>
@@ -37,6 +39,7 @@ const Drugs: React.FC = () => {
                             fullWidth
                             label="Strength"
                             value={strength}
+                            placeholder={"e.g. 450mg"}
                             onChange={(e) => setStrength(e.target.value)}
                             required
                             sx={{ mb: 2 }}
