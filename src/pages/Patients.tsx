@@ -1,4 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, {useCallback, useEffect, useState} from "react";
+import ReactFlow, {
+    addEdge,
+    MiniMap,
+    Controls,
+    Background,
+    useEdgesState,
+    useNodesState,
+    Connection,
+    Edge
+} from "reactflow";
+import "reactflow/dist/style.css";
 import {
     Container,
     Typography,
@@ -9,13 +20,36 @@ import {
     FormControl,
     InputLabel,
     Select,
-    MenuItem,
+    MenuItem, TextField,
 } from "@mui/material";
 import axios from "axios";
 import BackButton from "../components/BackButton";
 
 const Patients: React.FC = () => {
-    const [populations, setPopulations] = useState<string[]>([]);
+    const initialNodes = [
+        { id: "1", position: { x: 250, y: 5 }, data: { label: "Patient A" } },
+        { id: "2", position: { x: 100, y: 100 }, data: { label: "Treatment X" } },
+        { id: "3", position: { x: 400, y: 100 }, data: { label: "Drug Y" } }
+    ];
+    const initialEdges = [{ id: "e1-2", source: "1", target: "2", label: "Treated With" }];
+
+    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+    const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+    const onConnect = useCallback(
+        (connection: Edge | Connection) => setEdges((eds) => addEdge(connection, eds)),
+        [setEdges]
+    );
+    const populations = [
+        "Iran Population",
+        "Tehran Population",
+        "Mashhad Population",
+        "Shiraz Population",
+        "Tabriz Population",
+        "Custom Population"
+    ]
+    const [selectedPopulations, setSelectedPopulations] = useState<string>("");
+    const [customPopulationNumber, setCustomPopulationNumber] = useState<string>("");
     const [primaryIndications, setPrimaryIndications] = useState<string[]>([]);
     const [charTypes, setCharTypes] = useState<string[]>([]);
     const [charNames, setCharNames] = useState<string[]>([]);
@@ -25,12 +59,10 @@ const Patients: React.FC = () => {
     const [selectedCharType, setSelectedCharType] = useState<string>("");
     const [selectedCharName, setSelectedCharName] = useState<string>("");
 
-    // Fetch patient characteristics from backend
     useEffect(() => {
         const fetchCharacteristics = async () => {
             try {
                 const response = await axios.get("http://localhost:5000/api/characteristics");
-                setPopulations(response.data.population || []);
                 setPrimaryIndications(response.data.primary_indication || []);
                 setCharTypes(response.data.other_characteristics_type || []);
                 setCharNames(response.data.other_characteristics_name || []);
@@ -41,12 +73,22 @@ const Patients: React.FC = () => {
         fetchCharacteristics();
     }, []);
 
-    // Handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        let finalPopulation = selectedPopulation;
+        if (selectedPopulation === "Custom Population") {
+            if (!customPopulationNumber) {
+                alert("Please enter a custom population number.");
+                return;
+            }
+            finalPopulation = `Custom Population - ${customPopulationNumber}`;
+        }
+
+        alert(`Population Selected: ${finalPopulation}`);
+
         try {
-            await axios.post("http://localhost:5000/patients", {
-                population: selectedPopulation,
+            await axios.post("http://localhost:3000/patients", {
+                population: finalPopulation,
                 primary_indication: selectedPrimaryIndication,
                 char_type: selectedCharType,
                 char_name: selectedCharName,
@@ -59,13 +101,13 @@ const Patients: React.FC = () => {
     };
 
     return (
-        <Container maxWidth="md" sx={{ mt: 5 }}>
-            <BackButton />
-            <Typography variant="h3" align="center" sx={{ mb: 4 }}>
+        <Container maxWidth="md" sx={{mt: 5}}>
+            <BackButton/>
+            <Typography variant="h3" align="center" sx={{mb: 4}}>
                 Patient Map Management
             </Typography>
 
-            <Card sx={{ mb: 4 }}>
+            <Card sx={{mb: 4}}>
                 <CardContent>
                     <Typography variant="h5" gutterBottom>Search Patients</Typography>
                     <form onSubmit={handleSubmit}>
@@ -84,6 +126,20 @@ const Patients: React.FC = () => {
                                     </Select>
                                 </FormControl>
                             </Grid>
+
+                            {selectedPopulation === "Custom Population" && (
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Enter Custom Population Number"
+                                        type="number"
+                                        value={customPopulationNumber}
+                                        onChange={(e) => setCustomPopulationNumber(e.target.value)}
+                                        inputProps={{ min: "1" }}
+                                        required
+                                    />
+                                </Grid>
+                            )}
 
                             <Grid item xs={12} sm={6}>
                                 <FormControl fullWidth>
@@ -140,18 +196,32 @@ const Patients: React.FC = () => {
                 </CardContent>
             </Card>
 
-            <Card>
-                <CardContent>
-                    <Typography variant="h5" gutterBottom>Patient Map Visualization</Typography>
-                    <iframe
-                        src="http://localhost:5000/static/pyvis_graph.html"
-                        width="100%"
-                        height="600"
-                        style={{ border: "none" }}
-                        title="Patient Graph"
-                    ></iframe>
-                </CardContent>
-            </Card>
+            <div style={{height: "500px", width: "100%", border: "1px solid #ddd"}}>
+                <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    onConnect={onConnect}
+                    fitView
+                >
+                    <MiniMap/>
+                    <Controls/>
+                    <Background gap={12} size={1}/>
+                </ReactFlow>
+            </div>
+            {/*<Card>*/}
+            {/*    <CardContent>*/}
+            {/*        <Typography variant="h5" gutterBottom>Patient Map Visualization</Typography>*/}
+            {/*        <iframe*/}
+            {/*            src="http://localhost:5000/static/pyvis_graph.html"*/}
+            {/*            width="100%"*/}
+            {/*            height="600"*/}
+            {/*            style={{ border: "none" }}*/}
+            {/*            title="Patient Graph"*/}
+            {/*        ></iframe>*/}
+            {/*    </CardContent>*/}
+            {/*</Card>*/}
         </Container>
     );
 };
