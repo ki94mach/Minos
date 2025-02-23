@@ -1,39 +1,15 @@
-from persistent.list import PersistentList
-from persistent import Persistent
 import re
 import hashlib
+from pkg.base_model import BaseModel
 
-class Characteristic(Persistent):
+class Characteristic(BaseModel):
     """Represents a patient characteristic with a unique name and type.
 
     Attributes:
         type (str): The type of characteristic (e.g., Primary Indicatio, Biomarker).
         name (str): The name of the characteristic (e.g., Lung Cancer, KRAS G12C).
     """
-    _instances = []
-    def __new__(cls, type: str=None, name: str=None):
-        """Creates a unique instance of Characteristic.
-
-        Args:
-            type (str): The type of characteristic.
-            name (str): The name of the characteristic.
-
-        Returns:
-            Characteristic: A unique instance of Characteristic based on type and name.
-        """
-        if type is None or name is None:
-            return super().__new__(cls)
-        registry = RegistryManager().get_registry('characteristic_registry')
-        type_t = cls._title_with_exception(type)
-        name_t = cls._title_with_exception(name)
-        key = (type_t, name_t)
-        if key in registry:
-            print(registry[key])
-            return registry[key]
-        else:
-            instance = super().__new__(cls)
-            registry[key] = instance
-            return instance
+    unique_fields = ['type', 'name']
         
     def __init__(self, type: str, name: str):
         self._type = self._title_with_exception(type)
@@ -81,7 +57,7 @@ class Characteristic(Persistent):
     def __repr__(self):
         return f"\nCharacteristic('type: {self.type}, name: {self.name}')"
 
-class Drug(Persistent):
+class Drug(BaseModel):
     """Represents a drug with a specific strength.
 
     Attributes:
@@ -89,30 +65,7 @@ class Drug(Persistent):
         strength (str): The strength of the drug with unit (e.g., 450 mg, 1 g).
     """
 
-    _instances = []
-    def __new__(cls, name: str=None, strength: str=None):
-        """Creates a unique instance of Drug.
-
-        Args:
-            name (str): The name of the drug.
-            strength (str): The strength of the drug.
-
-        Returns:
-            Drug: A unique instance of Drug based on name and strength.
-        """
-        if name is None or strength is None:
-            return super().__new__(cls)
-        registry = RegistryManager().get_registry('drug_registry')
-        name_t = cls._title_with_exception(name)
-        cls._validate_strength(strength)
-        key = (name_t, strength)
-        if key in registry:
-            print(f'{name_t} with {strength} strength was defined before.')
-            return registry[key]
-        else:
-            instance = super(Drug, cls).__new__(cls)
-            registry[key] = instance
-            return instance
+    unique_fields = ['name', 'strength']
 
     def __init__(self, name: str, strength: str):
         self._name = self._title_with_exception(name)
@@ -172,43 +125,17 @@ class Drug(Persistent):
     def __repr__(self):
         return f"Drug('{self.name}', strength='{self.strength}')"
 
-class Treatment(Persistent):
+class Treatment(BaseModel):
     """Represents a treatment that may have alternatives.
 
     Attributes:
         name (str): The name of the treatment.
         alts (list): A list of alternative treatments represented as tuples (Treatment, rate).
     """
-
-    _instances = []
-    @classmethod
-    def get_or_create(cls, name:str):
-        registry = RegistryManager().get_registry('treatment_registry')
-        key = (cls.__name__, name)
-        if key in registry:
-            return registry[key]
-        else:
-            instance = cls(name)
-            registry[key] = instance
-            return instance
+    unique_fields = ['name']
             
     def __init__(self, name: str):
         self.name = name
-        self.alts = PersistentList() # List of tuples (Treatment, rate)
-        self.__class__._instances.append(self)
-    
-    @classmethod
-    def get_all_instances(cls):
-        return cls._instances
-            
-    def add_alt(self, treatment, rate: float=1.0):
-        """Adds an alternative treatment.
-
-        Args:
-            treatment (Treatment): An alternative treatment.
-            rate (float): The rate at which the alternative is used.
-        """
-        self.alts.append((treatment, rate))
 
     def to_dict(self):
         return {
@@ -225,22 +152,9 @@ class MedicationRegimen(Treatment):
         drugs (list): A list of drugs included in the treatment, represented as tuples (Drug, annual_patient_con).
     """
 
-    _instances = []
-    @classmethod
-    def get_or_create(cls, name: str):
-        registry = RegistryManager().get_registry('treatment_registry')
-        key = (cls.__name__, name)
-        if key in registry:
-            return registry[key]
-        else:
-            instance = cls(name)
-            registry[key] = instance
-            return instance
-    
     def __init__(self, name: str):
         super().__init__(name)
-        self.drugs = PersistentList()
-        self.__class__._instances.append(self)
+        self.drugs = []
 
     @classmethod
     def get_all_instances(cls):
@@ -256,13 +170,14 @@ class MedicationRegimen(Treatment):
         self.drugs.append((drug, annual_patient_con))
 
     def to_dict(self):
-        return {
-            'name': self.name,
+        base = super().to_dict()
+        base.update({
             'drugs': [{
                 'drug': drug.to_dict(),
                 'annual_patient_con': annual_patient_con,
             } for drug, annual_patient_con in self.drugs]
-        }
+        })
+        return base
     
     def __repr__(self):
         return f"\nMedicationRegimen('{self.name}')"
@@ -274,19 +189,12 @@ class AlternativeTreatments(Treatment):
         alternatives (list): A list of treatments considered as alternatives.
         rates (list): A list of rates corresponding to the treatments.
     """
-
-    _instances = []
+    unique_fields = ['combined_name']
     @classmethod
-    def get_or_create(cls, *alternatives: Treatment, rates: list=None):
+    def generate_id(cls, **kwargs):
+        alternatives = kwargs.get('alternatives', [])
         combined_name = " / ".join(treatment.name for treatment in alternatives)
-        registry = RegistryManager().get_registry('treatment_registry')
-        key = (cls.__name__, combined_name)
-        if key in registry:
-            return registry[key]
-        else:
-            instance = cls(*alternatives, rates=rates)
-            registry[key] = instance
-            return instance
+        return hashlib.sha256(combined_name.encode('utf-8')).hexdigest()
 
     def __init__(self, *alternatives: Treatment, rates: list=None):
         """Initializes an instance of AlternativeTreatments with multiple alternative treatments.
@@ -300,9 +208,6 @@ class AlternativeTreatments(Treatment):
             ValueError: If no alternatives are provided.
             ValueError: If the length of rates does not match the number of provided alternatives.
         """
-        if hasattr(self, '_initialized') and self._initialized:
-            return  # Avoid re-initialization if already initialized
-        self._initialized = True
         if alternatives is None:
             raise ValueError('At least one treatment must be provided for a AlternativeTreatments.')
         
@@ -315,18 +220,13 @@ class AlternativeTreatments(Treatment):
         if len(rates) != len(alternatives):
             raise ValueError('The number of rates must match the number of treatments.')
         
-        self.alternatives = PersistentList(zip(alternatives, rates))
-        self.name = " / ".join(treatment.name for treatment in alternatives)
-        super().__init__(self.name)
-        self.__class__._instances.append(self)
-
-    @classmethod
-    def get_all_instances(cls):
-        return cls._instances
+        self.alternatives = list(zip(alternatives, rates))
+        combined_name = " / ".join(treatment.name for treatment in alternatives)
+        super().__init__(combined_name)
     
     def to_dict(self):
-        return {
-            'name': self.name,
+        base = super().to_dict()
+        base.update({
             'alternatives': [
                 {
                     'treatment': t.to_dict(),
@@ -334,12 +234,12 @@ class AlternativeTreatments(Treatment):
                 }
                 for t, rate in self.alternatives
             ]
-        }
+        })
     
     def __repr__(self):
         return f"\nAlternative Treatments('{self.name}')"
     
-class Patient(Persistent):
+class Patient(BaseModel):
     """Represents a patient group with characteristics, treatments, and relationships to other patient groups.
 
     Attributes:
@@ -348,7 +248,11 @@ class Patient(Persistent):
         treatments (list): A list of treatments applied to the patient group.
         next_groups (list): A list of child patient groups representing evolution from this group.
     """
-
+    @classmethod
+    def unique_key_from_kwargs(cls, size, chars, **kwargs):
+        char_list = [(char.name, s, r) for char, s, r in chars]
+        return f"{char_list}-{round(size, 2)}"
+    
     _instances = []
     def __init__(self,size: float, char: Characteristic=None, chars: list=None, treatments: list=None):
         """Initializes a Patient group.
@@ -365,49 +269,15 @@ class Patient(Persistent):
         if size <= 0:
             raise ValueError("Size must be greater than zero.")
 
-        self.chars = PersistentList()
         self.size = size
         if chars:
-            self.chars.extend(chars)
+            self.chars = chars
         elif char:
-            self.chars.append((char, self.size, 1)) # List of a tuple (char, size, rate)
+            self.chars = [(char, size, 1)] # List of a tuple (char, size, rate)
         else:
             raise ValueError("Either 'char' or 'chars' must be provided")
-        self.treatments = PersistentList(treatments) if treatments else PersistentList()
-        self.__class__._instances.append(self)
-
-    @classmethod
-    def get_all_instances(cls):
-        return cls._instances
-
-    def register_patient(self):
-        registry = RegistryManager().get_registry('patient_registry')
-        existing_patient = self._find_patient(registry)
-        if existing_patient:
-            print(f"A patient group with characteristics {self.get_char_names()} already exists.")
-            print("Please consider changing the characteristic or editing the rate/size of the patient group.")
-        else:
-            registry[self._get_hash()] = self
-        
-    def _get_hash(self):
-        """Generates a hash based on patient characteristics and size.
-
-        Returns:
-            int: A unique hash representing the patient.
-        """
-
-        chars_tuple = tuple((char.name, size, rate) for char, size, rate in self.chars)
-        data = f'{chars_tuple}-{round(self.size, 2)}'
-        hash_obj = hashlib.sha256(data.encode('utf-8'))
-        return hash_obj.hexdigest()
-
-    def _find_patient(self, registry):
-        """Finds an existing patient group with the same characteristics and size.
-
-        Returns:
-            Patient or None: The existing patient group if found, otherwise None.
-        """
-        return registry.get(self._get_hash(), None)
+        self.treatments = treatments if treatments is not None else []
+        self._id = None
 
     def add_characteristic(self, char: Characteristic, rate: float=1.0):
         """Adds one or more characteristics to the patient group, creating a new group.
@@ -436,7 +306,6 @@ class Patient(Persistent):
         """
         return any(char_entry[0] == char for char_entry, _, _ in self.chars)
     
-
     def get_char_names(self) -> list:
         """Gets the names of all characteristics of the patient group.
 
@@ -475,8 +344,12 @@ class Patient(Persistent):
         new_patient = self._new_patient(char, rate, branch_point)
         return new_patient
         
-    def _new_patient(self, new_char: Characteristic, 
-                     rate: float, branch_point: Characteristic=None):
+    def _new_patient(
+            self,
+            new_char: Characteristic, 
+            rate: float,
+            branch_point: Characteristic=None
+            ):
         if branch_point is not None:
             try:
                 branch_index = next(
@@ -508,7 +381,7 @@ class Patient(Persistent):
     def __repr__(self):
         return f"\nPatient(chars={self.get_char_names()}, Size={self.size}"
 
-class FollowUp(Persistent):
+class FollowUp(BaseModel):
     """Represents follow-up data for a patient group after receiving treatment.
 
     Attributes:
@@ -517,19 +390,14 @@ class FollowUp(Persistent):
         os (float): The overall survival rate after treatment.
         new_patient (Patient): The new patient group after adding the follow-up characteristic.
     """
-
-    _instances = []
-    def __new__(cls, patient: Patient=None, overall_survival: float=None):
-        if patient is None or overall_survival is None:
-            return super().__new__(cls)
-        registry = RegistryManager().get_registry('followup_registry')
-        key = (patient._get_hash(), overall_survival)
-        if key in registry:
-            return registry[key]
-        else:
-            instance = super().__new__(cls)
-            registry[key] = instance
-            return instance
+    @classmethod
+    def unique_key_from_kwargs(cls, patient, overall_survival, **kwargs):
+        patient_id = (
+            patient._id 
+            if hasattr(patient, '_id') and patient._id
+            else patient.to_dict().get('id', 'unknown')
+        )
+        return f"{patient_id}-{overall_survival}"
         
     def __init__(self, patient: Patient, overall_survival: float):
         """Initializes a FollowUp instance.

@@ -9,11 +9,15 @@ class BaseModel:
         """
         Generates a unique_id based on the values of the unique_fields.
         """
-        key_data = {
-            field: kwargs[field] for field in cls.unique_fields if field in kwargs
-        }
-        key = json.dumps(key_data)
-        return hashlib.sha256(key.encode('utf-8')).hexdigest()
+        if hasattr(cls, 'unique_key_from_kwargs'):
+            unique_str = cls.unique_key_from_kwargs(**kwargs)
+        else:
+            key_data = {
+                field: kwargs[field]
+                for field in cls.unique_fields if field in kwargs
+            }
+            unique_str = json.dumps(key_data)
+        return hashlib.sha256(unique_str.encode('utf-8')).hexdigest()
     
     @classmethod
     def get_collection_name(cls):
@@ -23,7 +27,7 @@ class BaseModel:
         return cls.__name__.lower() + 's'
     
     @classmethod
-    def get_create(cls, **kwargs):
+    def get_or_create(cls, **kwargs):
         """
         Checks if an instance exists in MongoDB based on its unique key.
         If it exists, returns an instance created from the document.
