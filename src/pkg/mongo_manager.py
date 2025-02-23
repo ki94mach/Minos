@@ -27,7 +27,7 @@ class MongoManager:
     def find_patient(self, query={}):
         """Find patients matching a query"""
         collection = self.get_collection('patients')
-        return list(collection.find(query))    
+        return list(collection.find( query))    
 
     def delete_patient(self, patient_id):
         """Delete a patient by ID"""
