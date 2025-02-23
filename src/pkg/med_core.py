@@ -1,5 +1,4 @@
 from persistent.list import PersistentList
-from pkg.ZODB_manager import RegistryManager
 from persistent import Persistent
 import re
 import hashlib

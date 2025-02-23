@@ -39,6 +39,6 @@ class MongoManager:
             logging.warning(f'Patient {patient_id} not found in MongoDB.')    
 
     def close(self):
-        """Close MOngoDB connection."""
+        """Close MongoDB connection."""
         self.client.close()
         logging.info('MongoDB connection closed.')
