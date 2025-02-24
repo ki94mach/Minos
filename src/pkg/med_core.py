@@ -170,6 +170,7 @@ class MedicationRegimen(Treatment):
             annual_patient_con (int): The annual consumption of the drug per patient.
         """
         self.drugs.append((drug, annual_patient_con))
+        self.save()
 
     def to_dict(self):
         base = super().to_dict()
@@ -259,12 +260,16 @@ class AlternativeTreatments(Treatment):
     @classmethod
     def from_dict(cls, document):
         instance = super(AlternativeTreatments, cls).from_dict(document)
-        alts_list = document.get('a;ternatives', [])
+        alts_list = document.get('alternatives', [])
         new_alts = []
         for item in alts_list:
-            treatment_dict = item.get('treatment')
+            treatment_data = item.get('treatment')
             rate = item.get('rate')
-            treatment_obj = Treatment.from_dict(treatment_dict)
+            if isinstance(treatment_data, dict):
+                treatment_obj = Treatment.from_dict(treatment_data)
+            else:
+                # If it's not a dict, assume it's just a treatment name.
+                treatment_obj = Treatment(treatment_data)
             new_alts.append((treatment_obj, rate))
         instance.alternatives = new_alts
         return instance
@@ -385,6 +390,7 @@ class Patient(BaseModel):
         if not (0 < rate <= 1):
             raise ValueError('Rate must be between 0 and 1')
         new_patient = self._new_patient(char, rate, branch_point)
+        new_patient.save()
         return new_patient
         
     def _new_patient(

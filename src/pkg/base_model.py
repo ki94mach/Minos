@@ -6,6 +6,12 @@ from pkg.mongo_manager import MongoManager
 class BaseModel:
     unique_fields = []
 
+    def __setattr__(self, key, value):
+        object.__setattr__(self, key, value)
+        if not self.__dict__.get('_rehydrating', False):
+            if key != "_id" and self.__dict__.get("_id") is not None:
+                self.save()
+
     @classmethod
     def generate_id(cls, **kwargs):
         """
@@ -31,8 +37,9 @@ class BaseModel:
     @classmethod
     def from_dict(cls, document: dict):
         instance = cls.__new__(cls)
-        for key, value in document.items():
-            setattr(instance, key, value)
+        # Update the instance's __dict__ directly to avoid __setattr__ side effects
+        instance.__dict__.update(document)
+        instance.__dict__['_rehydrating'] = False
         return instance
     
     @classmethod
