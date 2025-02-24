@@ -35,8 +35,8 @@ class BaseModel:
         """
         instance_id = cls.generate_id(**kwargs)
         mongo_manager = MongoManager()
-        collection = mongo_manager.get_collection(cls.get_collection_name)
-        document = collection.find_one({'id': instance_id})
+        collection = mongo_manager.get_collection(cls.get_collection_name())
+        document = collection.find_one({'_id': instance_id})
         if document:
             document.pop('_id', None)
             instance = cls(**document)

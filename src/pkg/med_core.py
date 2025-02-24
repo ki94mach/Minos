@@ -10,6 +10,7 @@ class Characteristic(BaseModel):
         name (str): The name of the characteristic (e.g., Lung Cancer, KRAS G12C).
     """
     unique_fields = ['type', 'name']
+    _instances = []
         
     def __init__(self, type: str, name: str):
         self._type = self._title_with_exception(type)
@@ -66,6 +67,7 @@ class Drug(BaseModel):
     """
 
     unique_fields = ['name', 'strength']
+    _instances = []
 
     def __init__(self, name: str, strength: str):
         self._name = self._title_with_exception(name)
@@ -133,9 +135,11 @@ class Treatment(BaseModel):
         alts (list): A list of alternative treatments represented as tuples (Treatment, rate).
     """
     unique_fields = ['name']
-            
+    _instances = []
+
     def __init__(self, name: str):
         self.name = name
+        self.__class__._instances.append(self)
 
     def to_dict(self):
         return {
@@ -151,10 +155,9 @@ class MedicationRegimen(Treatment):
     Attributes:
         drugs (list): A list of drugs included in the treatment, represented as tuples (Drug, annual_patient_con).
     """
-
-    def __init__(self, name: str):
+    def __init__(self, name: str, drugs=None, **kwargs):
         super().__init__(name)
-        self.drugs = []
+        self.drugs = drugs if drugs is not None else []
 
     @classmethod
     def get_all_instances(cls):
@@ -196,7 +199,7 @@ class AlternativeTreatments(Treatment):
         combined_name = " / ".join(treatment.name for treatment in alternatives)
         return hashlib.sha256(combined_name.encode('utf-8')).hexdigest()
 
-    def __init__(self, *alternatives: Treatment, rates: list=None):
+    def __init__(self, alternatives: Treatment, rates: list=None):
         """Initializes an instance of AlternativeTreatments with multiple alternative treatments.
 
         Args:
@@ -235,6 +238,7 @@ class AlternativeTreatments(Treatment):
                 for t, rate in self.alternatives
             ]
         })
+        return base
     
     def __repr__(self):
         return f"\nAlternative Treatments('{self.name}')"
