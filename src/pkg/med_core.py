@@ -194,6 +194,10 @@ class MedicationRegimen(Treatment):
         instance.drugs = new_drugs
         return instance
     
+    @classmethod
+    def get_collection_name(cls):
+        return 'treatments'
+    
     def __repr__(self):
         return f"\nMedicationRegimen('{self.name}')"
 
@@ -264,6 +268,10 @@ class AlternativeTreatments(Treatment):
             new_alts.append((treatment_obj, rate))
         instance.alternatives = new_alts
         return instance
+    
+    @classmethod
+    def get_collection_name(cls):
+        return 'treatments'
     
     def __repr__(self):
         return f"\nAlternative Treatments('{self.name}')"
