@@ -40,14 +40,14 @@ const Patients: React.FC = () => {
         (connection: Edge | Connection) => setEdges((eds) => addEdge(connection, eds)),
         [setEdges]
     );
-    const populations = [
-        "Iran Population",
-        "Tehran Population",
-        "Mashhad Population",
-        "Shiraz Population",
-        "Tabriz Population",
-        "Custom Population"
-    ]
+    const populations = {
+        "Iran Population": 90000000,
+        "Tehran Population": 9000000,
+        "Mashhad Population": 3000000,
+        "Shiraz Population": 2000000,
+        "Tabriz Population": 1600000,
+        "Custom Population": null
+    };
     const [selectedPopulations, setSelectedPopulations] = useState<string>("");
     const [customPopulationNumber, setCustomPopulationNumber] = useState<string>("");
     const [primaryIndications, setPrimaryIndications] = useState<string[]>([]);
@@ -76,19 +76,20 @@ const Patients: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         let finalPopulation = selectedPopulation;
+        let populationNumber = populations[selectedPopulation as keyof typeof populations];
         if (selectedPopulation === "Custom Population") {
             if (!customPopulationNumber) {
                 alert("Please enter a custom population number.");
                 return;
             }
-            finalPopulation = `Custom Population - ${customPopulationNumber}`;
+            populationNumber = Number(customPopulationNumber);
         }
 
-        alert(`Population Selected: ${finalPopulation}`);
+        // alert(`Population Selected: ${finalPopulation}`);
 
         try {
             await axios.post("http://localhost:3000/patients", {
-                population: finalPopulation,
+                population: populationNumber,
                 primary_indication: selectedPrimaryIndication,
                 char_type: selectedCharType,
                 char_name: selectedCharName,
@@ -120,7 +121,7 @@ const Patients: React.FC = () => {
                                         onChange={(e) => setSelectedPopulation(e.target.value)}
                                         label="Population"
                                     >
-                                        {populations.map((pop) => (
+                                        {Object.keys(populations).map((pop) => (
                                             <MenuItem key={pop} value={pop}>{pop}</MenuItem>
                                         ))}
                                     </Select>
@@ -205,8 +206,8 @@ const Patients: React.FC = () => {
                     onConnect={onConnect}
                     fitView
                 >
-                    <MiniMap/>
-                    <Controls/>
+                    {/*<MiniMap/>*/}
+                    {/*<Controls/>*/}
                     <Background gap={12} size={1}/>
                 </ReactFlow>
             </div>
