@@ -10,12 +10,10 @@ class Characteristic(BaseModel):
         name (str): The name of the characteristic (e.g., Lung Cancer, KRAS G12C).
     """
     unique_fields = ['type', 'name']
-    _instances = []
         
     def __init__(self, type: str, name: str):
         self._type = self._title_with_exception(type)
         self._name = self._title_with_exception(name)
-        self.__class__._instances.append(self)
     
     @staticmethod
     def _title_with_exception(value: str) -> str:
@@ -45,15 +43,19 @@ class Characteristic(BaseModel):
     def name(self, value:str):
         self._name = self._title_with_exception(value)
 
-    @classmethod
-    def get_all_instances(cls):
-        return cls._instances
     
     def to_dict(self):
         return {
             'type': self._type,
             'name': self._name,
         }
+    
+    @classmethod
+    def from_dict(cls, document: dict):
+        instance = cls.__new__(cls)
+        instance._type = document.get('type')
+        instance._name = document.get('name')
+        return instance
     
     def __repr__(self):
         return f"\nCharacteristic('type: {self.type}, name: {self.name}')"
@@ -67,16 +69,11 @@ class Drug(BaseModel):
     """
 
     unique_fields = ['name', 'strength']
-    _instances = []
 
     def __init__(self, name: str, strength: str):
         self._name = self._title_with_exception(name)
         self._strength = strength
-        self.__class__._instances.append(self)
     
-    @classmethod
-    def get_all_instances(cls):
-        return cls._instances
     
     @staticmethod
     def _title_with_exception(value: str) -> str:
@@ -124,6 +121,13 @@ class Drug(BaseModel):
             'strength': self._strength,
         }
     
+    @classmethod
+    def from_dict(cls, document: dict):
+        instance = cls.__new__(cls)
+        instance._name = document.get('name')
+        instance._strength = document.get('strength')
+        return instance
+    
     def __repr__(self):
         return f"Drug('{self.name}', strength='{self.strength}')"
 
@@ -135,11 +139,9 @@ class Treatment(BaseModel):
         alts (list): A list of alternative treatments represented as tuples (Treatment, rate).
     """
     unique_fields = ['name']
-    _instances = []
 
     def __init__(self, name: str):
         self.name = name
-        self.__class__._instances.append(self)
 
     def to_dict(self):
         return {
@@ -159,9 +161,6 @@ class MedicationRegimen(Treatment):
         super().__init__(name)
         self.drugs = drugs if drugs is not None else []
 
-    @classmethod
-    def get_all_instances(cls):
-        return cls._instances
     
     def add_drug(self, drug: Drug, annual_patient_con: int):
         """Adds a drug to the treatment.
@@ -181,6 +180,19 @@ class MedicationRegimen(Treatment):
             } for drug, annual_patient_con in self.drugs]
         })
         return base
+    
+    @classmethod
+    def from_dict(cls, document: dict):
+        instance = super(MedicationRegimen, cls).from_dict(document)
+        drugs_list = document.get('drugs', [])
+        new_drugs = []
+        for item in drugs_list:
+            drug_dict = item.get('drug')
+            annual_patient_con = item.get('annual_patient_con')
+            drug_obj = Drug.from_dict(drug_dict)
+            new_drugs.append((drug_obj, annual_patient_con))
+        instance.drugs = new_drugs
+        return instance
     
     def __repr__(self):
         return f"\nMedicationRegimen('{self.name}')"
@@ -240,6 +252,19 @@ class AlternativeTreatments(Treatment):
         })
         return base
     
+    @classmethod
+    def from_dict(cls, document):
+        instance = super(AlternativeTreatments, cls).from_dict(document)
+        alts_list = document.get('a;ternatives', [])
+        new_alts = []
+        for item in alts_list:
+            treatment_dict = item.get('treatment')
+            rate = item.get('rate')
+            treatment_obj = Treatment.from_dict(treatment_dict)
+            new_alts.append((treatment_obj, rate))
+        instance.alternatives = new_alts
+        return instance
+    
     def __repr__(self):
         return f"\nAlternative Treatments('{self.name}')"
     
@@ -258,7 +283,13 @@ class Patient(BaseModel):
         return f"{char_list}-{round(size, 2)}"
     
     _instances = []
-    def __init__(self,size: float, char: Characteristic=None, chars: list=None, treatments: list=None):
+    def __init__(
+            self,
+            size: float,
+            char: Characteristic=None,
+            chars: list=None,
+            treatments: list=None
+            ):
         """Initializes a Patient group.
 
          Args:
@@ -382,6 +413,28 @@ class Patient(BaseModel):
             'treatments': [t.to_dict() for t in self.treatments]
         }
     
+    @classmethod
+    def from_dict(cls, document):
+        instance = cls.__new__(cls)
+        instance.size = document.get('size')
+        chars_list = document.get('chars', [])
+        new_chars = []
+        for item in chars_list:
+            char_data = item.get('characteristic')
+            size = item.get('size')
+            rate = item.get('rate')
+            char_obj = Characteristic.from_dict(char_data)
+            new_chars.append((char_obj, size, rate))
+        instance.chars = new_chars
+        treatments_list = document.get('treatments', [])
+        new_treatments = []
+        for t in treatments_list:
+            t_obj = Treatment.from_dict(t)
+            new_treatments.append(t_obj)
+        instance.treatments = new_treatments
+        instance._id = document.get('_id')
+        return instance
+
     def __repr__(self):
         return f"\nPatient(chars={self.get_char_names()}, Size={self.size}"
 
@@ -414,11 +467,6 @@ class FollowUp(BaseModel):
         self._patient = patient
         self.treatment = FollowUp._get_latest_treatment(self._patient)
         self.os = overall_survival
-        self.__class__._instances.append(self)
-
-    @classmethod
-    def get_all_instances(cls):
-        return cls._instances
 
     @property
     def patient(self):
@@ -475,6 +523,16 @@ class FollowUp(BaseModel):
             'patient': self.patient.to_dict(),
             'overall_survival': self.os,
         }
+    
+    @classmethod
+    def from_dict(cls, document):
+        instance = cls.__new__(cls)
+        patient_data = document.get('patient')
+        instance._patient = Patient.from_dict(patient_data)
+        instance.os = document.get('overall_survival')
+        instance.treatment = FollowUp._get_latest_treatment(instance._patient)
+        instance._id = document.get('_id')
+        return instance
     
     def __repr__(self):
         """Provides a string representation of the FollowUp instance.

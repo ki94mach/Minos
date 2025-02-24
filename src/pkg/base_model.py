@@ -1,6 +1,8 @@
 import json
 import hashlib
 from pkg.mongo_manager import MongoManager
+
+
 class BaseModel:
     unique_fields = []
 
@@ -27,6 +29,13 @@ class BaseModel:
         return cls.__name__.lower() + 's'
     
     @classmethod
+    def from_dict(cls, document: dict):
+        instance = cls.__new__(cls)
+        for key, value in document.items():
+            setattr(instance, key, value)
+        return instance
+    
+    @classmethod
     def get_or_create(cls, **kwargs):
         """
         Checks if an instance exists in MongoDB based on its unique key.
@@ -35,11 +44,12 @@ class BaseModel:
         """
         instance_id = cls.generate_id(**kwargs)
         mongo_manager = MongoManager()
-        collection = mongo_manager.get_collection(cls.get_collection_name())
+        collection = mongo_manager.get_collection(
+            cls.get_collection_name()
+            )
         document = collection.find_one({'_id': instance_id})
         if document:
-            document.pop('_id', None)
-            instance = cls(**document)
+            instance = cls.from_dict(document)
             instance._id = instance_id
             return instance
         else:
@@ -49,3 +59,9 @@ class BaseModel:
             doc['_id'] = instance_id
             collection.insert_one(doc)
             return instance
+        
+    def save(self):
+        mongo_manager = MongoManager()
+        doc = self.to_dict()
+        doc['_id'] = self._id
+        mongo_manager.insert_update(self._id, self.get_collection_name(), doc)
