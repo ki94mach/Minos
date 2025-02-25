@@ -1,6 +1,9 @@
+# Minos/src/pkg/base_model.py
 import json
 import hashlib
 from pkg.mongo_manager import MongoManager
+from bson.objectid import ObjectId
+
 
 
 class BaseModel:
@@ -11,21 +14,6 @@ class BaseModel:
         if not self.__dict__.get('_rehydrating', False):
             if key != "_id" and self.__dict__.get("_id") is not None:
                 self.save()
-
-    @classmethod
-    def generate_id(cls, **kwargs):
-        """
-        Generates a unique_id based on the values of the unique_fields.
-        """
-        if hasattr(cls, 'unique_key_from_kwargs'):
-            unique_str = cls.unique_key_from_kwargs(**kwargs)
-        else:
-            key_data = {
-                field: kwargs[field]
-                for field in cls.unique_fields if field in kwargs
-            }
-            unique_str = json.dumps(key_data)
-        return hashlib.sha256(unique_str.encode('utf-8')).hexdigest()
     
     @classmethod
     def get_collection_name(cls):
@@ -49,7 +37,7 @@ class BaseModel:
         If it exists, returns an instance created from the document.
         If not, creates a new instance, saves it, and returns it.
         """
-        instance_id = cls.generate_id(**kwargs)
+        instance_id = ObjectId()
         mongo_manager = MongoManager()
         collection = mongo_manager.get_collection(
             cls.get_collection_name()
