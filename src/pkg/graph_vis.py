@@ -4,7 +4,6 @@ from networkx.drawing.nx_agraph import graphviz_layout
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from collections import deque
-from pkg.ZODB_manager import RegistryManager
 
 class GraphVisualizer:
     def __init__(self):

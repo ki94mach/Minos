@@ -1,7 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from pkg.utils import commit
 from pkg.med_core import Patient, Characteristic, Drug, Treatment, MedicationRegimen, AlternativeTreatments, FollowUp
-from pkg.ZODB_manager import RegistryManager
 from pkg.graph_vis import GraphVisualizer
 
 main = Blueprint('main', __name__)

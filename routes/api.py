@@ -1,22 +1,207 @@
 # routes/api.py
 from flask import Blueprint, jsonify, request
 import logging
-from models.patient.driver import PatientDriver
-from models.characteristic.driver import Characteristic
-from models.drug.driver import DrugDriver
-from models.treatment.driver import TreatmentDriver
-from models.followup.driver import FollowupDriver
 
+# Import driver classes from the appropriate directories
+from models.characteristic.driver import CharacteristicDriver
+from models.drug.driver import DrugDriver
+from models.followup.driver import FollowupDriver
+from models.patient.driver import PatientDriver
+from models.treatment.driver import TreatmentDriver
+
+# Also import model classes from tables for creating new instances.
+from models.tables import Characteristic, Drug, Followup, Treatment, Patient
 
 api_blueprint = Blueprint('api', __name__)
 
 
+# --------------------------------------------------
+# Characteristic Endpoints
+# --------------------------------------------------
+@api_blueprint.route('/characteristics', methods=['GET'])
+def get_characteristics():
+    try:
+        characteristics = CharacteristicDriver.find()
+        data = [char.to_json() for char in characteristics]
+        return jsonify(data), 200
+    except Exception as e:
+        logging.error(f"Error fetching characteristics: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/characteristics', methods=['POST'])
+def create_characteristic():
+    try:
+        data = request.get_json()
+        # Expect JSON payload with keys "type" and "name"
+        char_type = data.get('type')
+        name = data.get('name')
+        if not char_type or not name:
+            return jsonify({'error': 'Missing required fields: type and name'}), 400
+
+        # Create a new Characteristic instance
+        char = Characteristic(char_type=char_type, name=name)
+        char_id = CharacteristicDriver.insert(char)
+        return jsonify({'id': str(char_id)}), 201
+    except Exception as e:
+        logging.error(f"Error creating characteristic: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/characteristics/<char_id>', methods=['PUT'])
+def update_characteristic(char_id):
+    try:
+        data = request.get_json()
+        char = CharacteristicDriver.find(id=char_id).first()
+        if not char:
+            return jsonify({'error': 'Characteristic not found'}), 404
+
+        if 'type' in data:
+            char.char_type = data['type']
+        if 'name' in data:
+            char.name = data['name']
+        CharacteristicDriver.update(char)
+        return jsonify({'message': 'Characteristic updated'}), 200
+    except Exception as e:
+        logging.error(f"Error updating characteristic: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/characteristics/<char_id>', methods=['DELETE'])
+def delete_characteristic(char_id):
+    try:
+        CharacteristicDriver.delete(char_id)
+        return jsonify({'message': 'Characteristic deleted'}), 200
+    except Exception as e:
+        logging.error(f"Error deleting characteristic: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# --------------------------------------------------
+# Drug Endpoints
+# --------------------------------------------------
+@api_blueprint.route('/drugs', methods=['GET'])
+def get_drugs():
+    try:
+        drugs = DrugDriver.find()
+        data = [drug.to_json() for drug in drugs]
+        return jsonify(data), 200
+    except Exception as e:
+        logging.error(f"Error fetching drugs: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/drugs', methods=['POST'])
+def create_drug():
+    try:
+        data = request.get_json()
+        name = data.get('name')
+        strength = data.get('strength')
+        if not name or not strength:
+            return jsonify({'error': 'Missing required fields: name and strength'}), 400
+
+        drug = Drug(name=name, strength=strength)
+        drug_id = DrugDriver.insert(drug)
+        return jsonify({'id': str(drug_id)}), 201
+    except Exception as e:
+        logging.error(f"Error creating drug: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/drugs/<drug_id>', methods=['PUT'])
+def update_drug(drug_id):
+    try:
+        data = request.get_json()
+        drug = DrugDriver.find(id=drug_id).first()
+        if not drug:
+            return jsonify({'error': 'Drug not found'}), 404
+
+        if 'name' in data:
+            drug.name = data['name']
+        if 'strength' in data:
+            drug.strength = data['strength']
+        DrugDriver.update(drug)
+        return jsonify({'message': 'Drug updated'}), 200
+    except Exception as e:
+        logging.error(f"Error updating drug: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/drugs/<drug_id>', methods=['DELETE'])
+def delete_drug(drug_id):
+    try:
+        DrugDriver.delete(drug_id)
+        return jsonify({'message': 'Drug deleted'}), 200
+    except Exception as e:
+        logging.error(f"Error deleting drug: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# --------------------------------------------------
+# Treatment Endpoints
+# --------------------------------------------------
+@api_blueprint.route('/treatments', methods=['GET'])
+def get_treatments():
+    try:
+        treatments = TreatmentDriver.find()
+        data = [treatment.to_json() for treatment in treatments]
+        return jsonify(data), 200
+    except Exception as e:
+        logging.error(f"Error fetching treatments: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/treatments', methods=['POST'])
+def create_treatment():
+    try:
+        data = request.get_json()
+        name = data.get('name')
+        if not name:
+            return jsonify({'error': 'Missing required field: name'}), 400
+
+        treatment = Treatment(name=name)
+        treatment_id = TreatmentDriver.insert(treatment)
+        return jsonify({'id': str(treatment_id)}), 201
+    except Exception as e:
+        logging.error(f"Error creating treatment: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/treatments/<treatment_id>', methods=['PUT'])
+def update_treatment(treatment_id):
+    try:
+        data = request.get_json()
+        treatment = TreatmentDriver.find(id=treatment_id).first()
+        if not treatment:
+            return jsonify({'error': 'Treatment not found'}), 404
+
+        if 'name' in data:
+            treatment.name = data['name']
+        # Additional fields for drugs or alternatives can be handled here.
+        TreatmentDriver.update(treatment)
+        return jsonify({'message': 'Treatment updated'}), 200
+    except Exception as e:
+        logging.error(f"Error updating treatment: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/treatments/<treatment_id>', methods=['DELETE'])
+def delete_treatment(treatment_id):
+    try:
+        TreatmentDriver.delete(treatment_id)
+        return jsonify({'message': 'Treatment deleted'}), 200
+    except Exception as e:
+        logging.error(f"Error deleting treatment: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# --------------------------------------------------
+# Patient Endpoints
+# --------------------------------------------------
 @api_blueprint.route('/patients', methods=['GET'])
 def get_patients():
     try:
-        # Retrieve all patients using the driver
         patients = PatientDriver.find()
-        # MongoEngine documents have a built-in to_json method
         data = [patient.to_json() for patient in patients]
         return jsonify(data), 200
     except Exception as e:
@@ -27,26 +212,25 @@ def get_patients():
 @api_blueprint.route('/patients', methods=['POST'])
 def create_patient():
     try:
-        # Parse JSON payload from the client
         data = request.get_json()
         size = data.get('size')
-        char_data = data.get('characteristic')  # Expected to be a dict with 'type' and 'name'
+        # Expect a characteristic as a dict (with keys "type" and "name") for the initial patient characteristic.
+        char_data = data.get('characteristic')
         if not size or not char_data:
             return jsonify({'error': 'Missing required fields: size and characteristic'}), 400
 
-        # Create a characteristic document first
+        # Create a characteristic using its driver (if needed)
         char = Characteristic(char_type=char_data.get('type'), name=char_data.get('name'))
-        char.save()
+        char_id = CharacteristicDriver.insert(char)
 
-        # Create the patient document. For simplicity, we embed the characteristic
-        # Note: In your MongoEngine models for Patient, you defined an EmbeddedDocument for characteristics.
-        # Here we build a minimal embedded document dictionary.
+        # Build the patient document. The embedded characteristic is represented as a dict.
+        # You might need to adjust this based on your Patient model design.
         patient = Patient(
             size=size,
-            chars=[{'embedded': {'char_type': char.char_type, 'name': char.name, 'size': size, 'rate': 1.0}}]
+            chars=[{'characteristic': {'char_type': char.char_type, 'name': char.name, 'size': size, 'rate': 1.0}}]
         )
-        PatientDriver.insert(patient)
-        return jsonify({'id': str(patient.id)}), 201
+        patient_id = PatientDriver.insert(patient)
+        return jsonify({'id': str(patient_id)}), 201
     except Exception as e:
         logging.error(f"Error creating patient: {e}")
         return jsonify({'error': str(e)}), 500
@@ -56,16 +240,13 @@ def create_patient():
 def update_patient(patient_id):
     try:
         data = request.get_json()
-        # Retrieve the existing patient
         patient = PatientDriver.find(id=patient_id).first()
         if not patient:
             return jsonify({'error': 'Patient not found'}), 404
 
-        # Update fields as needed; for example, update size.
         if 'size' in data:
             patient.size = data['size']
-        # If you need to update embedded characteristics or treatments, add additional logic here.
-
+        # Additional logic to update embedded characteristics or treatments can be added here.
         PatientDriver.update(patient)
         return jsonify({'message': 'Patient updated'}), 200
     except Exception as e:
@@ -80,4 +261,64 @@ def delete_patient(patient_id):
         return jsonify({'message': 'Patient deleted'}), 200
     except Exception as e:
         logging.error(f"Error deleting patient: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# --------------------------------------------------
+# Followup Endpoints
+# --------------------------------------------------
+@api_blueprint.route('/followups', methods=['GET'])
+def get_followups():
+    try:
+        followups = FollowupDriver.find()
+        data = [followup.to_json() for followup in followups]
+        return jsonify(data), 200
+    except Exception as e:
+        logging.error(f"Error fetching followups: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/followups', methods=['POST'])
+def create_followup():
+    try:
+        data = request.get_json()
+        patient_id = data.get('patient_id')
+        overall_survival = data.get('overall_survival')
+        if patient_id is None or overall_survival is None:
+            return jsonify({'error': 'Missing required fields: patient_id and overall_survival'}), 400
+
+        followup = Followup(patient_id=patient_id, overall_survival=overall_survival)
+        followup_id = FollowupDriver.insert(followup)
+        return jsonify({'id': str(followup_id)}), 201
+    except Exception as e:
+        logging.error(f"Error creating followup: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/followups/<followup_id>', methods=['PUT'])
+def update_followup(followup_id):
+    try:
+        data = request.get_json()
+        followup = FollowupDriver.find(id=followup_id).first()
+        if not followup:
+            return jsonify({'error': 'Followup not found'}), 404
+
+        if 'patient_id' in data:
+            followup.patient_id = data['patient_id']
+        if 'overall_survival' in data:
+            followup.overall_survival = data['overall_survival']
+        FollowupDriver.update(followup)
+        return jsonify({'message': 'Followup updated'}), 200
+    except Exception as e:
+        logging.error(f"Error updating followup: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/followups/<followup_id>', methods=['DELETE'])
+def delete_followup(followup_id):
+    try:
+        FollowupDriver.delete(followup_id)
+        return jsonify({'message': 'Followup deleted'}), 200
+    except Exception as e:
+        logging.error(f"Error deleting followup: {e}")
         return jsonify({'error': str(e)}), 500
