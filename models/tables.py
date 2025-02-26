@@ -123,7 +123,7 @@ class Node(EmbeddedDocument):
     characteristic_data = EmbeddedDocumentField(CharacteristicEmbedded, required=False)
 
     # Allow a node to have children to form a recursive tree.
-    children = ListField(EmbeddedDocumentField('TreeNode'))
+    children = ListField(EmbeddedDocumentField('Node'))
 
 
 # =============================================================================
