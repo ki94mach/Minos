@@ -1,14 +1,7 @@
-# driver.py
 import logging
-from ..tables import (
-    Characteristic,
-    Drug,
-    Followup,
-    Treatment,
-    Patient
-)
+from ..tables import PatientTree as Patient
 
-# Driver for Patient collection
+
 class PatientDriver:
     @staticmethod
     def insert(patient: Patient):
@@ -40,6 +33,3 @@ class PatientDriver:
             logging.info(f"Deleted Patient with id: {patient_id}")
         else:
             logging.warning(f"Patient with id: {patient_id} not found.")
-
-
-

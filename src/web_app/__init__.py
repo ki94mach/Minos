@@ -8,7 +8,7 @@ from routes.api import api_blueprint
 def create_app():
     app = Flask(__name__)
 
-    app.config['SECRET_KEY'] = '579e4593ab7d119e814e5b1dcd48d26cfd4341802a89750f2324359a12db8a8e'
+    # app.config['SECRET_KEY'] = '579e4593ab7d119e814e5b1dcd48d26cfd4341802a89750f2324359a12db8a8e'
 
     # Load configuration (you can also use app.config.from_object(...))
     app.config['MONGO_DBNAME'] = 'minos_db'
@@ -20,7 +20,7 @@ def create_app():
     # Register the blueprint for API endpoints
     app.register_blueprint(api_blueprint, url_prefix='/api')
 
-    from .routes import main
-    app.register_blueprint(main)
+    # from .routes import main
+    # app.register_blueprint(main)
 
     return app

@@ -1,15 +1,6 @@
-# driver.py
 import logging
-from ..tables import (
-    Characteristic,
-    Drug,
-    Followup,
-    Treatment,
-    Patient
-)
+from ..tables import Characteristic
 
-
-# Driver for Characteristic collection
 class CharacteristicDriver:
     @staticmethod
     def insert(characteristic: Characteristic):

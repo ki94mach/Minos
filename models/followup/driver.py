@@ -1,13 +1,7 @@
-# driver.py
 import logging
-from ..tables import (
-    Characteristic,
-    Drug,
-    Followup,
-    Treatment,
-    Patient
-)
-# Driver for Followup collection
+from ..tables import Followup
+
+
 class FollowupDriver:
     @staticmethod
     def insert(followup: Followup):

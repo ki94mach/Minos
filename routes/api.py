@@ -2,15 +2,15 @@
 from flask import Blueprint, jsonify, request
 import logging
 
-# Import driver classes from the appropriate directories
+# Import driver classes from their directories
 from models.characteristic.driver import CharacteristicDriver
 from models.drug.driver import DrugDriver
 from models.followup.driver import FollowupDriver
 from models.patient.driver import PatientDriver
 from models.treatment.driver import TreatmentDriver
 
-# Also import model classes from tables for creating new instances.
-from models.tables import Characteristic, Drug, Followup, Treatment, Patient
+# Import model classes from tables for instance creation.
+from models.tables import Characteristic, Drug, Followup, Treatment, PatientTree
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -33,13 +33,11 @@ def get_characteristics():
 def create_characteristic():
     try:
         data = request.get_json()
-        # Expect JSON payload with keys "type" and "name"
         char_type = data.get('type')
         name = data.get('name')
         if not char_type or not name:
             return jsonify({'error': 'Missing required fields: type and name'}), 400
 
-        # Create a new Characteristic instance
         char = Characteristic(char_type=char_type, name=name)
         char_id = CharacteristicDriver.insert(char)
         return jsonify({'id': str(char_id)}), 201
@@ -159,7 +157,9 @@ def create_treatment():
         if not name:
             return jsonify({'error': 'Missing required field: name'}), 400
 
-        treatment = Treatment(name=name)
+        # For demo purposes, we assign the treatment hash as the name.
+        # In production, compute a proper hash based on treatment details.
+        treatment = Treatment(name=name, treatment_hash=name)
         treatment_id = TreatmentDriver.insert(treatment)
         return jsonify({'id': str(treatment_id)}), 201
     except Exception as e:
@@ -177,7 +177,7 @@ def update_treatment(treatment_id):
 
         if 'name' in data:
             treatment.name = data['name']
-        # Additional fields for drugs or alternatives can be handled here.
+        # Additional fields (e.g., regimen or alternatives) can be handled here.
         TreatmentDriver.update(treatment)
         return jsonify({'message': 'Treatment updated'}), 200
     except Exception as e:
@@ -196,7 +196,7 @@ def delete_treatment(treatment_id):
 
 
 # --------------------------------------------------
-# Patient Endpoints
+# Patient Endpoints (using PatientTree)
 # --------------------------------------------------
 @api_blueprint.route('/patients', methods=['GET'])
 def get_patients():
@@ -214,20 +214,32 @@ def create_patient():
     try:
         data = request.get_json()
         size = data.get('size')
-        # Expect a characteristic as a dict (with keys "type" and "name") for the initial patient characteristic.
+        # Expect a characteristic as a dict with "type" and "name" for the initial node.
         char_data = data.get('characteristic')
         if not size or not char_data:
             return jsonify({'error': 'Missing required fields: size and characteristic'}), 400
 
-        # Create a characteristic using its driver (if needed)
+        # Create the characteristic using its driver
         char = Characteristic(char_type=char_data.get('type'), name=char_data.get('name'))
         char_id = CharacteristicDriver.insert(char)
 
-        # Build the patient document. The embedded characteristic is represented as a dict.
-        # You might need to adjust this based on your Patient model design.
-        patient = Patient(
+        # Build the patient (PatientTree) document.
+        # The tree is constructed as a list of nodes; here we create a simple node for the characteristic.
+        patient = PatientTree(
             size=size,
-            chars=[{'characteristic': {'char_type': char.char_type, 'name': char.name, 'size': size, 'rate': 1.0}}]
+            tree=[{
+                'node_type': 'characteristic',
+                'ref_id': char_id,
+                'rate': 1.0,
+                'characteristic_data': {
+                    'char_type': char.char_type,
+                    'name': char.name,
+                    'size': size,
+                    'rate': 1.0
+                },
+                'children': []
+            }],
+            tree_hash=str(size)  # For demonstration, using the size as the hash; replace with a real hash computation.
         )
         patient_id = PatientDriver.insert(patient)
         return jsonify({'id': str(patient_id)}), 201
@@ -246,7 +258,7 @@ def update_patient(patient_id):
 
         if 'size' in data:
             patient.size = data['size']
-        # Additional logic to update embedded characteristics or treatments can be added here.
+        # Additional logic to update the tree can be added here.
         PatientDriver.update(patient)
         return jsonify({'message': 'Patient updated'}), 200
     except Exception as e:

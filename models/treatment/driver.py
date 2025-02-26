@@ -1,15 +1,7 @@
-# driver.py
 import logging
-from ..tables import (
-    Characteristic,
-    Drug,
-    Followup,
-    Treatment,
-    Patient
-)
+from ..tables import Treatment
 
 
-# Driver for Treatment collection
 class TreatmentDriver:
     @staticmethod
     def insert(treatment: Treatment):
