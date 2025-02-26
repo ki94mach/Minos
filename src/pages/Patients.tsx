@@ -24,14 +24,18 @@ import {
 } from "@mui/material";
 import axios from "axios";
 import BackButton from "../components/BackButton";
+import CustomNode from "../components/CustomNode";
 
-const Patients: React.FC = () => {
-    const initialNodes = [
-        { id: "1", position: { x: 250, y: 5 }, data: { label: "Patient A" } },
-        { id: "2", position: { x: 100, y: 100 }, data: { label: "Treatment X" } },
-        { id: "3", position: { x: 400, y: 100 }, data: { label: "Drug Y" } }
+const nodeTypes = { custom: (props: any) => <CustomNode {...props} setNodes={props.setNodes} /> };
+
+const initialNodes = [
+        { id: "1", position: { x: 250, y: 5 }, type: "custom", data: { label: "Disease A", number: 1, type: "Disease" } },
+        { id: "2", position: { x: 100, y: 100 },type: "custom", data: { label: "Treatment B" , number: 2, type: "Drug" } },
+        { id: "3", position: { x: 400, y: 100 },type: "custom", data: { label: "Drug C" , number: 2, type: "Drug" } }
     ];
     const initialEdges = [{ id: "e1-2", source: "1", target: "2", label: "Treated With" }];
+
+const Patients: React.FC = () => {
 
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -205,6 +209,7 @@ const Patients: React.FC = () => {
                     onEdgesChange={onEdgesChange}
                     onConnect={onConnect}
                     fitView
+                    nodeTypes={nodeTypes}
                 >
                     {/*<MiniMap/>*/}
                     {/*<Controls/>*/}
