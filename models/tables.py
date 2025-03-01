@@ -17,47 +17,48 @@ from mongoengine import (
 
 # Embedded version of a characteristic node
 class CharacteristicEmbedded(EmbeddedDocument):
+    _id = ObjectIdField(required=True)
     char_type = StringField(required=True, db_field="type")
     name = StringField(required=True)
-    size = FloatField(required=False)
-    rate = FloatField(required=False)
 
 
 # Embedded version of a drug (used within treatments)
 class DrugEmbedded(EmbeddedDocument):
     _id = ObjectIdField(required=True)
     name = StringField(required=True)
-    strength = StringField(required=True)
+    strength = IntField(required=True)
+    unit = StringField(required=True, choices=['mg', 'g', 'ng', 'mcg', 'IU'])
 
 
 class TreatmentDrug(EmbeddedDocument):
-    _id = ObjectIdField(required=True)
     drug = EmbeddedDocumentField(DrugEmbedded, required=True)
     annual_patient_con = IntField(required=True)
 
 
 class Regimen(EmbeddedDocument):
-    _id = ObjectIdField(required=True)
     name = StringField(required=True)
     drugs = ListField(EmbeddedDocumentField(TreatmentDrug), required=True)
 
 
 class AlternativeTreatment(EmbeddedDocument):
-    _id = ObjectIdField(required=True)
     regimen = EmbeddedDocumentField(Regimen, required=True)
     ratio = FloatField(required=True)
 
 
 # Embedded version of a treatment node
 class TreatmentEmbedded(EmbeddedDocument):
+    _id = ObjectIdField(required=True)
     name = StringField(required=True)
+    type = StringField(required=True, choices=['Treatment', 'Regimen', 'Alternative'])
     regimen = EmbeddedDocumentField(Regimen, required=False)
     alternatives = ListField(EmbeddedDocumentField(AlternativeTreatment), required=False)
 
 
 # Embedded version of a followup node
 class FollowupEmbedded(EmbeddedDocument):
-    patient_id = LongField(required=True)
+    _id = ObjectIdField(required=True)
+    patient_id = ObjectIdField(required=True)
+    node_parent_id = ObjectIdField(required=True)
     overall_survival = FloatField(required=True)
 
 
@@ -76,17 +77,20 @@ class Characteristic(Document):
 
 class Drug(Document):
     name = StringField(required=True)
-    strength = StringField(required=True)
+    strength = IntField(required=True)
+    unit = StringField(required=True, choices=['mg', 'g', 'ng', 'mcg', 'IU'])
     meta = {
         'collection': 'drugs',
-        'indexes': [{'fields': ['name', 'strength'], 'unique': True}]
+        'indexes': [{'fields': ['name', 'strength', 'unit'], 'unique': True}]
     }
 
 
 class Treatment(Document):
     name = StringField(required=True)
+    type = StringField(required=True, choices=['Treatment', 'Regimen', 'Alternative'])
     regimen = EmbeddedDocumentField(Regimen, required=False)
     alternatives = ListField(EmbeddedDocumentField(AlternativeTreatment), required=False)
+
     # Field to store computed hash value.
     treatment_hash = StringField(required=True, unique=True)
 
@@ -99,9 +103,11 @@ class Treatment(Document):
 class Followup(Document):
     name = StringField(required=True)
     overall_survival = FloatField(required=True)
+    patient_id = ObjectIdField(required=True)
+    parent_id = ObjectIdField(required=True)
     meta = {
         'collection': 'followups',
-        'indexes': [{'fields': ['name', 'overall_survival'], 'unique': True}]
+        'indexes': [{'fields': ['name', 'overall_survival', 'patient_id', 'parent_id'], 'unique': True}]
     }
 
 
@@ -112,10 +118,11 @@ class Followup(Document):
 class Node(EmbeddedDocument):
     # Node type indicates which master node is represented:
     # 'treatment', 'followup', or 'characteristic'
+    _id = ObjectIdField(required=True)
+    rate = FloatField(required=True)
     node_type = StringField(required=True, choices=['treatment', 'followup', 'characteristic'])
     # Reference to the master node's ObjectId (created independently)
-    ref_id = ObjectIdField(required=True)
-    rate = FloatField(required=True)
+    parent_id = ObjectIdField(required=True)
 
     # Embedded payload: one of these should be populated based on node_type.
     treatment_data = EmbeddedDocumentField(TreatmentEmbedded, required=False)
