@@ -36,7 +36,6 @@ class TreatmentDrug(EmbeddedDocument):
 
 
 class Regimen(EmbeddedDocument):
-    name = StringField(required=True)
     drugs = ListField(EmbeddedDocumentField(TreatmentDrug), required=True)
 
 
@@ -120,9 +119,10 @@ class Node(EmbeddedDocument):
     # 'treatment', 'followup', or 'characteristic'
     _id = ObjectIdField(required=True)
     rate = FloatField(required=True)
+    size = FloatField(required=True)
     node_type = StringField(required=True, choices=['treatment', 'followup', 'characteristic'])
     # Reference to the master node's ObjectId (created independently)
-    parent_id = ObjectIdField(required=True)
+    parent_id = ObjectIdField(required=False)
 
     # Embedded payload: one of these should be populated based on node_type.
     treatment_data = EmbeddedDocumentField(TreatmentEmbedded, required=False)
@@ -138,9 +138,9 @@ class Node(EmbeddedDocument):
 # =============================================================================
 
 class PatientTree(Document):
-    size = FloatField(required=True)
+
     # The 'tree' field holds the entire heterogeneous tree (a list of root TreeNodes).
-    tree = ListField(EmbeddedDocumentField(Node))
+    tree = EmbeddedDocumentField(Node)
     tree_hash = StringField(required=True, unique=True)
 
     meta = {'collection': 'patients'}
