@@ -1,3 +1,8 @@
+# Import model classes from tables for creating new instances.
+from models.tables import (
+    Regimen, AlternativeTreatment
+)
+
 from flask import Blueprint, jsonify, request
 import logging
 import hashlib
@@ -12,10 +17,8 @@ from models.patient.driver import PatientDriver
 from models.treatment.driver import TreatmentDriver
 
 # Import model classes from tables for creating new instances.
-from models.tables import (
-    Characteristic, Drug, Followup, Treatment, PatientTree,
-    Regimen, AlternativeTreatment
-)
+from models.tables import Characteristic, Drug, Followup, Treatment, PatientTree
+from models.tables import Node, CharacteristicEmbedded, TreatmentEmbedded, FollowupEmbedded
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -199,6 +202,7 @@ def get_treatments():
         data = [treatment.to_json() for treatment in treatments]
         return jsonify(data), 200
     except Exception as e:
+        print(e)
         logging.error(f"Error fetching treatments: {e}")
         return jsonify({'error': "Failed to retrieve treatments."}), 500
 
@@ -256,7 +260,7 @@ def create_treatment():
         treatment = Treatment(
             name=name,
             type=_type,
-            regimen=regimen,            # Note: We assume the JSON matches the structure for Regimen.
+            regimen=regimen,  # Note: We assume the JSON matches the structure for Regimen.
             alternatives=alternatives,  # Similarly, JSON for alternatives must match the structure.
             treatment_hash=treatment_hash
         )
@@ -335,6 +339,7 @@ def get_patients():
         data = [patient.to_json() for patient in patients]
         return jsonify(data), 200
     except Exception as e:
+        print(e)
         logging.error(f"Error fetching patients: {e}")
         return jsonify({'error': "Failed to retrieve patients."}), 500
 
@@ -344,7 +349,7 @@ def create_patient():
     """
     Expected JSON body (legacy style):
     {
-      "size": 90000000,
+
       "node": {
          "node_type": "characteristic",      // Allowed: "characteristic", "treatment", "followup"
          "rate": 1.0,
@@ -369,10 +374,8 @@ def create_patient():
     """
     try:
         data = request.get_json()
-        size = data.get('size')
+
         node_data = data.get('node')
-        if not size or not node_data:
-            return jsonify({'error': 'Missing required fields: size and node'}), 400
 
         # Validate common node fields.
         node_type = node_data.get('node_type')
@@ -396,7 +399,7 @@ def create_patient():
                 return jsonify({'error': 'Missing _id in characteristic_data'}), 400
 
             # Validate that the referenced master Characteristic exists.
-            existing_char = CharacteristicDriver.find(id=char_id_str).first()
+            existing_char = CharacteristicDriver.find(id=ObjectId(char_id_str)).first()
             if not existing_char:
                 return jsonify({'error': 'Referenced characteristic does not exist.'}), 400
 
@@ -459,7 +462,7 @@ def create_patient():
             new_node.followup_data = node_data.get('followup_data')
 
         # Generate a unique tree_hash using the patient size and the node’s Mongo representation.
-        hash_input = f"{size}{new_node.to_mongo().to_dict()}".encode('utf-8')
+        hash_input = f"{node_size}{new_node.to_mongo().to_dict()}".encode('utf-8')
         tree_hash = hashlib.sha256(hash_input).hexdigest()
 
         # Create the PatientTree document with the single root node.
@@ -483,26 +486,39 @@ def add_node(patient_id):
     """
     Expected JSON body:
     {
-      "parent_node_id": "<parent node ObjectId as string>",  // For the root node, can be null or omitted.
+      "parent_node_id": "67c44e28e0ff95ef4bd2a2a4", // For the root node, can be null or omitted.
       "node": {
-         "node_type": "characteristic",   // or "treatment" or "followup"
-         "rate": 0.8,
-         "size": 50000,
-         // Embedded payload, based on node_type:
-         "characteristic_data": {
-             "_id": "<existing characteristic ObjectId>",
-             "char_type": "Population",
-             "name": "Iran"
-         }
-         // For treatment or followup nodes, provide "treatment_data" or "followup_data" respectively.
+          "node_type": "treatment", // Allowed values: "characteristic", "treatment", or "followup"
+          "rate": 0.8,
+          "size": 50000,
+          // Embedded payload, based on node_type:
+          "treatment_data": {
+              "_id": "67c40a2adf372a4f37db72d5",
+              "name": "First-line 1 Treatment",
+              "type": "Regimen",
+              "regimen": {
+                  "drugs": [
+                      {
+                          "drug": {
+                              "_id": "60a7eb5a9c8e4b0015d8a125",
+                              "name": "Carboplatin",
+                              "strength": 450,
+                              "unit": "mg"
+                          },
+                          "annual_patient_con": 100
+                      }
+                  ]
+              }
+          }
+          // For followup nodes, provide "followup_data" instead.
       }
     }
-    ---
     This endpoint:
       1. Fetches the PatientTree document.
-      2. Locates the parent node (if provided); if not provided, the new node is added as a sibling to the root.
-      3. Appends the new node to the parent's children list.
-      4. Updates the PatientTree document.
+      2. Locates the parent node (if provided) by recursively traversing the tree.
+      3. Appends the new node to the parent's children list (or as a child of the root if no parent_node_id is provided).
+      4. Recomputes the tree_hash over the entire tree.
+      5. Replaces the entire PatientTree document in the database.
     """
     try:
         data = request.get_json()
@@ -513,7 +529,6 @@ def add_node(patient_id):
             return jsonify({'error': 'Missing node data'}), 400
 
         # Create the new node instance.
-        from models.tables import Node, CharacteristicEmbedded, TreatmentEmbedded, FollowupEmbedded
         new_node = Node(
             _id=ObjectId(),
             rate=new_node_data.get('rate'),
@@ -551,7 +566,7 @@ def add_node(patient_id):
         if not patient_tree:
             return jsonify({'error': 'Patient not found'}), 404
 
-        # Define a recursive function to locate the parent node.
+        # Recursive function to find the parent node in the tree.
         def find_node(node, target_id):
             if str(node._id) == target_id:
                 return node
@@ -562,23 +577,24 @@ def add_node(patient_id):
             return None
 
         if parent_node_id:
-            # Traverse the tree to find the parent node.
             parent_node = find_node(patient_tree.tree, parent_node_id)
             if not parent_node:
                 return jsonify({'error': 'Parent node not found'}), 404
-            # Append the new node to the parent's children.
             parent_node.children.append(new_node)
         else:
-            # If no parent_node_id is provided, we assume the new node becomes the root.
-            # Alternatively, you may choose to add it as a child of the existing root.
-            # For this example, we replace the root.
-            patient_tree.tree = new_node
+            # If no parent_node_id is provided, add the new node as a child of the root.
+            patient_tree.tree.children.append(new_node)
 
-        # Update the tree_hash
+        # Recompute the tree_hash over the entire tree.
         hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
         patient_tree.tree_hash = hashlib.sha256(hash_input).hexdigest()
 
-        PatientDriver.update(patient_tree)
+        # Instead of calling patient_tree.save() (which may trigger a partial update conflict),
+        # use the underlying PyMongo collection to replace the entire document.
+        from mongoengine.connection import get_db
+        db = get_db()
+        db['patients'].replace_one({'_id': patient_tree.id}, patient_tree.to_mongo().to_dict())
+
         return jsonify({'message': 'Node added successfully', 'tree_hash': patient_tree.tree_hash}), 200
 
     except Exception as e:
@@ -591,7 +607,7 @@ def update_patient(patient_id):
     """
     Expected JSON body (any subset, legacy style):
     {
-      "size": 1200,
+
       // Optionally, to update the entire tree structure:
       "tree": {
           "_id": "60abc...",            // Required: new ObjectId as string for the root node
@@ -604,10 +620,10 @@ def update_patient(patient_id):
               "char_type": "Population",
               "name": "Iran"
           },
-          "children": []                // Optional: list of child nodes (must follow same structure)
+          "children": [ ... ]           // Optional: list of child nodes (must follow the same structure)
       }
     }
-    If "tree" is provided, the endpoint will attempt to update the patient tree and recompute the tree_hash.
+    If "tree" is provided, the endpoint will update the patient tree and recompute the tree_hash.
     Otherwise, only the "size" field will be updated.
     """
     try:
@@ -620,35 +636,203 @@ def update_patient(patient_id):
         if 'size' in data:
             patient.size = data['size']
 
-        # Optionally update the tree if provided.
+        # Optionally update the entire tree.
         if 'tree' in data:
             from models.tables import Node
             try:
                 # Convert the incoming JSON to a Node instance.
-                # Note: The JSON must have all required fields (e.g. _id, rate, size, node_type).
                 new_tree = Node(**data['tree'])
                 patient.tree = new_tree
-                # Recompute tree_hash based on the updated tree.
+                # Recompute tree_hash based on the full tree.
                 hash_input = f"{new_tree.to_mongo().to_dict()}".encode('utf-8')
                 patient.tree_hash = hashlib.sha256(hash_input).hexdigest()
             except Exception as e:
                 logging.error(f"Error updating patient tree: {e}")
                 return jsonify({'error': "Invalid tree structure provided."}), 400
 
-        PatientDriver.update(patient)
+        # Replace the entire document using a full document replacement.
+        from mongoengine.connection import get_db
+        db = get_db()
+        db['patients'].replace_one({'_id': patient.id}, patient.to_mongo().to_dict())
+
         return jsonify({'message': 'Patient updated'}), 200
     except Exception as e:
         logging.error(f"Error updating patient: {e}")
         return jsonify({'error': "An unexpected error occurred while updating the patient."}), 500
 
+
+@api_blueprint.route('/patients/<patient_id>/node/<node_id>', methods=['PUT'])
+def update_node(patient_id, node_id):
+    """
+    Expected JSON body (any subset, legacy style):
+    {
+        "rate": 0.9,
+        "size": 60000,
+        "node_type": "characteristic",  // Optional if not changing.
+        "parent_id": "<new parent ObjectId as string, if updating>",
+        // Optionally, update the embedded payload:
+        "characteristic_data": {
+            "_id": "67c4540de5e465927f4c0288",
+            "char_type": "Biomarker",
+            "name": "KRAS"
+        }
+        // Alternatively, for treatment or followup nodes:
+        // "treatment_data": { ... }
+        // "followup_data": { ... }
+        // "children": [ ... ] (optional)
+    }
+
+    This endpoint:
+      1. Fetches the PatientTree document.
+      2. Recursively locates the node with _id equal to node_id.
+      3. Updates the node's fields with the provided values.
+      4. Recomputes the tree_hash over the entire tree.
+      5. Replaces the entire PatientTree document in the database.
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No update data provided.'}), 400
+
+        # Fetch the PatientTree document.
+        patient_tree = PatientDriver.find(id=patient_id).first()
+        if not patient_tree:
+            return jsonify({'error': 'Patient not found.'}), 404
+
+        # Recursive function to find the node with the given _id.
+        def find_node(node, target_id):
+            if str(node._id) == target_id:
+                return node
+            for child in node.children:
+                found = find_node(child, target_id)
+                if found:
+                    return found
+            return None
+
+        target_node = find_node(patient_tree.tree, node_id)
+        if not target_node:
+            return jsonify({'error': 'Node not found in patient tree.'}), 404
+
+        # Update node fields if provided.
+        if 'rate' in data:
+            target_node.rate = data['rate']
+        if 'size' in data:
+            target_node.size = data['size']
+        if 'node_type' in data:
+            target_node.node_type = data['node_type']
+        if 'parent_id' in data:
+            parent = data['parent_id']
+            target_node.parent_id = ObjectId(parent) if parent else None
+
+        # Update the embedded payload based on node_type.
+        if target_node.node_type == 'characteristic' and 'characteristic_data' in data:
+            char_data = data['characteristic_data']
+            target_node.characteristic_data = CharacteristicEmbedded(
+                _id=ObjectId(char_data.get('_id')),
+                char_type=char_data.get('char_type'),
+                name=char_data.get('name')
+            )
+        elif target_node.node_type == 'treatment' and 'treatment_data' in data:
+            target_node.treatment_data = TreatmentEmbedded(**data['treatment_data'])
+        elif target_node.node_type == 'followup' and 'followup_data' in data:
+            target_node.followup_data = FollowupEmbedded(**data['followup_data'])
+
+        # Optionally, update children if provided.
+        if 'children' in data:
+            target_node.children = data['children']
+
+        # Recompute the tree_hash over the entire tree.
+        hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
+        patient_tree.tree_hash = hashlib.sha256(hash_input).hexdigest()
+
+        # Replace the entire document using full document replacement.
+        from mongoengine.connection import get_db
+        db = get_db()
+        db['patients'].replace_one({'_id': patient_tree.id}, patient_tree.to_mongo().to_dict())
+
+        return jsonify({'message': 'Node updated successfully', 'tree_hash': patient_tree.tree_hash}), 200
+
+    except Exception as e:
+        logging.error(f"Error updating node: {e}")
+        return jsonify({'error': "An unexpected error occurred while updating the node."}), 500
+
+
 @api_blueprint.route('/patients/<patient_id>', methods=['DELETE'])
 def delete_patient(patient_id):
+    """
+    Deletes the entire PatientTree document.
+    """
     try:
         PatientDriver.delete(patient_id)
         return jsonify({'message': 'Patient deleted'}), 200
     except Exception as e:
         logging.error(f"Error deleting patient: {e}")
         return jsonify({'error': "An unexpected error occurred while deleting the patient."}), 500
+
+
+@api_blueprint.route('/patients/<patient_id>/node/<node_id>', methods=['DELETE'])
+def delete_node(patient_id, node_id):
+    """
+    Deletes a single node from the PatientTree without discarding its children.
+    The children of the deleted node are spliced into the parent's children list,
+    and their parent_id fields are updated accordingly.
+
+    Expected URL parameters:
+      - patient_id: The PatientTree document's id.
+      - node_id: The _id of the node to delete (as a string).
+
+    This endpoint:
+      1. Fetches the PatientTree document.
+      2. Recursively finds and removes the node with _id equal to node_id,
+         splicing its children into the parent's children list and updating their parent_id.
+      3. Recomputes the tree_hash based on the updated tree.
+      4. Replaces the entire PatientTree document in the database.
+    """
+    try:
+        # Fetch the PatientTree document.
+        patient_tree = PatientDriver.find(id=patient_id).first()
+        if not patient_tree:
+            return jsonify({'error': 'Patient not found'}), 404
+
+        # Recursive function to remove a node and splice its children into the parent's list.
+        def remove_node(node, target_id):
+            new_children = []
+            removed = False
+            for child in node.children:
+                if str(child._id) == target_id:
+                    removed = True
+                    # Before splicing, update each grandchild's parent_id to the current node's _id.
+                    for grandchild in child.children:
+                        grandchild.parent_id = node._id
+                    # Splice the removed node's children into the parent's children list.
+                    new_children.extend(child.children)
+                else:
+                    # Recurse into the child.
+                    child_removed = remove_node(child, target_id)
+                    removed = removed or child_removed
+                    new_children.append(child)
+            node.children = new_children
+            return removed
+
+        # Remove the target node from the tree starting at the root.
+        removed = remove_node(patient_tree.tree, node_id)
+        if not removed:
+            return jsonify({'error': 'Node not found in patient tree'}), 404
+
+        # Recompute the tree_hash over the updated tree.
+        hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
+        patient_tree.tree_hash = hashlib.sha256(hash_input).hexdigest()
+
+        # Replace the entire document using full document replacement.
+        from mongoengine.connection import get_db
+        db = get_db()
+        db['patients'].replace_one({'_id': patient_tree.id}, patient_tree.to_mongo().to_dict())
+
+        return jsonify({'message': 'Node deleted successfully', 'tree_hash': patient_tree.tree_hash}), 200
+
+    except Exception as e:
+        logging.error(f"Error deleting node: {e}")
+        return jsonify({'error': "An unexpected error occurred while deleting the node."}), 500
 
 
 # --------------------------------------------------
