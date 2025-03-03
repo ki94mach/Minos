@@ -1,5 +1,4 @@
 src/pkg/test.ipynb
-docs
 src/__pycache__
 */__pycache__/*
 src/pkg/__pycache__

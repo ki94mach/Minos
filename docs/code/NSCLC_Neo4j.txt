@@ -1,0 +1,89 @@
+CREATE (p: Population {name: 'Population', n : 90000000})
+CREATE (d1:Disease : PrimaryIndication {name: 'Lung Cancer'})
+CREATE (p)-[pd1:Prevalence {rate:0.0001}]->(d1)
+CREATE (nonmet: Disease : Metastasis {name:'Non-Metastasis'})
+CREATE (met: Disease : Metastasis {name:'Metastasis'})
+CREATE (nsclc:Disease : Type {name:'NSCLC'})
+CREATE (d1)-[d1nsclc:Prevalence {rate:0.85}]->(nsclc)
+CREATE (nsclc)-[nsclcnonmet:Prevalence {rate:0.55}]->(nonmet)
+CREATE (nsclc)-[nsclcmet:Prevalence {rate:0.45}]->(met)
+SET d1.n = p.n * pd1.rate
+SET nsclc.n = d1.n * d1nsclc.rate
+SET nonmet.n = nsclc.n * nsclcnonmet.rate
+SET met.n = nsclc.n * nsclcmet.rate
+
+MATCH (d1:Disease {name: 'Metastasis'})
+CREATE (bm:Disease : Metastasis {name:'Bone Metastasis'})
+CREATE (d1)-[d1bm:Prevalence {rate:0.343}]->(bm)
+SET bm.n = d1.n * d1bm.rate
+
+MATCH (bm:Disease {name:'Bone Metastasis'})
+CREATE (mt:Treatment : Medication {name: 'Denosumab/Bisphosphonate', drug1: 'Denosumab 120', drug1_annual_con: 13, drug2:'Zoledronic acid 4', drug2_annual_con: 13, os: 0.43})
+CREATE (bm)-[bmmt:TREATED]->(mt)
+
+MATCH (met: Disease : Metastasis {name: 'Metastasis'})
+CREATE (mut : Disease : Mutation {name: 'KRASG12C'})
+CREATE (met)-[p:Prevalence {rate:0.39}]->(mut)
+SET mut.n = met.n * p.rate
+
+MATCH (mut: Disease : Mutation {name: 'KRASG12C'})
+CREATE (pdl_high : Disease : Biomarker {name: 'PDL1' , value: '>=1'})
+CREATE (pdl_low : Disease : Biomarker {name: 'PDL1' , value: '<1'})
+CREATE (mut)-[p1:Prevalence {rate:0.37}]->(pdl_high)
+CREATE (mut)-[p2:Prevalence {rate:0.63}]->(pdl_low)
+SET pdl_high.n = mut.n * p1.rate
+SET pdl_low.n = mut.n * p2.rate
+
+MATCH (pdl1_low: Disease : Biomarker {name: 'PDL1', value:'<1'})
+CREATE (squa : Disease : Histology {name: 'Squamous'})
+CREATE (non_squa : Disease : Histology {name: 'Non-Squamous'})
+CREATE (pdl1_low)-[p1:Prevalence {rate:0.75}]->(non_squa)
+CREATE (pdl1_low)-[p2:Prevalence {rate:0.25}]->(squa)
+SET non_squa.n = pdl1_low.n * p1.rate
+SET squa.n = pdl1_low.n * p2.rate
+
+MATCH (t1 {name: 'Bone Targeted Therapy'})
+CREATE (deno: Treatment :Drug {name:'Denosumab', str: '120 mg' , annual_patient_con: 13, annual_pop_con: 6602 })
+CREATE (zol: Treatment :Drug {name:'Zoledronic Acid', str: '4 mg' , annual_patient_con: 13, annual_pop_con: 6602 })
+CREATE (t1)-[:CONTAINS_DRUG]->(deno)
+CREATE (t1)-[:CONTAINS_DRUG]->(zol)
+CREATE (deno)-[:ALTERNATIVE]->(zol)
+CREATE (zol)-[:ALTERNATIVE]->(deno)
+
+MATCH (ps01 : Patient : Performance {name: 'PS', value:'0 or 1'})
+MATCH (ps2 : Patient : Performance {name: 'PS', value:'2'})
+CREATE (t1: Treatment : Regimen {name: 'Pembro + Carbo + Pacli'})
+CREATE (t2 : Treatment : Regimen {name: 'Carbo + Gem / Pacli'})
+CREATE (ps01)-[:TREATED]->(t1)
+CREATE (ps2)-[:TREATED]->(t2)
+CREATE (d1 : Treatment : Drug {name: 'Pembrolizumab', str: '200 mg', annual_patient_con: 8, annaul_pop_con: 1592})
+CREATE (d2 : Treatment : Drug {name: 'Carboplatin', str: 'AUC 6', annual_patient_con: 16, annual_pop_con: 3184})
+CREATE (d3 : Treatment : Drug {name: 'Paclitaxel', str: '200 mg/m2', annual_patient_con: 4, annual_pop_con: 796})
+CREATE (t1)-[:CONTAINS_DRUG]->(d1)
+CREATE (t1)-[:CONTAINS_DRUG]->(d2)
+CREATE (t1)-[:CONTAINS_DRUG]->(d3)
+CREATE (d1)-[:COMBINATION]->(d2)
+CREATE (d2)-[:COMBINATION]->(d3)
+CREATE (d3)-[:COMBINATION]->(d1)
+CREATE (d4 : Treatment : Drug {name: 'Gemcitabine', str: '1000 mg/m2', annual_patient_con: 16, annaul_pop_con: 1792})
+CREATE (d5 : Treatment : Drug {name: 'Carboplatin', str: 'AUC 5', annual_patient_con: 16, annual_pop_con: 1792})
+CREATE (d6 : Treatment : Drug {name: 'Paclitaxel', str: '200 mg/m2', annual_patient_con: 4, annual_pop_con: 448})
+CREATE (d5)-[:COMBINATION]->(d4)
+CREATE (d5)-[:COMBINATION]->(d6)
+CREATE (d4)-[:ALTERNATIVE]->(d6)
+
+MATCH (d1) WHERE id(d1) = 23
+MATCH (d2) WHERE id(d2) = 24
+MATCH (d3) WHERE id(d3) = 22
+MATCH (r) WHERE id(r) = 18
+CREATE (r)-[:CONTAINS_DRUG]->(d1)
+CREATE (r)-[:CONTAINS_DRUG]->(d2)
+CREATE (r)-[:CONTAINS_DRUG]->(d3)
+
+MATCH (d1) WHERE id(d1) = 17
+CREATE (t1: Treatment : Response {name: 'Response'})
+CREATE (d1)-[r1:Prevalence {rate:0.3}]->(t1)
+SET t1.n = d1.n * r1.rate 
+CREATE (t2: Treatment : Progress {name: 'Progress'})
+CREATE (d1)-[r2:Prevalence {rate:0.7}]->(t2)
+SET t2.n = d1.n * r2.rate
