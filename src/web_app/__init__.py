@@ -12,7 +12,7 @@ def create_app():
 
     # Load configuration (you can also use app.config.from_object(...))
     app.config['MONGO_DBNAME'] = 'minos_db'
-    app.config['MONGO_URI'] = 'mongodb://localhost:27017/minos_db'
+    app.config['MONGO_URI'] = 'mongodb://10.20.52.20:27017/minos_db'
 
     # Connect to MongoDB using your helper
     connect_db(db_name=app.config['MONGO_DBNAME'], host=app.config['MONGO_URI'])

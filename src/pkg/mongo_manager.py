@@ -3,7 +3,7 @@ import logging
 
 
 class MongoManager:
-    def __init__(self, db_name: str='minos_db', uri='mongodb://localhost:27017/'):
+    def __init__(self, db_name: str='minos_db', uri='mongodb://10.20.52.20:27017/'):
         'Initialize MongoDB connection.'
         self.client = MongoClient(uri)
         self.db = self.client[db_name]
