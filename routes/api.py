@@ -214,7 +214,7 @@ def create_treatment():
     {
       "name": "First-line 1 Treatment",
       "type": "Regimen",    // Valid values: "Treatment", "Regimen", "Alternative"
-      "regimen": {
+      "regimen": { 
          "drugs": [
             {
               "drug": {
@@ -229,6 +229,8 @@ def create_treatment():
       },
       "alternatives": [
          {
+            "_id": //regimen id
+            "name": "regimen name"
            "regimen": {
               "drugs": [
                   // Similar structure as above.
@@ -247,24 +249,29 @@ def create_treatment():
         if not name or not _type:
             return jsonify({'error': 'Missing required fields: name and type'}), 400
 
-        regimen = data.get('regimen', {})
-        alternatives = data.get('alternatives', [])
-        if regimen:
-            alternatives = []
-        else:
-            regimen = {}
+        # Get the regimen and alternatives from the request
+        regimen_data = data.get('regimen')
+        alternatives_data = data.get('alternatives', [])
 
-        hash_input = name + _type + str(regimen) + str(alternatives)
+        # For an Alternative type treatment, we don't expect a top-level regimen.
+        if _type == "Alternative":
+            regimen_data = None
+        elif regimen_data:
+            # If regimen is provided for Regimen type, ignore alternatives.
+            alternatives_data = []
+
+        hash_input = name + _type + str(regimen_data) + str(alternatives_data)
         treatment_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
 
         treatment = Treatment(
             name=name,
             type=_type,
-            regimen=regimen,  # Note: We assume the JSON matches the structure for Regimen.
-            alternatives=alternatives,  # Similarly, JSON for alternatives must match the structure.
+            regimen=regimen_data,         # Will be None if not applicable
+            alternatives=alternatives_data,
             treatment_hash=treatment_hash
         )
         treatment_id = TreatmentDriver.insert(treatment)
+
         return jsonify({'id': str(treatment_id)}), 201
     except NotUniqueError:
         logging.error("Duplicate treatment detected.")

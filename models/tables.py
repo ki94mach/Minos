@@ -40,6 +40,8 @@ class Regimen(EmbeddedDocument):
 
 
 class AlternativeTreatment(EmbeddedDocument):
+    _id = ObjectIdField(required=True)
+    name = StringField(required=True)
     regimen = EmbeddedDocumentField(Regimen, required=True)
     ratio = FloatField(required=True)
 
