@@ -211,6 +211,7 @@ def get_treatments():
 def create_treatment():
     """
     Expected JSON body:
+    E.g 1:
     {
       "name": "First-line 1 Treatment",
       "type": "Regimen",    // Valid values: "Treatment", "Regimen", "Alternative"
@@ -240,6 +241,68 @@ def create_treatment():
          }
       ]
     }
+    E.g 2:
+    {
+        "name": "Combined Alternative Treatment",
+        "type": "Alternative",
+        "alternatives": [
+            {
+            "_id": "67d022c49e8a82122fb0332d",
+            "name": "Carboplatin with Gemcitabine",
+            "regimen": {
+                "drugs": [
+                {
+                    "drug": {
+                    "_id": "67d0207b9e8a82122fb03327",
+                    "name": "Carboplatin",
+                    "strength": 450,
+                    "unit": "mg"
+                    },
+                    "annual_patient_con": 13
+                },
+                {
+                    "drug": {
+                    "_id": "67d020809e8a82122fb03328",
+                    "name": "Gemcitabine",
+                    "strength": 1,
+                    "unit": "g"
+                    },
+                    "annual_patient_con": 13
+                }
+                ]
+            },
+            "ratio": 0.5
+            },
+            {
+            "_id": "67d023479e8a82122fb0332f",
+            "name": "Carboplatin with Paclitaxel",
+            "regimen": {
+                "drugs": [
+                {
+                    "drug": {
+                    "_id": "67d0207b9e8a82122fb03327",
+                    "name": "Carboplatin",
+                    "strength": 450,
+                    "unit": "mg"
+                    },
+                    "annual_patient_con": 15
+                },
+                {
+                    "drug": {
+                    "_id": "67d020869e8a82122fb03329",
+                    "name": "Paclitaxel",
+                    "strength": 100,
+                    "unit": "mg"
+                    },
+                    "annual_patient_con": 20
+                }
+                ]
+            },
+            "ratio": 0.5
+            }
+        ]
+        }
+
     Note: "treatment_hash" is auto-generated.
     """
     try:
@@ -488,85 +551,119 @@ def create_patient():
         return jsonify({'error': "An unexpected error occurred while creating the patient."}), 500
 
 
+def create_node_from_dict(node_dict, parent_id=None):
+    """
+    Recursively convert a dictionary (representing a node) into a Node instance.
+    If a node (or any of its children) does not have an _id, one is generated.
+    The parent_id is set appropriately for all child nodes.
+    """
+    # If the dictionary is wrapped in a "node" key, unwrap it.
+    if 'node' in node_dict:
+        node_dict = node_dict['node']
+
+    # Get or generate the node's _id.
+    node_id = ObjectId(node_dict.get('_id')) if node_dict.get('_id') else ObjectId()
+    # Use the node's provided parent_id if available; otherwise, use the passed-in parent_id.
+    node_parent_id = ObjectId(node_dict.get('parent_id')) if node_dict.get('parent_id') else parent_id
+
+    # Create the Node instance.
+    new_node = Node(
+        _id=node_id,
+        rate=node_dict.get('rate'),
+        size=node_dict.get('size'),
+        node_type=node_dict.get('node_type'),
+        parent_id=node_parent_id,
+        children=[]  # We'll fill this in below.
+    )
+
+    # Process the embedded payload based on the node type.
+    if new_node.node_type == 'characteristic':
+        char_data = node_dict.get('characteristic_data')
+        if char_data:
+            new_node.characteristic_data = CharacteristicEmbedded(
+                _id=ObjectId(char_data.get('_id')) if char_data.get('_id') else ObjectId(),
+                char_type=char_data.get('char_type'),
+                name=char_data.get('name')
+            )
+    elif new_node.node_type == 'treatment':
+        treatment_data = node_dict.get('treatment_data')
+        if treatment_data:
+            new_node.treatment_data = TreatmentEmbedded(**treatment_data)
+    elif new_node.node_type == 'followup':
+        followup_data = node_dict.get('followup_data')
+        if followup_data:
+            new_node.followup_data = FollowupEmbedded(**followup_data)
+
+    # Recursively process any children.
+    for child_dict in node_dict.get('children', []):
+        child_node = create_node_from_dict(child_dict, parent_id=node_id)
+        new_node.children.append(child_node)
+
+    return new_node
+
+# -------------------------------------------------------------------
 @api_blueprint.route('/patients/<patient_id>/add_node', methods=['POST'])
 def add_node(patient_id):
     """
-    Expected JSON body:
+    Expected JSON body example:
     {
-      "parent_node_id": "67c44e28e0ff95ef4bd2a2a4", // For the root node, can be null or omitted.
+      "parent_node_id": "67c44e28e0ff95ef4bd2a2a4", // Optional for root-level addition.
       "node": {
-          "node_type": "treatment", // Allowed values: "characteristic", "treatment", or "followup"
-          "rate": 0.8,
-          "size": 50000,
-          // Embedded payload, based on node_type:
-          "treatment_data": {
-              "_id": "67c40a2adf372a4f37db72d5",
-              "name": "First-line 1 Treatment",
-              "type": "Regimen",
-              "regimen": {
-                  "drugs": [
-                      {
-                          "drug": {
-                              "_id": "60a7eb5a9c8e4b0015d8a125",
-                              "name": "Carboplatin",
-                              "strength": 450,
-                              "unit": "mg"
-                          },
-                          "annual_patient_con": 100
+          "node_type": "characteristic",
+          "rate": 0.343,
+          "characteristic_data": {
+              "_id": "67d01f899e8a82122fb0331d",
+              "char_type": "Metastasis",
+              "name": "Bone Metastasis"
+          }
+      },
+      "children": [
+          {
+              "node": {
+                  "node_type": "treatment",
+                  "rate": 1,
+                  "treatment_data": {
+                      "_id": "67d05523af3304f08c7e9fb1",
+                      "name": "Denosumab Treatment",
+                      "type": "Regimen",
+                      "regimen": {
+                          "drugs": [
+                              {
+                                  "drug": {
+                                      "_id": "67d020989e8a82122fb0332b",
+                                      "name": "Denosumab",
+                                      "strength": 120,
+                                      "unit": "mg"
+                                  },
+                                  "annual_patient_con": 13
+                              }
+                          ]
                       }
-                  ]
+                  }
               }
           }
-          // For followup nodes, provide "followup_data" instead.
-      }
+      ]
     }
     This endpoint:
       1. Fetches the PatientTree document.
       2. Locates the parent node (if provided) by recursively traversing the tree.
-      3. Appends the new node to the parent's children list (or as a child of the root if no parent_node_id is provided).
+      3. Appends the new node (with processed children) to the parent's children list (or as a child of the root if no parent_node_id is provided).
       4. Recomputes the tree_hash over the entire tree.
       5. Replaces the entire PatientTree document in the database.
     """
     try:
         data = request.get_json()
         new_node_data = data.get('node')
+        # Merge top-level "children" into the node dictionary if provided.
+        if data.get('children'):
+            new_node_data['children'] = data.get('children')
+        
         parent_node_id = data.get('parent_node_id')  # May be None for root-level addition.
-
         if not new_node_data:
             return jsonify({'error': 'Missing node data'}), 400
 
-        # Create the new node instance.
-        new_node = Node(
-            _id=ObjectId(),
-            rate=new_node_data.get('rate'),
-            size=new_node_data.get('size'),
-            node_type=new_node_data.get('node_type'),
-            parent_id=ObjectId(parent_node_id) if parent_node_id else None,
-            children=new_node_data.get('children', [])
-        )
-
-        # Depending on node_type, assign the embedded payload.
-        if new_node.node_type == 'characteristic':
-            char_data = new_node_data.get('characteristic_data')
-            if not char_data:
-                return jsonify({'error': 'Missing characteristic_data for characteristic node'}), 400
-            new_node.characteristic_data = CharacteristicEmbedded(
-                _id=ObjectId(char_data.get('_id')),
-                char_type=char_data.get('char_type'),
-                name=char_data.get('name')
-            )
-        elif new_node.node_type == 'treatment':
-            treatment_data = new_node_data.get('treatment_data')
-            if not treatment_data:
-                return jsonify({'error': 'Missing treatment_data for treatment node'}), 400
-            new_node.treatment_data = TreatmentEmbedded(**treatment_data)
-        elif new_node.node_type == 'followup':
-            followup_data = new_node_data.get('followup_data')
-            if not followup_data:
-                return jsonify({'error': 'Missing followup_data for followup node'}), 400
-            new_node.followup_data = FollowupEmbedded(**followup_data)
-        else:
-            return jsonify({'error': 'Invalid node_type'}), 400
+        # Recursively create the new node (and its children) from the provided dictionary.
+        new_node = create_node_from_dict(new_node_data, parent_id=ObjectId(parent_node_id) if parent_node_id else None)
 
         # Fetch the PatientTree document.
         patient_tree = PatientDriver.find(id=patient_id).first()
@@ -596,8 +693,7 @@ def add_node(patient_id):
         hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
         patient_tree.tree_hash = hashlib.sha256(hash_input).hexdigest()
 
-        # Instead of calling patient_tree.save() (which may trigger a partial update conflict),
-        # use the underlying PyMongo collection to replace the entire document.
+        # Replace the entire document in the database.
         from mongoengine.connection import get_db
         db = get_db()
         db['patients'].replace_one({'_id': patient_tree.id}, patient_tree.to_mongo().to_dict())
@@ -672,6 +768,7 @@ def update_patient(patient_id):
 def update_node(patient_id, node_id):
     """
     Expected JSON body (any subset, legacy style):
+    eg 1:
     {
         "rate": 0.9,
         "size": 60000,
