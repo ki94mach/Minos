@@ -6,3 +6,4 @@ pyvis~=0.3.2
 pymongo~=4.11.1
 flask~=3.0.3
 mongoengine~=0.29.1
+khayyam

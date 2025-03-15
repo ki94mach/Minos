@@ -7,8 +7,29 @@ from mongoengine import (
     LongField,
     ListField,
     EmbeddedDocumentField,
-    ObjectIdField
+    ObjectIdField,
+    BooleanField
 )
+
+from enum import Enum
+
+
+class RoleEnum(Enum):
+    ADMIN = "ADMIN"
+    USER = "USER"
+
+    @classmethod
+    def all_roles(cls):
+        return [role.value for role in cls]
+
+
+class User(Document):
+    email = StringField(required=True, unique=True)
+    password_hash = StringField(required=True)
+    role = StringField(required=True, choices=[role for role in RoleEnum.all_roles()])
+    is_active = BooleanField(default=True)
+
+    meta = {'collection': 'users'}
 
 
 # =============================================================================
@@ -140,7 +161,6 @@ class Node(EmbeddedDocument):
 # =============================================================================
 
 class PatientTree(Document):
-
     # The 'tree' field holds the entire heterogeneous tree (a list of root TreeNodes).
     tree = EmbeddedDocumentField(Node)
     tree_hash = StringField(required=True, unique=True)
