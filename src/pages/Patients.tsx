@@ -1,13 +1,13 @@
-import React, {useCallback, useEffect, useState} from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import ReactFlow, {
     addEdge,
-    MiniMap,
-    Controls,
     Background,
     useEdgesState,
     useNodesState,
     Connection,
-    Edge
+    Edge,
+    NodeProps,
+    NodeTypes
 } from "reactflow";
 import "reactflow/dist/style.css";
 import {
@@ -20,147 +20,101 @@ import {
     FormControl,
     InputLabel,
     Select,
-    MenuItem, TextField,
+    MenuItem,
+    TextField
 } from "@mui/material";
 import axios from "axios";
 import BackButton from "../components/BackButton";
 import CustomNode from "../components/CustomNode";
 
-const nodeTypes = { custom: (props: any) => <CustomNode {...props} setNodes={props.setNodes} /> };
+interface CustomNodeProps extends NodeProps {
+    setNodes?: React.Dispatch<React.SetStateAction<any[]>>;
+}
 
-const initialNodes = [
-        { id: "1", position: { x: 250, y: 5 }, type: "custom", data: { label: "Disease A", number: 1, type: "Disease" } },
-        { id: "2", position: { x: 100, y: 100 },type: "custom", data: { label: "Treatment B" , number: 2, type: "Drug" } },
-        { id: "3", position: { x: 400, y: 100 },type: "custom", data: { label: "Drug C" , number: 2, type: "Drug" } }
-    ];
-    const initialEdges = [{ id: "e1-2", source: "1", target: "2", label: "Treated With" }];
+const nodeTypes: NodeTypes = {
+    custom: (props: NodeProps) => <CustomNode {...props} />
+};
 
 const Patients: React.FC = () => {
+    const [nodes, setNodes, onNodesChange] = useNodesState([]);
+    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const [selectedPopulation, setSelectedPopulation] = useState("");
+    const [customPopulationNumber, setCustomPopulationNumber] = useState("");
+    const [charTypes, setCharTypes] = useState<string[]>([]);
+    const [charNames, setCharNames] = useState<string[]>([]);
+    const [selectedCharType, setSelectedCharType] = useState("");
+    const [selectedCharName, setSelectedCharName] = useState("");
 
-    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-    const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+    useEffect(() => {
+        const fetchPatients = async () => {
+            try {
+                const response = await axios.get("http://localhost:5000/patients");
+                const formattedNodes = response.data.map((patient: any, index: number) => ({
+                    id: patient._id,
+                    position: { x: index * 200, y: 100 },
+                    type: "custom",
+                    data: { label: patient.node.characteristic_data.name, number: index + 1, type: patient.node.node_type }
+                }));
+                setNodes(formattedNodes);
+            } catch (error) {
+                console.error("Error fetching patients:", error);
+            }
+        };
+        fetchPatients();
+    }, []);
 
     const onConnect = useCallback(
         (connection: Edge | Connection) => setEdges((eds) => addEdge(connection, eds)),
         [setEdges]
     );
-    const populations = {
-        "Iran Population": 90000000,
-        "Tehran Population": 9000000,
-        "Mashhad Population": 3000000,
-        "Shiraz Population": 2000000,
-        "Tabriz Population": 1600000,
-        "Custom Population": null
-    };
-    const [selectedPopulations, setSelectedPopulations] = useState<string>("");
-    const [customPopulationNumber, setCustomPopulationNumber] = useState<string>("");
-    const [primaryIndications, setPrimaryIndications] = useState<string[]>([]);
-    const [charTypes, setCharTypes] = useState<string[]>([]);
-    const [charNames, setCharNames] = useState<string[]>([]);
-
-    const [selectedPopulation, setSelectedPopulation] = useState<string>("");
-    const [selectedPrimaryIndication, setSelectedPrimaryIndication] = useState<string>("");
-    const [selectedCharType, setSelectedCharType] = useState<string>("");
-    const [selectedCharName, setSelectedCharName] = useState<string>("");
-
-    useEffect(() => {
-        const fetchCharacteristics = async () => {
-            try {
-                const response = await axios.get("http://localhost:5000/api/characteristics");
-                setPrimaryIndications(response.data.primary_indication || []);
-                setCharTypes(response.data.other_characteristics_type || []);
-                setCharNames(response.data.other_characteristics_name || []);
-            } catch (error) {
-                console.error("Error fetching patient characteristics:", error);
-            }
-        };
-        fetchCharacteristics();
-    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        let finalPopulation = selectedPopulation;
-        let populationNumber = populations[selectedPopulation as keyof typeof populations];
-        if (selectedPopulation === "Custom Population") {
-            if (!customPopulationNumber) {
-                alert("Please enter a custom population number.");
-                return;
-            }
-            populationNumber = Number(customPopulationNumber);
-        }
-
-        // alert(`Population Selected: ${finalPopulation}`);
+        let populationNumber = selectedPopulation === "Custom Population" ? Number(customPopulationNumber) : null;
 
         try {
-            await axios.post("http://localhost:3000/patients", {
-                population: populationNumber,
-                primary_indication: selectedPrimaryIndication,
-                char_type: selectedCharType,
-                char_name: selectedCharName,
+            const response = await axios.post("http://localhost:5000/patients", {
+                node: {
+                    node_type: "characteristic",
+                    rate: 1.0,
+                    size: populationNumber,
+                    characteristic_data: {
+                        _id: selectedCharName,
+                        char_type: selectedCharType,
+                        name: selectedCharName
+                    }
+                }
             });
-            alert("Search completed and patient map updated!");
+
+            setNodes((prevNodes) => [
+                ...prevNodes,
+                {
+                    id: response.data.id,
+                    position: { x: prevNodes.length * 200, y: 100 },
+                    type: "custom",
+                    data: { label: selectedCharName, number: prevNodes.length + 1, type: "characteristic" }
+                }
+            ]);
+
+            alert("Patient tree created successfully!");
         } catch (error) {
-            console.error("Error during patient search:", error);
-            alert("Failed to fetch patient data.");
+            console.error("Error during patient creation:", error);
+            alert("Failed to create patient tree.");
         }
     };
 
     return (
-        <Container maxWidth="md" sx={{mt: 5}}>
-            <BackButton/>
-            <Typography variant="h3" align="center" sx={{mb: 4}}>
+        <Container maxWidth="md" sx={{ mt: 5 }}>
+            <BackButton />
+            <Typography variant="h3" align="center" sx={{ mb: 4 }}>
                 Patient Map Management
             </Typography>
 
-            <Card sx={{mb: 4}}>
+            <Card sx={{ mb: 4 }}>
                 <CardContent>
-                    <Typography variant="h5" gutterBottom>Search Patients</Typography>
+                    <Typography variant="h5" gutterBottom>New Patient Tree</Typography>
                     <form onSubmit={handleSubmit}>
                         <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Population</InputLabel>
-                                    <Select
-                                        value={selectedPopulation}
-                                        onChange={(e) => setSelectedPopulation(e.target.value)}
-                                        label="Population"
-                                    >
-                                        {Object.keys(populations).map((pop) => (
-                                            <MenuItem key={pop} value={pop}>{pop}</MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-
-                            {selectedPopulation === "Custom Population" && (
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        fullWidth
-                                        label="Enter Custom Population Number"
-                                        type="number"
-                                        value={customPopulationNumber}
-                                        onChange={(e) => setCustomPopulationNumber(e.target.value)}
-                                        inputProps={{ min: "1" }}
-                                        required
-                                    />
-                                </Grid>
-                            )}
-
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Primary Indication</InputLabel>
-                                    <Select
-                                        value={selectedPrimaryIndication}
-                                        onChange={(e) => setSelectedPrimaryIndication(e.target.value)}
-                                        label="Primary Indication"
-                                    >
-                                        {primaryIndications.map((pi) => (
-                                            <MenuItem key={pi} value={pi}>{pi}</MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-
                             <Grid item xs={12} sm={6}>
                                 <FormControl fullWidth>
                                     <InputLabel>Characteristic Type</InputLabel>
@@ -191,9 +145,36 @@ const Patients: React.FC = () => {
                                 </FormControl>
                             </Grid>
 
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Population</InputLabel>
+                                    <Select
+                                        value={selectedPopulation}
+                                        onChange={(e) => setSelectedPopulation(e.target.value)}
+                                        label="Population"
+                                    >
+                                        <MenuItem value="Custom Population">Custom Population</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            {selectedPopulation === "Custom Population" && (
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Enter Population Number"
+                                        type="number"
+                                        value={customPopulationNumber}
+                                        onChange={(e) => setCustomPopulationNumber(e.target.value)}
+                                        inputProps={{ min: "1" }}
+                                        required
+                                    />
+                                </Grid>
+                            )}
+
                             <Grid item xs={12}>
                                 <Button type="submit" variant="contained" fullWidth>
-                                    Search
+                                    Create Patient Tree
                                 </Button>
                             </Grid>
                         </Grid>
@@ -201,7 +182,7 @@ const Patients: React.FC = () => {
                 </CardContent>
             </Card>
 
-            <div style={{height: "500px", width: "100%", border: "1px solid #ddd"}}>
+            <div style={{ height: "500px", width: "100%", border: "1px solid #ddd" }}>
                 <ReactFlow
                     nodes={nodes}
                     edges={edges}
@@ -211,23 +192,9 @@ const Patients: React.FC = () => {
                     fitView
                     nodeTypes={nodeTypes}
                 >
-                    {/*<MiniMap/>*/}
-                    {/*<Controls/>*/}
-                    <Background gap={12} size={1}/>
+                    <Background gap={12} size={1} />
                 </ReactFlow>
             </div>
-            {/*<Card>*/}
-            {/*    <CardContent>*/}
-            {/*        <Typography variant="h5" gutterBottom>Patient Map Visualization</Typography>*/}
-            {/*        <iframe*/}
-            {/*            src="http://localhost:5000/static/pyvis_graph.html"*/}
-            {/*            width="100%"*/}
-            {/*            height="600"*/}
-            {/*            style={{ border: "none" }}*/}
-            {/*            title="Patient Graph"*/}
-            {/*        ></iframe>*/}
-            {/*    </CardContent>*/}
-            {/*</Card>*/}
         </Container>
     );
 };
