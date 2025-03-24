@@ -6,6 +6,7 @@ import Drugs from "./pages/Drugs";
 import Patients from "./pages/Patients";
 import Treatments from "./pages/Treatments";
 import Navbar from "./components/Navbar";
+import FollowUps from "./pages/Follow-Ups";
 
 const App: React.FC = () => {
   return (
@@ -17,6 +18,7 @@ const App: React.FC = () => {
             <Route path="/drugs" element={<Drugs />} />
             <Route path="/patients" element={<Patients />} />
             <Route path="/treatments" element={<Treatments />} />
+            <Route path="/follow-ups" element={<FollowUps />} />
         </Routes>
       </Router>
   );
