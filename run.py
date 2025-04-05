@@ -1,38 +1,91 @@
 import sys
 import os
-from flask import Flask
+from flask import Flask, request, g, redirect
 from models.meta import connect_db  # Your connection helper from meta.py
 from routes.api import api_blueprint
 from routes.auth import auth_blueprint
 from datetime import timedelta
+import secrets
+import logging
+from flask_mail import Mail
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Create a Mail instance that we'll attach to our app
+mail = Mail()
 
 # app.py
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder='templates')
 
-    # Secret key for signing session cookies. Replace with a secure value.
-    app.config['SECRET_KEY'] = '579e4593ab7d119e814e5b1dcd48d26cfd4341802a89750f2324359a12db8a8e'
+    # Get secret key from environment variable or generate a secure one
+    # In production, ALWAYS set this as an environment variable
+    secret_key = os.environ.get('SECRET_KEY')
+    if not secret_key:
+        # Only for development - in production, always use an environment variable
+        secret_key = secrets.token_hex(32)
+        logging.warning("Using a generated SECRET_KEY. In production, set this as an environment variable.")
+    
+    app.config['SECRET_KEY'] = secret_key
+
+    # Email Configuration
+    app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+    app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+    app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() in ('true', 'yes', '1')
+    app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL', 'False').lower() in ('true', 'yes', '1')
+    app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', None)
+    app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', None)
+    app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@example.com')
+    app.config['MAIL_MAX_EMAILS'] = int(os.environ.get('MAIL_MAX_EMAILS', 100))
+    app.config['MAIL_ASCII_ATTACHMENTS'] = os.environ.get('MAIL_ASCII_ATTACHMENTS', 'False').lower() in ('true', 'yes', '1')
+    app.config['MAIL_SUPPRESS_SEND'] = os.environ.get('FLASK_ENV', 'development') != 'production'
+    
+    # Initialize the mail extension
+    mail.init_app(app)
 
     # Common session settings:
-    app.config['SESSION_COOKIE_NAME'] = 'session'  # Default cookie name.
-    app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production if using HTTPS.
-    app.config['SESSION_COOKIE_HTTPONLY'] = True  # Helps protect against XSS.
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Can be 'Lax', 'Strict', or 'None' depending on your requirements.
-    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Lifetime of a permanent session.
+    app.config['SESSION_COOKIE_NAME'] = 'session'
+    app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'  # Only True in production
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)  # Shorter session lifetime for security
+    app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Refresh session on each request
 
-    # Load configuration (you can also use app.config.from_object(...))
-    app.config['MONGO_DBNAME'] = 'minos_db'
-    app.config['MONGO_URI'] = 'mongodb://10.20.52.20:27017/minos_db'
+    # Load database configuration
+    db_name = os.environ.get('MONGO_DBNAME', 'minos_db')
+    db_host = os.environ.get('MONGO_URI', 'mongodb://10.20.52.20:27017/minos_db')
+    
+    app.config['MONGO_DBNAME'] = db_name
+    app.config['MONGO_URI'] = db_host
 
     # Connect to MongoDB using your helper
     connect_db(db_name=app.config['MONGO_DBNAME'], host=app.config['MONGO_URI'])
+    
+    # Add root route that redirects to login
+    @app.route('/')
+    def home():
+        return redirect('/auth/login')
 
     # Register the blueprint for API endpoints
     app.register_blueprint(api_blueprint, url_prefix='/api')
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
+
+    @app.after_request
+    def add_security_headers(response):
+        # Add security headers to all responses
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        
+        # Only in production
+        if os.environ.get('FLASK_ENV') == 'production':
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        
+        return response
 
     return app
 
@@ -40,4 +93,6 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(debug=True, use_reloader=False)
+    app.run(debug=os.environ.get('FLASK_ENV') != 'production', 
+            host='0.0.0.0', 
+            port=int(os.environ.get('PORT', 5000)))

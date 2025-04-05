@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Login</title>
+    <title>Register</title>
     <!-- Include jQuery from a CDN -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
@@ -34,6 +34,11 @@
         margin-bottom: 15px;
         color: red;
       }
+      .password-requirements {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+      }
       button {
         width: 100%;
         padding: 10px;
@@ -46,7 +51,7 @@
       button:hover {
         background-color: #357ae8;
       }
-      .register-link {
+      .login-link {
         text-align: center;
         margin-top: 15px;
         font-size: 14px;
@@ -55,9 +60,9 @@
   </head>
   <body>
     <div class="container">
-      <h2>Login</h2>
+      <h2>Register</h2>
       <div id="message"></div>
-      <form id="loginForm">
+      <form id="registerForm">
         <input
           type="hidden"
           id="csrf_token"
@@ -71,32 +76,50 @@
         <div class="form-group">
           <label for="password">Password:</label>
           <input type="password" id="password" name="password" required />
+          <div class="password-requirements">
+            Password must meet at least 3 of these 4 criteria:<br />
+            - At least 12 characters long<br />
+            - Contains both uppercase and lowercase letters<br />
+            - Contains at least one number<br />
+            - Contains at least one special character<br />
+            (Minimum length: 8 characters)
+          </div>
         </div>
-        <div
-          class="forgot-password"
-          style="text-align: right; margin-bottom: 15px; font-size: 14px"
-        >
-          <a href="/auth/forgot-password">Forgot Password?</a>
+        <div class="form-group">
+          <label for="confirm_password">Confirm Password:</label>
+          <input
+            type="password"
+            id="confirm_password"
+            name="confirm_password"
+            required
+          />
         </div>
-        <button type="submit">Login</button>
+        <button type="submit">Register</button>
       </form>
-      <div class="register-link">
-        Don't have an account? <a href="/auth/register">Register</a>
+      <div class="login-link">
+        Already have an account? <a href="/auth/login">Log in</a>
       </div>
     </div>
 
     <script>
       $(document).ready(function () {
-        $("#loginForm").submit(function (e) {
+        $("#registerForm").submit(function (e) {
           e.preventDefault(); // Prevent form from submitting normally.
           $("#message").text(""); // Clear previous messages.
 
           var email = $("#email").val();
           var password = $("#password").val();
+          var confirmPassword = $("#confirm_password").val();
           var csrfToken = $("#csrf_token").val();
 
+          // Validate password confirmation
+          if (password !== confirmPassword) {
+            $("#message").text("Passwords do not match.");
+            return;
+          }
+
           $.ajax({
-            url: "/auth/login",
+            url: "/auth/register",
             type: "POST",
             contentType: "application/json",
             data: JSON.stringify({
@@ -105,13 +128,8 @@
               csrf_token: csrfToken,
             }),
             success: function (response) {
-              // Check the response from the server.
-              if (response.status && response.status === "fail") {
-                $("#message").text(response.error);
-              } else {
-                // On success, redirect to the dashboard or desired page.
-                window.location.href = "/api/characteristics"; // Change to your desired landing page.
-              }
+              // On success, redirect to the dashboard
+              window.location.href = "/api/characteristics";
             },
             error: function (xhr) {
               // Display error message

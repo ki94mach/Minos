@@ -8,10 +8,13 @@ from mongoengine import (
     ListField,
     EmbeddedDocumentField,
     ObjectIdField,
-    BooleanField
+    BooleanField,
+    DateTimeField,
+    ReferenceField
 )
 
 from enum import Enum
+from datetime import datetime, timedelta
 
 
 class RoleEnum(Enum):
@@ -30,6 +33,50 @@ class User(Document):
     is_active = BooleanField(default=True)
 
     meta = {'collection': 'users'}
+
+
+class PasswordResetToken(Document):
+    user = ReferenceField(User, required=True)
+    token = StringField(required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+    expires_at = DateTimeField(required=True)
+    is_used = BooleanField(default=False)
+    
+    meta = {'collection': 'password_reset_tokens'}
+    
+    @classmethod
+    def create_token(cls, user, expires_in_minutes=30):
+        """Create a new password reset token"""
+        from utils.auth_security import generate_secure_token
+        
+        # Invalidate any existing tokens
+        cls.objects(user=user, is_used=False).update(is_used=True)
+        
+        # Create new token
+        token = generate_secure_token()
+        expires_at = datetime.utcnow() + timedelta(minutes=expires_in_minutes)
+        
+        reset_token = cls(
+            user=user,
+            token=token,
+            expires_at=expires_at
+        ).save()
+        
+        return reset_token
+    
+    @classmethod
+    def validate_token(cls, token):
+        """Validate a token and return the associated user if valid"""
+        reset_token = cls.objects(
+            token=token,
+            is_used=False,
+            expires_at__gt=datetime.utcnow()
+        ).first()
+        
+        if not reset_token:
+            return None
+            
+        return reset_token.user
 
 
 # =============================================================================

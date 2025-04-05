@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>{{ error_title }}</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f2f2f2;
+        color: #333;
+      }
+      .container {
+        width: 500px;
+        margin: 100px auto;
+        padding: 30px;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        text-align: center;
+      }
+      h1 {
+        color: #d9534f;
+        margin-bottom: 20px;
+      }
+      p {
+        font-size: 16px;
+        line-height: 1.6;
+        margin-bottom: 30px;
+      }
+      .btn {
+        display: inline-block;
+        padding: 10px 20px;
+        background-color: #4285f4;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 5px;
+        font-weight: bold;
+      }
+      .btn:hover {
+        background-color: #357ae8;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>{{ error_title }}</h1>
+      <p>{{ error_message }}</p>
+      <a href="/auth/login" class="btn">Return to Login</a>
+    </div>
+  </body>
+</html>
