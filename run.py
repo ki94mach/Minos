@@ -9,6 +9,8 @@ import secrets
 import logging
 from flask_mail import Mail
 from dotenv import load_dotenv
+from flask_session import Session
+import redis
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,6 +19,15 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Create a Mail instance that we'll attach to our app
 mail = Mail()
+
+# Create Redis instance
+redis_client = redis.Redis(
+    host=os.environ.get('REDIS_HOST', '10.20.52.20'),
+    port=int(os.environ.get('REDIS_PORT', 6379)),
+    password=os.environ.get('REDIS_PASSWORD', 'MinosProject1234'),
+    db=int(os.environ.get('REDIS_DB', 0)),
+    decode_responses=False
+)
 
 # app.py
 def create_app():
@@ -47,13 +58,23 @@ def create_app():
     # Initialize the mail extension
     mail.init_app(app)
 
-    # Common session settings:
+    # Redis Session Configuration
+    app.config['SESSION_TYPE'] = 'redis'
+    app.config['SESSION_REDIS'] = redis_client
+    app.config['SESSION_USE_SIGNER'] = True
+    app.config['SESSION_PERMANENT'] = True
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Session lifetime for security
+    app.config['SESSION_KEY_PREFIX'] = 'minos_session:'
+    
+    # Common session settings
     app.config['SESSION_COOKIE_NAME'] = 'session'
     app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'  # Only True in production
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)  # Shorter session lifetime for security
     app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Refresh session on each request
+    
+    # Initialize Flask-Session
+    Session(app)
 
     # Load database configuration
     db_name = os.environ.get('MONGO_DBNAME', 'minos_db')

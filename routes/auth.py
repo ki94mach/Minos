@@ -8,11 +8,13 @@ from utils.auth_security import (
     generate_csrf_token, validate_csrf_token,
     secure_headers, login_required,
     send_password_reset_email, generate_secure_token,
-    PASSWORD_RESET_TIMEOUT_MINUTES
+    PASSWORD_RESET_TIMEOUT_MINUTES,
+    set_user_session, clear_user_session
 )
 from models.tables import RoleEnum, User
 from models.user.driver import UserDriver
 from models.token.driver import TokenDriver
+from datetime import datetime
 
 auth_blueprint = Blueprint('auth', __name__)
 
@@ -67,13 +69,15 @@ def login_post():
         # Login successful - reset failed login counter
         track_login_attempt(email, True)
         
-        # Set session data
-        session['user_id'] = str(user.id)
-        session['email'] = user.email
-        session['role'] = user.role
-        
-        # Generate new CSRF token on successful login
-        generate_csrf_token()  
+        # Set session data using Redis helper
+        set_user_session(
+            user_id=str(user.id),
+            email=user.email,
+            role=user.role,
+            additional_data={
+                'last_login': str(datetime.utcnow())
+            }
+        )
 
         # Return success response with user role
         response = jsonify({'message': 'Login successful', 'role': user.role})
@@ -91,7 +95,7 @@ def login_post():
 
 @auth_blueprint.route('/logout', methods=['GET'])
 def logout():
-    session.clear()
+    clear_user_session()
     return redirect(url_for('auth.login_get'))
 
 
@@ -146,13 +150,15 @@ def register_post():
         # Save user
         user_id = UserDriver.insert(new_user)
         
-        # Auto-login the user after registration
-        session['user_id'] = str(user_id)
-        session['email'] = email
-        session['role'] = RoleEnum.USER.value
-        
-        # Generate new CSRF token
-        generate_csrf_token()
+        # Auto-login the user after registration using Redis helper
+        set_user_session(
+            user_id=str(user_id),
+            email=email,
+            role=RoleEnum.USER.value,
+            additional_data={
+                'registered_at': str(datetime.utcnow())
+            }
+        )
         
         # Return success
         response = jsonify({'message': 'Registration successful', 'role': RoleEnum.USER.value})

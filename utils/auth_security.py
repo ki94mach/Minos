@@ -8,6 +8,8 @@ import secrets
 from datetime import datetime
 import logging
 from flask_mail import Message
+import json
+import redis
 
 # Dictionary to track login attempts
 login_attempts = {}
@@ -18,6 +20,46 @@ LOCKOUT_DURATION = 300  # 5 minutes
 
 # Password reset configuration
 PASSWORD_RESET_TIMEOUT_MINUTES = 30
+
+
+def get_redis_connection():
+    """
+    Get a Redis connection from the Flask application configuration
+    """
+    try:
+        from run import redis_client
+        return redis_client
+    except ImportError:
+        # Fallback to config-based connection
+        redis_url = current_app.config.get('SESSION_REDIS', 'redis://:MinosProject1234@10.20.52.20:6379/0')
+        if isinstance(redis_url, str):
+            return redis.from_url(redis_url)
+        # If SESSION_REDIS is already a Redis instance
+        return redis_url
+
+
+def set_user_session(user_id, email, role, additional_data=None):
+    """
+    Create and store user session data in Redis
+    """
+    session['user_id'] = str(user_id)
+    session['email'] = email
+    session['role'] = role
+    
+    # Store additional user information if provided
+    if additional_data and isinstance(additional_data, dict):
+        for key, value in additional_data.items():
+            session[key] = value
+    
+    # Generate new CSRF token on session creation
+    generate_csrf_token()
+
+
+def clear_user_session():
+    """
+    Clear the user session completely
+    """
+    session.clear()
 
 
 def is_strong_password(password):
@@ -117,11 +159,24 @@ def track_login_attempt(email, success):
 def login_required(f):
     """
     Decorator to protect routes that require authentication.
+    Checks if the user is logged in by verifying the session data in Redis.
+    Updates the session activity timestamp on each access.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('user_id'):
+        user_id = session.get('user_id')
+        if not user_id:
             return jsonify({'error': 'Authentication required'}), 401
+        
+        # Record session activity
+        try:
+            from utils.redis_utils import update_session_activity
+            session_id = session.sid if hasattr(session, 'sid') else None
+            if session_id:
+                update_session_activity(session_id)
+        except Exception as e:
+            logging.warning(f"Could not update session activity: {e}")
+            
         return f(*args, **kwargs)
     return decorated_function
 
