@@ -5,16 +5,17 @@ from utils.helpers import SecurityUtils
 from utils.auth_security import (
     track_login_attempt, is_strong_password, 
     hash_password, verify_password, 
-    generate_csrf_token, validate_csrf_token,
-    secure_headers, login_required,
+    get_csrf_token, login_required,
     send_password_reset_email, generate_secure_token,
     PASSWORD_RESET_TIMEOUT_MINUTES,
-    set_user_session, clear_user_session
+    set_user_session, clear_user_session,
+    secure_headers
 )
 from models.tables import RoleEnum, User
 from models.user.driver import UserDriver
 from models.token.driver import TokenDriver
 from datetime import datetime
+from flask_wtf.csrf import CSRFProtect
 
 auth_blueprint = Blueprint('auth', __name__)
 
@@ -25,11 +26,9 @@ def login_get():
         # Redirect to a dashboard or home route after login
         return redirect(url_for('api.get_characteristics'))
 
-    # Generate CSRF token
-    csrf_token = generate_csrf_token()
-    
-    # Render login template with CSRF token
-    return render_template('login.html', csrf_token=csrf_token)
+    # No need to explicitly generate CSRF token, Flask-WTF does this automatically
+    # when render_template is called
+    return render_template('login.html')
 
 
 @auth_blueprint.route('/login', methods=['POST'])
@@ -37,17 +36,12 @@ def login_post():
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
-    csrf_token = data.get('csrf_token')
+    # CSRF token is validated automatically by Flask-WTF
     
     # Validate required fields
     if not email or not password:
         return jsonify({'status': 'fail', 'error': 'Email and password are required.'}), 400
     
-    # Validate CSRF token
-    if not validate_csrf_token(csrf_token):
-        logging.warning(f'Invalid CSRF token during login attempt for email: {email}')
-        return jsonify({'status': 'fail', 'error': 'Invalid CSRF token.'}), 400
-
     try:
         # Check if account is locked due to too many failed attempts
         if track_login_attempt(email, False):  # Initially mark as failed
@@ -105,10 +99,7 @@ def register_get():
         # Redirect to dashboard if already logged in
         return redirect(url_for('api.get_characteristics'))
     
-    # Generate CSRF token
-    csrf_token = generate_csrf_token()
-    
-    return render_template('register.html', csrf_token=csrf_token)
+    return render_template('register.html')
 
 
 @auth_blueprint.route('/register', methods=['POST'])
@@ -116,15 +107,11 @@ def register_post():
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
-    csrf_token = data.get('csrf_token')
+    # CSRF token is validated automatically by Flask-WTF
     
     # Validate required fields
     if not email or not password:
         return jsonify({'status': 'fail', 'error': 'Email and password are required.'}), 400
-    
-    # Validate CSRF token
-    if not validate_csrf_token(csrf_token):
-        return jsonify({'status': 'fail', 'error': 'Invalid CSRF token.'}), 400
     
     # Validate password strength
     if not is_strong_password(password):
@@ -177,10 +164,7 @@ def register_post():
 @auth_blueprint.route('/change-password', methods=['GET'])
 @login_required
 def change_password_get():
-    # Generate CSRF token
-    csrf_token = generate_csrf_token()
-    
-    return render_template('change_password.html', csrf_token=csrf_token)
+    return render_template('change_password.html')
 
 
 @auth_blueprint.route('/change-password', methods=['POST'])
@@ -189,15 +173,11 @@ def change_password():
     data = request.get_json()
     current_password = data.get('current_password')
     new_password = data.get('new_password')
-    csrf_token = data.get('csrf_token')
+    # CSRF token is validated automatically by Flask-WTF
     
     # Validate required fields
     if not current_password or not new_password:
         return jsonify({'status': 'fail', 'error': 'Current and new passwords are required.'}), 400
-    
-    # Validate CSRF token
-    if not validate_csrf_token(csrf_token):
-        return jsonify({'status': 'fail', 'error': 'Invalid CSRF token.'}), 400
     
     # Validate password strength
     if not is_strong_password(new_password):
@@ -219,9 +199,6 @@ def change_password():
         user.password_hash = hash_password(new_password)
         UserDriver.update(user)
         
-        # Generate new CSRF token after password change
-        generate_csrf_token()
-        
         return jsonify({'message': 'Password changed successfully'}), 200
         
     except Exception as e:
@@ -235,27 +212,14 @@ def forgot_password_get():
         # If already logged in, redirect to dashboard
         return redirect(url_for('api.get_characteristics'))
     
-    # Generate CSRF token
-    csrf_token = generate_csrf_token()
-    
-    # Render forgot password template
-    return render_template('forgot_password.html', csrf_token=csrf_token)
+    return render_template('forgot_password.html')
 
 
 @auth_blueprint.route('/forgot-password', methods=['POST'])
 def forgot_password_post():
     data = request.get_json()
     email = data.get('email')
-    csrf_token = data.get('csrf_token')
-    
-    # Validate email
-    if not email:
-        return jsonify({'status': 'fail', 'error': 'Email is required.'}), 400
-    
-    # Validate CSRF token
-    if not validate_csrf_token(csrf_token):
-        logging.warning(f'Invalid CSRF token during forgot password attempt for email: {email}')
-        return jsonify({'status': 'fail', 'error': 'Invalid CSRF token.'}), 400
+    # CSRF token is validated automatically by Flask-WTF
     
     try:
         # Find user by email
@@ -297,34 +261,16 @@ def reset_password_get(token):
                               error_title='Invalid Reset Link',
                               error_message='The password reset link is invalid or has expired. Please request a new one.')
     
-    # Generate CSRF token
-    csrf_token = generate_csrf_token()
-    
     # Render reset password form
-    return render_template('reset_password.html', token=token, csrf_token=csrf_token)
+    return render_template('reset_password.html', token=token)
 
 
 @auth_blueprint.route('/reset-password', methods=['POST'])
 def reset_password_post():
     data = request.get_json()
-    password = data.get('password')
     token = data.get('token')
-    csrf_token = data.get('csrf_token')
-    
-    # Validate data
-    if not password or not token:
-        return jsonify({'status': 'fail', 'error': 'Password and token are required.'}), 400
-    
-    # Validate CSRF token
-    if not validate_csrf_token(csrf_token):
-        return jsonify({'status': 'fail', 'error': 'Invalid CSRF token.'}), 400
-    
-    # Validate password strength
-    if not is_strong_password(password):
-        return jsonify({
-            'status': 'fail', 
-            'error': 'Password must meet at least 3 of these 4 criteria: 12+ characters, mix of upper/lowercase, contains digits, contains special characters. Minimum length: 8 characters.'
-        }), 400
+    password = data.get('password')
+    # CSRF token is validated automatically by Flask-WTF
     
     try:
         # Validate token and get user

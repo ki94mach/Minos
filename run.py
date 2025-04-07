@@ -11,6 +11,7 @@ from flask_mail import Mail
 from dotenv import load_dotenv
 from flask_session import Session
 import redis
+from flask_wtf.csrf import CSRFProtect  # Add Flask-WTF CSRF protection
 
 # Load environment variables from .env file
 load_dotenv()
@@ -19,6 +20,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Create a Mail instance that we'll attach to our app
 mail = Mail()
+
+# Create CSRF protection instance
+csrf = CSRFProtect()
 
 # Create Redis instance
 redis_client = redis.Redis(
@@ -42,6 +46,10 @@ def create_app():
         logging.warning("Using a generated SECRET_KEY. In production, set this as an environment variable.")
     
     app.config['SECRET_KEY'] = secret_key
+    
+    # CSRF Protection configuration
+    app.config['WTF_CSRF_ENABLED'] = True
+    app.config['WTF_CSRF_TIME_LIMIT'] = 3600  # 1 hour in seconds
 
     # Email Configuration
     app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
@@ -57,6 +65,9 @@ def create_app():
     
     # Initialize the mail extension
     mail.init_app(app)
+    
+    # Initialize CSRF protection
+    csrf.init_app(app)
 
     # Redis Session Configuration
     app.config['SESSION_TYPE'] = 'redis'

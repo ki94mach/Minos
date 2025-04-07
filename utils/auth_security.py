@@ -10,6 +10,7 @@ import logging
 from flask_mail import Message
 import json
 import redis
+from flask_wtf.csrf import generate_csrf
 
 # Dictionary to track login attempts
 login_attempts = {}
@@ -51,8 +52,8 @@ def set_user_session(user_id, email, role, additional_data=None):
         for key, value in additional_data.items():
             session[key] = value
     
-    # Generate new CSRF token on session creation
-    generate_csrf_token()
+    # Generate new CSRF token on session creation using Flask-WTF
+    generate_csrf()
 
 
 def clear_user_session():
@@ -181,20 +182,12 @@ def login_required(f):
     return decorated_function
 
 
-def generate_csrf_token():
+def get_csrf_token():
     """
-    Generates a CSRF token for form protection.
+    Gets a CSRF token using Flask-WTF's generate_csrf function.
+    This replaces the custom generate_csrf_token function.
     """
-    if 'csrf_token' not in session:
-        session['csrf_token'] = secrets.token_hex(32)
-    return session['csrf_token']
-
-
-def validate_csrf_token(token):
-    """
-    Validates a CSRF token.
-    """
-    return token == session.get('csrf_token')
+    return generate_csrf()
 
 
 def generate_secure_token(length=64):

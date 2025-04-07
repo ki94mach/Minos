@@ -62,7 +62,7 @@
           type="hidden"
           id="csrf_token"
           name="csrf_token"
-          value="{{ csrf_token }}"
+          value="{{ csrf_token() }}"
         />
         <div class="form-group">
           <label for="email">Email:</label>
@@ -99,10 +99,12 @@
             url: "/auth/login",
             type: "POST",
             contentType: "application/json",
+            headers: {
+              "X-CSRFToken": csrfToken,
+            },
             data: JSON.stringify({
               email: email,
               password: password,
-              csrf_token: csrfToken,
             }),
             success: function (response) {
               // Check the response from the server.
