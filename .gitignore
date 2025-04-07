@@ -62,3 +62,4 @@ logs/
 # Local development
 .coverage
 htmlcov/
+flask_session/
