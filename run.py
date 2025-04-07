@@ -11,7 +11,7 @@ from flask_mail import Mail
 from dotenv import load_dotenv
 from flask_session import Session
 import redis
-from flask_wtf.csrf import CSRFProtect  # Add Flask-WTF CSRF protection
+from flask_wtf.csrf import CSRFProtect, CSRFError  # Add CSRFError
 
 # Load environment variables from .env file
 load_dotenv()
@@ -50,6 +50,9 @@ def create_app():
     # CSRF Protection configuration
     app.config['WTF_CSRF_ENABLED'] = True
     app.config['WTF_CSRF_TIME_LIMIT'] = 3600  # 1 hour in seconds
+    app.config['WTF_CSRF_SSL_STRICT'] = False  # Set to True in production with HTTPS
+    app.config['WTF_CSRF_METHODS'] = ['POST', 'PUT', 'PATCH', 'DELETE']  # Explicitly define methods
+    app.config['WTF_CSRF_CHECK_DEFAULT'] = True  # Ensure CSRF checking is enabled by default
 
     # Email Configuration
     app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
@@ -68,6 +71,14 @@ def create_app():
     
     # Initialize CSRF protection
     csrf.init_app(app)
+    
+    # Handle CSRF errors
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(e):
+        return {
+            'error': 'CSRF token validation failed',
+            'message': e.description
+        }, 400
 
     # Redis Session Configuration
     app.config['SESSION_TYPE'] = 'redis'
