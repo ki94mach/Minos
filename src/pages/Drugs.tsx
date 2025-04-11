@@ -3,6 +3,13 @@ import { TextField, Button, Typography, Container, Card, CardContent, Select, Me
 import axios from "axios";
 import BackButton from "../components/BackButton";
 
+interface Drug {
+    _id: string;
+    name: string;
+    strength: number;
+    unit: string;
+}
+
 const Drugs: React.FC = () => {
     const [name, setName] = useState("");
     const [strength, setStrength] = useState<number | "">("");
@@ -18,7 +25,10 @@ const Drugs: React.FC = () => {
         setLoading(true);
         try {
             const response = await axios.get("http://localhost:5000/api/drugs");
-            setDrugs(response.data);
+            const parsedDrugs = response.data.map((item: string) => JSON.parse(item));
+            setDrugs(parsedDrugs);
+
+            console.log("Parsed Drugs:", parsedDrugs);
         } catch (error) {
             console.error("Error fetching drugs:", error);
             alert("Error loading drugs.");
@@ -111,7 +121,7 @@ const Drugs: React.FC = () => {
                     ) : drugs.length > 0 ? (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                             {drugs.map((drug) => (
-                                <Card key={drug.id} variant="outlined" sx={{ p: 2 }}>
+                                <Card key={drug._id} variant="outlined" sx={{ p: 2 }}>
                                     <Typography>
                                         {drug.name} - {drug.strength} {drug.unit}
                                     </Typography>

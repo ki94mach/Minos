@@ -67,16 +67,6 @@ const Home: React.FC = () => {
                             </Button>
                         </Grid>
 
-                        <Grid item xs={12}>
-                            <Button
-                                variant="contained"
-                                fullWidth
-                                component={Link}
-                                to="/follow-ups"
-                            >
-                                Follow-Ups
-                            </Button>
-                        </Grid>
                     </Grid>
                 </CardContent>
             </Card>

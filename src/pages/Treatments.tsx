@@ -24,7 +24,6 @@ interface DrugWithCon {
 interface Alternative {
     _id?: string;
     name: string;
-    regimen: { drugs: DrugWithCon[] };
     ratio: number;
 }
 
@@ -41,7 +40,7 @@ const Treatments: React.FC = () => {
     const [treatments, setTreatments] = useState<Treatment[]>([]);
 
     const [treatmentName, setTreatmentName] = useState("");
-    const [treatmentType, setTreatmentType] = useState("Regimen");
+    const [treatmentType, setTreatmentType] = useState("Treatment");
 
     const [selectedDrugId, setSelectedDrugId] = useState("");
     const [annualPatientCon, setAnnualPatientCon] = useState<number>(0);
@@ -60,7 +59,8 @@ const Treatments: React.FC = () => {
     const fetchDrugs = async () => {
         try {
             const response = await axios.get("http://localhost:5000/api/drugs");
-            setDrugs(response.data);
+            const parsedDrugs = response.data.map((item: string) => JSON.parse(item));
+            setDrugs(parsedDrugs);
         } catch (error) {
             console.error("Error fetching drugs:", error);
         }
@@ -69,7 +69,8 @@ const Treatments: React.FC = () => {
     const fetchTreatments = async () => {
         try {
             const response = await axios.get("http://localhost:5000/api/treatments");
-            setTreatments(response.data);
+            const parsedTreatments = response.data.map((item: string) => JSON.parse(item));
+            setTreatments(parsedTreatments);
         } catch (error) {
             console.error("Error fetching treatments:", error);
         }
@@ -92,14 +93,13 @@ const Treatments: React.FC = () => {
     };
 
     const addAlternative = () => {
-        if (!alternativeName || alternativeRegimenDrugs.length === 0 || alternativeRatio <= 0 || alternativeRatio > 1) {
+        if (!alternativeName || alternativeRatio <= 0 || alternativeRatio > 1) {
             alert("Add a name, valid ratio (0-1), and at least one drug to the alternative.");
             return;
         }
         const newAlt: Alternative = {
             _id: uuidv4(),
             name: alternativeName,
-            regimen: { drugs: alternativeRegimenDrugs },
             ratio: alternativeRatio
         };
         setAlternatives([...alternatives, newAlt]);
@@ -133,7 +133,6 @@ const Treatments: React.FC = () => {
 
     const resetForm = () => {
         setTreatmentName("");
-        setTreatmentType("Regimen");
         setRegimenDrugs([]);
         setAlternatives([]);
     };
@@ -155,12 +154,21 @@ const Treatments: React.FC = () => {
                                 <FormControl fullWidth required>
                                     <InputLabel>Type</InputLabel>
                                     <Select value={treatmentType} onChange={(e) => setTreatmentType(e.target.value)} label="Type">
+                                        <MenuItem value="Treatment">Treatment</MenuItem>
                                         <MenuItem value="Regimen">Regimen</MenuItem>
                                         <MenuItem value="Alternative">Alternative</MenuItem>
                                     </Select>
                                 </FormControl>
                             </Grid>
                         </Grid>
+
+                        {treatmentType === "Treatment" && (
+                        <Box mt={3}>
+                            <Typography variant="body1" color="textSecondary">
+                            Basic treatment. No regimen or alternatives required.
+                            </Typography>
+                        </Box>
+                        )}
 
                         {/* Regimen Section */}
                         {treatmentType === "Regimen" && (
@@ -200,22 +208,9 @@ const Treatments: React.FC = () => {
                                 <Typography variant="subtitle1">Add Alternative Regimen</Typography>
                                 <TextField label="Alternative Name" value={alternativeName} onChange={(e) => setAlternativeName(e.target.value)} fullWidth sx={{ mb: 2 }} />
                                 <Grid container spacing={2}>
-                                    <Grid item xs={6}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Select Drug</InputLabel>
-                                            <Select value={selectedDrugId} onChange={(e) => setSelectedDrugId(e.target.value)}>
-                                                {drugs.map(drug => (
-                                                    <MenuItem key={drug._id} value={drug._id}>{drug.name} - {drug.strength} {drug.unit}</MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Grid>
-                                    <Grid item xs={4}>
-                                        <TextField type="number" label="Annual Patient Con" fullWidth value={annualPatientCon} onChange={(e) => setAnnualPatientCon(Number(e.target.value))} />
-                                    </Grid>
-                                    <Grid item xs={2}>
-                                        <Button variant="contained" onClick={() => addDrug(true)} fullWidth>Add</Button>
-                                    </Grid>
+                                    
+                                    
+                                    
                                 </Grid>
                                 <List>
                                     {alternativeRegimenDrugs.map((item, i) => (
@@ -231,13 +226,7 @@ const Treatments: React.FC = () => {
                                 {alternatives.map((alt, i) => (
                                     <Paper key={i} sx={{ p: 2, mb: 2 }}>
                                         <Typography variant="body2"><strong>{alt.name}</strong> (Ratio: {alt.ratio})</Typography>
-                                        <List dense>
-                                            {alt.regimen.drugs.map((drugWithCon, j) => (
-                                                <ListItem key={j}>
-                                                    <ListItemText primary={`${drugWithCon.drug.name} - ${drugWithCon.drug.strength} ${drugWithCon.drug.unit}`} secondary={`Annual: ${drugWithCon.annual_patient_con}`} />
-                                                </ListItem>
-                                            ))}
-                                        </List>
+                                    
                                         <Button size="small" color="error" onClick={() => setAlternatives(alternatives.filter((_, idx) => idx !== i))}>Remove</Button>
                                     </Paper>
                                 ))}
