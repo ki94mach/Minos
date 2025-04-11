@@ -1,33 +1,82 @@
-# Ignore Python-related files and folders
+# Python
 src/pkg/test.ipynb
-docs
 src/__pycache__/
-__pycache__/*
+*/__pycache__/*
 src/pkg/__pycache__/
 src/web_app/__pycache__/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Node.js and frontend-related ignores
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Virtual Environment
+venv/
+ENV/
+.env
+.venv
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# testing
-/coverage
-
-# production
-/build
-
-# misc
-.DS_Store
+# Environment Variables and Security
+.env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.cert
+*.crt
 
-# Logs
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Log files
+*.log
+logs/
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Database
+*.db
+*.sqlite3
+*.sqlite
+
+# Local development
+.coverage
+htmlcov/
+flask_session/
+
+# Frontend-specific
+/node_modules
+/.pnp
+.pnp.js
+/coverage
+/build
+
+# Misc frontend docs
+docs
