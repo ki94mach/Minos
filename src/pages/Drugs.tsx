@@ -17,7 +17,7 @@ const Drugs: React.FC = () => {
     const fetchDrugs = async () => {
         setLoading(true);
         try {
-            const response = await axios.get("http://localhost:5000/drugs");
+            const response = await axios.get("http://localhost:5000/api/drugs");
             setDrugs(response.data);
         } catch (error) {
             console.error("Error fetching drugs:", error);
@@ -34,7 +34,7 @@ const Drugs: React.FC = () => {
         }
 
         try {
-            await axios.post("http://localhost:5000/drugs", {
+            await axios.post("http://localhost:5000/api/drugs", {
                 name,
                 strength: Number(strength),
                 unit

@@ -48,7 +48,7 @@ const Patients: React.FC = () => {
     useEffect(() => {
         const fetchPatients = async () => {
             try {
-                const response = await axios.get("http://localhost:5000/patients");
+                const response = await axios.get("http://localhost:5000/api/patients");
                 const formattedNodes = response.data.map((patient: any, index: number) => ({
                     id: patient._id,
                     position: { x: index * 200, y: 100 },
@@ -73,7 +73,7 @@ const Patients: React.FC = () => {
         let populationNumber = selectedPopulation === "Custom Population" ? Number(customPopulationNumber) : null;
 
         try {
-            const response = await axios.post("http://localhost:5000/patients", {
+            const response = await axios.post("http://localhost:5000/api/patients", {
                 node: {
                     node_type: "characteristic",
                     rate: 1.0,

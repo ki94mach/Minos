@@ -16,7 +16,7 @@ const FollowUps: React.FC = () => {
 
     const fetchFollowups = async () => {
         try {
-            const response = await axios.get("http://localhost:5000/followups");
+            const response = await axios.get("http://localhost:5000/api/followups");
             setFollowups(response.data);
         } catch (error) {
             console.error("Error fetching followups:", error);
@@ -26,7 +26,7 @@ const FollowUps: React.FC = () => {
     const handleCreateFollowup = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const response = await axios.post("http://localhost:5000/followups", {
+            const response = await axios.post("http://localhost:5000/api/followups", {
                 name,
                 overall_survival: parseFloat(overallSurvival),
                 patient_id: patientId,
@@ -42,7 +42,7 @@ const FollowUps: React.FC = () => {
 
     const handleDeleteFollowup = async (id: string) => {
         try {
-            await axios.delete(`http://localhost:5000/followups/${id}`);
+            await axios.delete(`http://localhost:5000/api/followups/${id}`);
             alert("Follow-up deleted successfully!");
             fetchFollowups();
         } catch (error) {

@@ -23,8 +23,14 @@ const Characteristics: React.FC = () => {
 
     const fetchCharacteristics = async () => {
         try {
-            const response = await axios.get("http://localhost:3000/characteristics");
-            setCharacteristics(response.data);
+            const response = await axios.get("http://localhost:5000/api/characteristics");
+            const parsed = response.data.map((item: string) => {
+                const obj = JSON.parse(item);
+                return { ...obj, _id: obj._id.$oid };
+              });
+
+    console.log("Parsed:", parsed);
+    setCharacteristics(parsed);
         } catch (error) {
             console.error("Error fetching characteristics:", error);
             setErrors("Error fetching characteristics.");
@@ -35,10 +41,18 @@ const Characteristics: React.FC = () => {
         e.preventDefault();
         try {
             if (editingId) {
-                await axios.put(`http://localhost:3000/characteristics/${editingId}`, { type, name });
+                await axios.put(`http://localhost:5000/api/characteristics/${editingId}`, { type, name });
                 setEditingId("");
             } else {
-                await axios.post("http://localhost:3000/characteristics", { type, name });
+                await axios.post(
+                    "http://localhost:5000/api/characteristics",
+                    { type, name },
+                    {
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                    }
+                  );
             }
             setType("");
             setName("");
@@ -58,7 +72,7 @@ const Characteristics: React.FC = () => {
 
     const handleDelete = async (char_id: string) => {
         try {
-            await axios.delete(`http://localhost:3000/characteristics/${char_id}`);
+            await axios.delete(`http://localhost:5000/api/characteristics/${char_id}`);
             fetchCharacteristics();
             alert("Characteristic deleted successfully!");
         } catch (error) {
@@ -93,11 +107,12 @@ const Characteristics: React.FC = () => {
                         <Button variant="contained" type="submit" fullWidth>Add Characteristic</Button>
                     </form>
                     {errors && <Typography color="error">{errors}</Typography>}
-                    <List>
+                    <List sx={{ backgroundColor: "#f0f0f0"}}>
                         
                         {characteristics.map((char: Characteristic) => (
-                            <ListItem key={char._id} secondaryAction={
+                            <ListItem key={char._id} sx={{ borderBottom: '1px solid #ccc', py: 1 }} secondaryAction={
                                 <>
+                                    
                                     <IconButton edge="end" aria-label="edit" onClick={() => handleEdit(char)}>
                                         <Edit />
                                     </IconButton>
@@ -106,7 +121,10 @@ const Characteristics: React.FC = () => {
                                     </IconButton>
                                 </>
                             }>
-                                <ListItemText primary={char.name} secondary={char.type} />
+                                <ListItemText
+                                    primary={<Typography sx={{ color: "#000" }}>{char.name}</Typography>}
+                                    secondary={<Typography sx={{ color: "#555" }}>{char.type}</Typography>}
+                                />
                             </ListItem>
                         ))}
                     </List>
