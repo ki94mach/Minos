@@ -3,14 +3,13 @@ import bcrypt
 from flask import session, request, jsonify, redirect, url_for, current_app
 from functools import wraps
 import time
-import hashlib
 import secrets
-from datetime import datetime
 import logging
 from flask_mail import Message
-import json
 import redis
 from flask_wtf.csrf import generate_csrf
+
+from validators.auth_validators import RegisterUserSchema
 
 # Dictionary to track login attempts
 login_attempts = {}
@@ -61,45 +60,6 @@ def clear_user_session():
     Clear the user session completely
     """
     session.clear()
-
-
-def is_strong_password(password):
-    """
-    Validates password strength.
-    Must meet at least 3 of these 4 criteria:
-    - At least 12 characters long
-    - Contains lowercase and uppercase letters
-    - Contains at least one digit
-    - Contains at least one special character
-    
-    Browser auto-generated passwords are typically very strong but might not
-    meet every specific requirement.
-    """
-    # Initialize criteria counter
-    criteria_met = 0
-    
-    # Check password length - browsers usually generate long passwords
-    if len(password) >= 12:
-        criteria_met += 1
-    
-    # Check for mix of upper and lowercase
-    if bool(re.search(r'[a-z]', password)) and bool(re.search(r'[A-Z]', password)):
-        criteria_met += 1
-    
-    # Check for digits
-    if bool(re.search(r'\d', password)):
-        criteria_met += 1
-    
-    # Check for special characters
-    if bool(re.search(r'[!@#$%^&*(),.?":{}|<>_\-+=[\]\\;\'/]', password)):
-        criteria_met += 1
-    
-    # Always require minimum length for security
-    if len(password) < 8:
-        return False
-        
-    # Password is strong if it meets at least 3 of the 4 criteria
-    return criteria_met >= 3
 
 
 def hash_password(password):
