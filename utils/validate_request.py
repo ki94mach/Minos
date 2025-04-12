@@ -28,6 +28,7 @@ def validate_request(model_class, location='json'):
             pass
     """
     def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
             try:
                 if location == 'json':
