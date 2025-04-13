@@ -1,13 +1,13 @@
 # validators/auth_validators.py
 
 import re
-from pydantic import BaseModel, validator, EmailStr
+from pydantic import BaseModel, field_validator, EmailStr
 
 class RegisterUserSchema(BaseModel):
     email: EmailStr
     password: str
 
-    @validator("password")
+    @field_validator("password")
     def validate_password(cls, value):
         # Always require a minimum length of 8 characters
         if len(value) < 8:
