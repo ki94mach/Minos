@@ -212,3 +212,29 @@ class PatientNode(BaseModel):
 
 class PatientCreate(BaseModel):
     node: PatientNode
+
+class PatientUpdate(BaseModel):
+    size: Optional[float] = None
+    tree: Optional[PatientNode] = None
+
+class AddNode(BaseModel):
+    parent_node_id: Optional[PyObjectId] = None
+    node: PatientNode
+    children: Optional[List[PatientNode]] = None
+
+class UpdateNode(BaseModel):
+    rate: Optional[float] = None
+    size: Optional[float] = None
+    node_type: Optional[str] = None
+    parent_id: Optional[PyObjectId] = None
+    characteristic_data: Optional[CharacteristicData] = None
+    treatment_data: Optional[TreatmentData] = None
+    followup_data: Optional[FollowupData] = None
+    children: Optional[List[PatientNode]] = None
+
+    @field_validator('node_type')
+    def validate_optional_node_type(cls, v):
+        if v and v not in ALLOWED_NODE_TYPES:
+            raise ValueError(f"node_type must be one of {ALLOWED_NODE_TYPES}")
+        return v
+    

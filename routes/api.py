@@ -18,8 +18,15 @@ from models.patient.driver import PatientDriver
 from models.treatment.driver import TreatmentDriver
 
 # Import model classes from tables for creating new instances.
-from models.tables import Characteristic, Drug, Followup, Treatment, PatientTree
-from models.tables import Node, CharacteristicEmbedded, TreatmentEmbedded, FollowupEmbedded
+from models.tables import (Characteristic, Drug, Followup,
+                           Treatment, PatientTree)
+from models.tables import (Node, CharacteristicEmbedded,
+                           TreatmentEmbedded, FollowupEmbedded)
+from validators.api_validators import (CharacteristicCreate, CharacteristicUpdate,
+                                       DrugCreate, DrugUpdate, TreatmentUpdate,
+                                       TreatmentCreate, PatientCreate, PatientUpdate,
+                                       AddNode, UpdateNode, FollowupUpdate, FollowupCreate)
+from utils.validate_request import validate_request
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -39,6 +46,7 @@ def get_characteristics():
 
 
 @api_blueprint.route('/characteristics', methods=['POST'])
+@validate_request(CharacteristicCreate, location='json')
 def create_characteristic():
     """
     Expected JSON body:
@@ -67,6 +75,7 @@ def create_characteristic():
 
 
 @api_blueprint.route('/characteristics/<char_id>', methods=['PUT'])
+@validate_request(CharacteristicUpdate, location='json')
 def update_characteristic(char_id):
     """
     Expected JSON body (any subset):
@@ -121,6 +130,7 @@ def get_drugs():
 
 
 @api_blueprint.route('/drugs', methods=['POST'])
+@validate_request(DrugCreate, location='json')
 def create_drug():
     """
     Expected JSON body:
@@ -151,6 +161,7 @@ def create_drug():
 
 
 @api_blueprint.route('/drugs/<drug_id>', methods=['PUT'])
+@validate_request(DrugUpdate, location='json')
 def update_drug(drug_id):
     """
     Expected JSON body (any subset):
@@ -209,6 +220,7 @@ def get_treatments():
 
 
 @api_blueprint.route('/treatments', methods=['POST'])
+@validate_request(TreatmentCreate, location='json')
 def create_treatment():
     """
     Expected JSON body:
@@ -346,6 +358,7 @@ def create_treatment():
 
 
 @api_blueprint.route('/treatments/<treatment_id>', methods=['PUT'])
+@validate_request(TreatmentUpdate, location='json')
 def update_treatment(treatment_id):
     """
     Expected JSON body (any subset):
@@ -416,6 +429,7 @@ def get_patients():
 
 
 @api_blueprint.route('/patients', methods=['POST'])
+@validate_request(PatientCreate, location='json')
 def create_patient():
     """
     Expected JSON body (legacy style):
@@ -604,6 +618,7 @@ def create_node_from_dict(node_dict, parent_id=None):
 
 # -------------------------------------------------------------------
 @api_blueprint.route('/patients/<patient_id>/add_node', methods=['POST'])
+@validate_request(AddNode, location='json')
 def add_node(patient_id):
     """
     Expected JSON body example:
@@ -707,6 +722,7 @@ def add_node(patient_id):
 
 
 @api_blueprint.route('/patients/<patient_id>', methods=['PUT'])
+@validate_request(PatientUpdate, location='json')
 def update_patient(patient_id):
     """
     Expected JSON body (any subset, legacy style):
@@ -766,6 +782,7 @@ def update_patient(patient_id):
 
 
 @api_blueprint.route('/patients/<patient_id>/node/<node_id>', methods=['PUT'])
+@validate_request(UpdateNode, location='json')
 def update_node(patient_id, node_id):
     """
     Expected JSON body (any subset, legacy style):
@@ -961,6 +978,7 @@ def get_followups():
 
 
 @api_blueprint.route('/followups', methods=['POST'])
+@validate_request(FollowupCreate, location='json')
 def create_followup():
     """
     Expected JSON body:
@@ -998,6 +1016,7 @@ def create_followup():
 
 
 @api_blueprint.route('/followups/<followup_id>', methods=['PUT'])
+@validate_request(FollowupUpdate, location='json')
 def update_followup(followup_id):
     """
     Expected JSON body (any subset):
