@@ -1,7 +1,13 @@
 # validators/api_validators.py
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, List
 from bson import ObjectId
+
+# Drivers
+from models.drug.driver import DrugDriver
+from models.treatment.driver import TreatmentDriver
+from models.characteristic.driver import CharacteristicDriver
+from models.followup.driver import FollowupDriver
 
 # Constants for allowed values.
 ALLOWED_UNITS = ['mg', 'g', 'ng', 'mcg', 'IU']
@@ -47,6 +53,7 @@ class DrugCreate(BaseModel):
     unit: str
     
     @field_validator('unit')
+    @classmethod
     def validate_unit(cls, v):
         if v not in ALLOWED_UNITS:
             raise ValueError(f'Unit must be one of {ALLOWED_UNITS}')
@@ -58,6 +65,7 @@ class DrugUpdate(BaseModel):
     unit: Optional[str]
 
     @field_validator('unit')
+    @classmethod
     def validate_unit(cls, v):
         if v is None:
             return v
@@ -77,10 +85,26 @@ class DrugSubItem(BaseModel):
     unit: str
 
     @field_validator('unit')
+    @classmethod
     def validate_unit(cls, v):
         if v not in ALLOWED_UNITS:
             raise ValueError(f'Unit must be one of {ALLOWED_UNITS}')
         return v
+    
+    @model_validator(mode="after")
+    @classmethod
+    def validate_against_database(cls, values):
+        drug_id = values.get("_id")
+        db_drug = DrugDriver.get_by_id(drug_id)
+        if db_drug is None:
+            raise ValueError(f"Drug with id {drug_id} not found in the database")
+        if values.get("name") != db_drug.name:
+            raise ValueError("Embedded drug: 'name' does not match the database record")
+        if values.get("strength") != db_drug.strength:
+            raise ValueError("Embedded drug: 'strength' does not match the database record")
+        if values.get("unit") != db_drug.unit:
+            raise ValueError("Embedded drug: 'unit' does not match the database record")
+        return values
     
 class TreatmentDrugItem(BaseModel):
     drug: DrugSubItem
@@ -89,12 +113,27 @@ class TreatmentDrugItem(BaseModel):
 class Regimen(BaseModel):
     drugs: List[TreatmentDrugItem]
 
-# For nested models in Regimen treatments
+# For nested models in Alternative treatments
 class AlternativeTreatment(BaseModel):
-    _id: Optional[PyObjectId]
+    _id: PyObjectId
     name: str
     regimen: Regimen
     ratio: float
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_against_database(cls, values):
+        treatment_id = values.get("_id")
+        db_treatment = TreatmentDriver.get_by_id(treatment_id)
+        if db_treatment is None:
+            raise ValueError(f"Treatment with id {treatment_id} not found in the database")
+        if values.get("name") != db_treatment.name:
+            raise ValueError("Embedded Treatment: 'name' does not match the database record")
+        if values.get("strength") != db_treatment.regimen:
+            raise ValueError("Embedded Treatment: 'strength' does not match the database record")
+        if values.get("unit") != db_treatment.ratio:
+            raise ValueError("Embedded Treatment: 'unit' does not match the database record")
+        return values
 
 class TreatmentCreate(BaseModel):
     name: str
@@ -103,12 +142,14 @@ class TreatmentCreate(BaseModel):
     alternatives: Optional[List[AlternativeTreatment]] = None
 
     @field_validator('type')
+    @classmethod
     def validate_treatment_type(cls, v):
         if v not in ALLOWED_TREATMENT_TYPES:
             raise ValueError(f'Type must be one of {ALLOWED_TREATMENT_TYPES}')
         return v
     
     @field_validator('regimen', always=True)
+    @classmethod
     def validate_regimen_field(cls, v, values):
         treatment_type = values.get('type')
         if treatment_type == 'Alternative' and v is not None:
@@ -124,6 +165,7 @@ class TreatmentUpdate(BaseModel):
     alternatives: Optional[List[AlternativeTreatment]] = None
 
     @field_validator('type')
+    @classmethod
     def validate_treatment_type(cls, v):
         if v is None:
             return v
@@ -154,19 +196,55 @@ class CharacteristicData(BaseModel):
     char_type: str
     name: str
 
+    @model_validator(mode="after")
+    @classmethod
+    def validate_against_database(cls, values):
+        char_id = values.get("_id")
+        db_char = CharacteristicDriver.find(id=char_id).first()
+        if db_char is None:
+            raise ValueError(f"Characteristic with id {char_id} not found in the database")
+        if values.get("char_type") != db_char.char_type:
+            raise ValueError("Embedded characteristic: 'char_type' does not match the database record")
+        if values.get("name") != db_char.name:
+            raise ValueError("Embedded characteristic: 'name' does not match the database record")
+        return values
+    
 class TreatmentData(BaseModel):
     _id: PyObjectId
     name: str = Field(..., min_length=1)
-    
+   
     @field_validator("name")
+    @classmethod
     def name_must_be_non_empty(cls, v):
         if not v.strip():
             raise ValueError("Treatment name must not be empty")
         return v
 
+    @model_validator(mode="after")
+    @classmethod
+    def validate_against_database(cls, values):
+        treatment_id = values.get("_id")
+        db_treatment = TreatmentData.find(id=treatment_id).first()
+        if db_treatment is None:
+            raise ValueError(f"Treatment with id {treatment_id} not found in the database")
+        if values.get("name") != db_treatment.name:
+            raise ValueError("Embedded Treatment: 'name' does not match the database record")
+        return values
+
 class FollowupData(BaseModel):
     _id: PyObjectId
     overall_survival: float = Field(..., ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_against_database(cls, values):
+        followup_id = values.get("_id")
+        db_followup = CharacteristicDriver.find(id=followup_id).first()
+        if db_followup is None:
+            raise ValueError(f"Followup with id {followup_id} not found in the database")
+        if values.get("overall_survival") != db_followup.overall_survival:
+            raise ValueError("Embedded Followup: 'overall_survival' does not match the database record")
+        return values
 
 # ------------------------------------------------------------------------------
 # PATIENT NODE AND PATIENT CREATE VALIDATORS
@@ -183,24 +261,28 @@ class PatientNode(BaseModel):
     children: Optional[List["PatientNode"]] = None
 
     @field_validator('node_type')
+    @classmethod
     def validate_node_type(cls, v):
         if v not in ALLOWED_NODE_TYPES:
             raise ValueError(f"node_type must be one of {ALLOWED_NODE_TYPES}")
         return v
 
     @field_validator('characteristic_data', mode='after', always=True)
+    @classmethod
     def check_characteristic_data(cls, v, info):
         if info.data.get('node_type') == "characteristic" and v is None:
             raise ValueError("characteristic_data is required for characteristic nodes")
         return v
 
     @field_validator('treatment_data', mode='after', always=True)
+    @classmethod
     def check_treatment_data(cls, v, info):
         if info.data.get('node_type') == "treatment" and v is None:
             raise ValueError("treatment_data is required for treatment nodes")
         return v
 
     @field_validator('followup_data', mode='after', always=True)
+    @classmethod
     def check_followup_data(cls, v, info):
         if info.data.get('node_type') == "followup" and v is None:
             raise ValueError("followup_data is required for followup nodes")
@@ -233,6 +315,7 @@ class UpdateNode(BaseModel):
     children: Optional[List[PatientNode]] = None
 
     @field_validator('node_type')
+    @classmethod
     def validate_optional_node_type(cls, v):
         if v and v not in ALLOWED_NODE_TYPES:
             raise ValueError(f"node_type must be one of {ALLOWED_NODE_TYPES}")
