@@ -51,3 +51,6 @@ class DrugDriver:
         except Exception as e:
             logging.error(f"Error updating Drug data: {e}")
             raise
+
+    def find_by_id():
+        pass

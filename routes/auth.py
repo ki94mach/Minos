@@ -80,6 +80,7 @@ def login_post(validated_data):
 
 
 @auth_blueprint.route('/logout', methods=['GET'])
+@login_required
 def logout():
     clear_user_session()
     return redirect(url_for('auth.login_get'))
