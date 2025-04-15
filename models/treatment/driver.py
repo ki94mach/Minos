@@ -16,7 +16,12 @@ class TreatmentDriver:
     @staticmethod
     def find(**query):
         return Treatment.objects(**query)
-
+    
+    @staticmethod
+    def get_by_id(drug_id):
+        """Retrieve a Drug document by its id using MongoEngine’s objects call."""
+        return Treatment.objects(id=drug_id).first()
+    
     @staticmethod
     def update(treatment: Treatment):
         try:

@@ -16,7 +16,12 @@ class DrugDriver:
     @staticmethod
     def find(**query):
         return Drug.objects(**query)
-
+    
+    @staticmethod
+    def get_by_id(drug_id):
+        """Retrieve a Drug document by its id using MongoEngine’s objects call."""
+        return Drug.objects(id=drug_id).first()
+    
     @staticmethod
     def update(drug: Drug):
         try:
@@ -51,6 +56,3 @@ class DrugDriver:
         except Exception as e:
             logging.error(f"Error updating Drug data: {e}")
             raise
-
-    def find_by_id():
-        pass
