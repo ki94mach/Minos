@@ -25,6 +25,9 @@ interface Alternative {
     _id?: string;
     name: string;
     ratio: number;
+    regimen: {
+        drugs: DrugWithCon[];
+    };
 }
 
 interface Treatment {
@@ -59,7 +62,13 @@ const Treatments: React.FC = () => {
     const fetchDrugs = async () => {
         try {
             const response = await axios.get("http://localhost:5000/api/drugs");
-            const parsedDrugs = response.data.map((item: string) => JSON.parse(item));
+            const parsedDrugs = response.data.map((item: string) => {
+                const obj = JSON.parse(item);
+                return {
+                  ...obj,
+                  _id: obj._id.$oid 
+                };
+              });
             setDrugs(parsedDrugs);
         } catch (error) {
             console.error("Error fetching drugs:", error);
@@ -84,7 +93,14 @@ const Treatments: React.FC = () => {
         const selectedDrug = drugs.find(d => d._id === selectedDrugId);
         if (!selectedDrug) return;
 
-        const drugWithCon: DrugWithCon = { drug: selectedDrug, annual_patient_con: annualPatientCon };
+        const drugWithCon: DrugWithCon = {
+            drug: {
+              ...selectedDrug,
+              _id: selectedDrug._id 
+            },
+            annual_patient_con: annualPatientCon
+          };
+        
         toAlternative ? setAlternativeRegimenDrugs([...alternativeRegimenDrugs, drugWithCon])
             : setRegimenDrugs([...regimenDrugs, drugWithCon]);
 
@@ -100,7 +116,16 @@ const Treatments: React.FC = () => {
         const newAlt: Alternative = {
             _id: uuidv4(),
             name: alternativeName,
-            ratio: alternativeRatio
+            ratio: alternativeRatio,
+            regimen: {
+                drugs: alternativeRegimenDrugs.map((item) => ({
+                  drug: {
+                    ...item.drug,
+                    _id: item.drug._id, 
+                  },
+                  annual_patient_con: item.annual_patient_con,
+                }))
+              }
         };
         setAlternatives([...alternatives, newAlt]);
         setAlternativeRegimenDrugs([]);

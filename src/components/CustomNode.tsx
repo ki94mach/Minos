@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Handle, Position, useReactFlow } from "reactflow";
 
-const CustomNode = ({ id, data }: { id: string; data: { label: string; number: number } }) => {
+const CustomNode = ({ id, data }: { id: string; data: any  }) => {
     const { setNodes, getNodes } = useReactFlow();
     const [isEditing, setIsEditing] = useState(false);
     const [label, setLabel] = useState(data.label);
@@ -10,6 +10,8 @@ const CustomNode = ({ id, data }: { id: string; data: { label: string; number: n
     const labelInputRef = useRef<HTMLInputElement>(null);
     const numberInputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    const isTreatment = data.type === "treatment";
 
     useEffect(() => {
         if (isEditing) {
@@ -35,10 +37,10 @@ const CustomNode = ({ id, data }: { id: string; data: { label: string; number: n
         }
     };
 
-    useEffect(() => {
-        const nodes = getNodes();
-        console.log("Number of nodes:", nodes.length);
-    }, [getNodes]);
+    // useEffect(() => {
+    //     const nodes = getNodes();
+    //     console.log("Number of nodes:", nodes.length);
+    // }, [getNodes]);
 
     return (
         <div
@@ -101,8 +103,17 @@ const CustomNode = ({ id, data }: { id: string; data: { label: string; number: n
                 </>
             ) : (
                 <>
-                    <div style={{ fontSize: "12px", color: "#666" }}>{data.label}</div>
-                    <div style={{ fontSize: "12px", color: "#666" }}>{data.number}</div>
+                    <strong>{data.label}</strong>
+                    <div>{data.number}</div>
+                    {isTreatment && data.drugs && (
+                        <ul style={{ padding: 0, margin: 0, listStyle: "none" }}>
+                            {data.drugs.map((d: any, i: number) => (
+                                <li key={i} style={{ marginTop: "4px" }}>
+                                    {d.name} - {d.strength} {d.unit}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </>
             )}
 

@@ -42,26 +42,96 @@ const Patients: React.FC = () => {
     const [customPopulationNumber, setCustomPopulationNumber] = useState("");
     const [charTypes, setCharTypes] = useState<string[]>([]);
     const [charNames, setCharNames] = useState<string[]>([]);
+    const [selectedCharObj, setSelectedCharObj] = useState<{ _id: string; type: string; name: string } | null>(null);
     const [selectedCharType, setSelectedCharType] = useState("");
     const [selectedCharName, setSelectedCharName] = useState("");
+    const [allCharacteristics, setAllCharacteristics] = useState<{ _id: string; type: string; name: string }[]>([]);
+    const [nodeType, setNodeType] = useState("characteristic");
+    const [selectedTreatmentId, setSelectedTreatmentId] = useState("");
+    const [treatments, setTreatments] = useState<any[]>([]);
+
 
     useEffect(() => {
         const fetchPatients = async () => {
             try {
                 const response = await axios.get("http://localhost:5000/api/patients");
-                const formattedNodes = response.data.map((patient: any, index: number) => ({
-                    id: patient._id,
-                    position: { x: index * 200, y: 100 },
-                    type: "custom",
-                    data: { label: patient.node.characteristic_data.name, number: index + 1, type: patient.node.node_type }
-                }));
+                const formattedNodes = response.data.map((patient: any, index: number) => {
+                    const nodeType = patient.node.node_type;
+                    const base = {
+                        id: patient._id,
+                        position: { x: index * 200, y: 100 },
+                        type: "custom" as const,
+                    };
+                
+                    if (nodeType === "treatment") {
+                        const treatment = patient.node.treatment_data;
+                        const drugs = treatment.regimen?.drugs?.map((d: any) => d.drug) || [];
+                        return {
+                            ...base,
+                            data: {
+                                label: treatment.name,
+                                number: index + 1,
+                                type: nodeType,
+                                drugs: drugs,
+                            },
+                        };
+                    }
+                
+                    return {
+                        ...base,
+                        data: {
+                            label: patient.node.characteristic_data.name,
+                            number: index + 1,
+                            type: nodeType,
+                        },
+                    };
+                });
                 setNodes(formattedNodes);
             } catch (error) {
                 console.error("Error fetching patients:", error);
             }
         };
+
+        const fetchCharacteristics = async () => {
+            try {
+                const response = await axios.get("http://localhost:5000/api/characteristics");
+                const parsed = response.data.map((item: string) => {
+                    const obj = JSON.parse(item);
+                    return { ...obj, _id: obj._id.$oid };
+                });
+
+                setAllCharacteristics(parsed);
+    
+                const uniqueTypes = Array.from(new Set(parsed.map((char: any) => char.type)));
+                setCharTypes(uniqueTypes as string[]);
+    
+                // Optionally, pre-populate names for the first type
+                if (uniqueTypes.length > 0) {
+                    // const names = parsed
+                    //     .filter((char: any) => char.type === uniqueTypes[0])
+                    //     .map((char: any) => char.name);
+                    setSelectedCharType(uniqueTypes[0] as string);
+                    // setCharNames(names);
+                }
+            } catch (error) {
+                console.error("Error fetching characteristics:", error);
+            }
+        };
+    
         fetchPatients();
+        fetchCharacteristics();
     }, []);
+
+    useEffect(() => {
+        if (selectedCharType) {
+            const filteredNames = allCharacteristics
+                .filter((char) => char.type === selectedCharType)
+                .map((char) => char.name);
+            setCharNames(filteredNames);
+            setSelectedCharName("");
+        }
+    }, [selectedCharType, allCharacteristics]);
+    
 
     const onConnect = useCallback(
         (connection: Edge | Connection) => setEdges((eds) => addEdge(connection, eds)),
@@ -79,7 +149,7 @@ const Patients: React.FC = () => {
                     rate: 1.0,
                     size: populationNumber,
                     characteristic_data: {
-                        _id: selectedCharName,
+                        _id: selectedCharObj?._id,
                         char_type: selectedCharType,
                         name: selectedCharName
                     }
@@ -135,8 +205,14 @@ const Patients: React.FC = () => {
                                     <InputLabel>Characteristic Name</InputLabel>
                                     <Select
                                         value={selectedCharName}
-                                        onChange={(e) => setSelectedCharName(e.target.value)}
+                                        onChange={(e) => {
+                                            const selectedName = e.target.value;
+                                            setSelectedCharName(selectedName);
+                                            const found = allCharacteristics.find((char) => char.name === selectedName && char.type === selectedCharType);
+                                            setSelectedCharObj(found || null);
+                                        }}
                                         label="Characteristic Name"
+                                        disabled={!selectedCharType}
                                     >
                                         {charNames.map((cname) => (
                                             <MenuItem key={cname} value={cname}>{cname}</MenuItem>
