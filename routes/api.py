@@ -22,6 +22,8 @@ from models.tables import (Characteristic, Drug, Followup,
                            Treatment, PatientTree)
 from models.tables import (Node, CharacteristicEmbedded,
                            TreatmentEmbedded, FollowupEmbedded)
+
+# Import validators and required decorators
 from validators.api_validators import (CharacteristicCreate, CharacteristicUpdate,
                                        DrugCreate, DrugUpdate, TreatmentUpdate,
                                        TreatmentCreate, PatientCreate, PatientUpdate,
@@ -50,7 +52,7 @@ def get_characteristics():
 @api_blueprint.route('/characteristics', methods=['POST'])
 @login_required
 @validate_request(CharacteristicCreate, location='json')
-def create_characteristic():
+def create_characteristic(validated_data):
     """
     Expected JSON body:
     {
@@ -59,9 +61,8 @@ def create_characteristic():
     }
     """
     try:
-        data = request.get_json()
-        char_type = data.get('type')
-        name = data.get('name')
+        char_type = validated_data.type
+        name = validated_data.name
         if not char_type or not name:
             return jsonify({'error': 'Missing required fields: type and name'}), 400
 
@@ -80,7 +81,7 @@ def create_characteristic():
 @api_blueprint.route('/characteristics/<char_id>', methods=['PUT'])
 @login_required
 @validate_request(CharacteristicUpdate, location='json')
-def update_characteristic(char_id):
+def update_characteristic(validated_data, char_id):
     """
     Expected JSON body (any subset):
     {
@@ -89,15 +90,14 @@ def update_characteristic(char_id):
     }
     """
     try:
-        data = request.get_json()
         char = CharacteristicDriver.find(id=char_id).first()
         if not char:
             return jsonify({'error': 'Characteristic not found'}), 404
 
-        if 'type' in data:
-            char.char_type = data['type']
-        if 'name' in data:
-            char.name = data['name']
+        if validated_data.type is not None:
+            char.char_type = validated_data.type
+        if validated_data.name is not None:
+            char.name = validated_data.name
         CharacteristicDriver.update(char)
         return jsonify({'message': 'Characteristic updated'}), 200
     except NotUniqueError:
@@ -138,7 +138,7 @@ def get_drugs():
 @api_blueprint.route('/drugs', methods=['POST'])
 @login_required
 @validate_request(DrugCreate, location='json')
-def create_drug():
+def create_drug(validated_data):
     """
     Expected JSON body:
     {
@@ -148,10 +148,9 @@ def create_drug():
     }
     """
     try:
-        data = request.get_json()
-        name = data.get('name')
-        strength = data.get('strength')
-        unit = data.get('unit')
+        name = validated_data.name
+        strength = validated_data.strength
+        unit = validated_data.unit
         if not name or strength is None or not unit:
             return jsonify({'error': 'Missing required fields: name, strength, and unit'}), 400
 
@@ -170,7 +169,7 @@ def create_drug():
 @api_blueprint.route('/drugs/<drug_id>', methods=['PUT'])
 @login_required
 @validate_request(DrugUpdate, location='json')
-def update_drug(drug_id):
+def update_drug(validated_data, drug_id):
     """
     Expected JSON body (any subset):
     {
@@ -180,17 +179,16 @@ def update_drug(drug_id):
     }
     """
     try:
-        data = request.get_json()
         drug = DrugDriver.find(id=drug_id).first()
         if not drug:
             return jsonify({'error': 'Drug not found'}), 404
 
-        if 'name' in data:
-            drug.name = data['name']
-        if 'strength' in data:
-            drug.strength = data['strength']
-        if 'unit' in data:
-            drug.unit = data['unit']
+        if validated_data.name is not None:
+            drug.name = validated_data.name
+        if validated_data.strength is not None:
+            drug.strength = validated_data.strength
+        if validated_data is not None:
+            drug.unit = validated_data.unit
         DrugDriver.update(drug)
         return jsonify({'message': 'Drug updated'}), 200
     except NotUniqueError:
@@ -232,7 +230,7 @@ def get_treatments():
 @api_blueprint.route('/treatments', methods=['POST'])
 @login_required
 @validate_request(TreatmentCreate, location='json')
-def create_treatment():
+def create_treatment(validated_data):
     """
     Expected JSON body:
     E.g 1:
@@ -330,15 +328,14 @@ def create_treatment():
     Note: "treatment_hash" is auto-generated.
     """
     try:
-        data = request.get_json()
-        name = data.get('name')
-        _type = data.get('type')
+        name = validated_data.name
+        _type = validated_data.type
         if not name or not _type:
             return jsonify({'error': 'Missing required fields: name and type'}), 400
 
         # Get the regimen and alternatives from the request
-        regimen_data = data.get('regimen')
-        alternatives_data = data.get('alternatives', [])
+        regimen_data = validated_data.get('regimen')
+        alternatives_data = validated_data.get('alternatives', [])
 
         # For an Alternative type treatment, we don't expect a top-level regimen.
         if _type == "Alternative":
@@ -371,7 +368,7 @@ def create_treatment():
 @api_blueprint.route('/treatments/<treatment_id>', methods=['PUT'])
 @login_required
 @validate_request(TreatmentUpdate, location='json')
-def update_treatment(treatment_id):
+def update_treatment(validated_data, treatment_id):
     """
     Expected JSON body (any subset):
     {
@@ -381,22 +378,21 @@ def update_treatment(treatment_id):
     }
     """
     try:
-        data = request.get_json()
         treatment = TreatmentDriver.find(id=treatment_id).first()
         if not treatment:
             return jsonify({'error': 'Treatment not found'}), 404
 
-        if 'name' in data:
-            treatment.name = data['name']
-        if 'type' in data:
-            treatment.type = data['type']
-        if 'regimen' in data:
+        if validated_data.name is not None:
+            treatment.name = validated_data.name
+        if validated_data.type is not None:
+            treatment.type = validated_data.type
+        if validated_data.regimen is not None:
             # Convert the provided dictionary to a Regimen instance.
-            regimen_data = data['regimen']
+            regimen_data = validated_data.regimen
             treatment.regimen = Regimen(**regimen_data)
             treatment.alternatives = []  # Clear alternatives if regimen is provided.
-        elif 'alternatives' in data:
-            alternatives_data = data['alternatives']
+        elif validated_data.alternatives is not None:
+            alternatives_data = validated_data.alternatives
             # Convert each alternative dictionary to an AlternativeTreatment instance.
             treatment.alternatives = [AlternativeTreatment(**alt) for alt in alternatives_data]
             treatment.regimen = None  # Clear regimen if alternatives are provided.
@@ -445,7 +441,7 @@ def get_patients():
 @api_blueprint.route('/patients', methods=['POST'])
 @login_required
 @validate_request(PatientCreate, location='json')
-def create_patient():
+def create_patient(validated_data):
     """
     Expected JSON body (legacy style):
     {
@@ -473,9 +469,7 @@ def create_patient():
       5. Creates a PatientTree document with the single root node.
     """
     try:
-        data = request.get_json()
-
-        node_data = data.get('node')
+        node_data = validated_data.node
 
         # Validate common node fields.
         node_type = node_data.get('node_type')
@@ -635,7 +629,7 @@ def create_node_from_dict(node_dict, parent_id=None):
 @api_blueprint.route('/patients/<patient_id>/add_node', methods=['POST'])
 @login_required
 @validate_request(AddNode, location='json')
-def add_node(patient_id):
+def add_node(validated_data, patient_id):
     """
     Expected JSON body example:
     {
@@ -684,13 +678,12 @@ def add_node(patient_id):
       5. Replaces the entire PatientTree document in the database.
     """
     try:
-        data = request.get_json()
-        new_node_data = data.get('node')
+        new_node_data = validated_data.get('node')
         # Merge top-level "children" into the node dictionary if provided.
-        if data.get('children'):
-            new_node_data['children'] = data.get('children')
+        if validated_data.children is not None:
+            new_node_data['children'] = validated_data.get('children')
         
-        parent_node_id = data.get('parent_node_id')  # May be None for root-level addition.
+        parent_node_id = validated_data.get('parent_node_id')  # May be None for root-level addition.
         if not new_node_data:
             return jsonify({'error': 'Missing node data'}), 400
 
@@ -740,7 +733,7 @@ def add_node(patient_id):
 @api_blueprint.route('/patients/<patient_id>', methods=['PUT'])
 @login_required
 @validate_request(PatientUpdate, location='json')
-def update_patient(patient_id):
+def update_patient(validated_data, patient_id):
     """
     Expected JSON body (any subset, legacy style):
     {
@@ -764,21 +757,20 @@ def update_patient(patient_id):
     Otherwise, only the "size" field will be updated.
     """
     try:
-        data = request.get_json()
         patient = PatientDriver.find(id=patient_id).first()
         if not patient:
             return jsonify({'error': 'Patient not found'}), 404
 
         # Update patient size if provided.
-        if 'size' in data:
-            patient.size = data['size']
+        if validated_data.size is not None:
+            patient.size = validated_data.size
 
         # Optionally update the entire tree.
-        if 'tree' in data:
+        if validated_data.tree is not None:
             from models.tables import Node
             try:
                 # Convert the incoming JSON to a Node instance.
-                new_tree = Node(**data['tree'])
+                new_tree = Node(**validated_data.tree)
                 patient.tree = new_tree
                 # Recompute tree_hash based on the full tree.
                 hash_input = f"{new_tree.to_mongo().to_dict()}".encode('utf-8')
@@ -801,7 +793,7 @@ def update_patient(patient_id):
 @api_blueprint.route('/patients/<patient_id>/node/<node_id>', methods=['PUT'])
 @login_required
 @validate_request(UpdateNode, location='json')
-def update_node(patient_id, node_id):
+def update_node(validated_data, patient_id, node_id):
     """
     Expected JSON body (any subset, legacy style):
     eg 1:
@@ -830,8 +822,7 @@ def update_node(patient_id, node_id):
       5. Replaces the entire PatientTree document in the database.
     """
     try:
-        data = request.get_json()
-        if not data:
+        if not validated_data:
             return jsonify({'error': 'No update data provided.'}), 400
 
         # Fetch the PatientTree document.
@@ -854,32 +845,32 @@ def update_node(patient_id, node_id):
             return jsonify({'error': 'Node not found in patient tree.'}), 404
 
         # Update node fields if provided.
-        if 'rate' in data:
-            target_node.rate = data['rate']
-        if 'size' in data:
-            target_node.size = data['size']
-        if 'node_type' in data:
-            target_node.node_type = data['node_type']
-        if 'parent_id' in data:
-            parent = data['parent_id']
+        if validated_data.rate is not None:
+            target_node.rate = validated_data.rate
+        if validated_data.size is not None:
+            target_node.size = validated_data.size
+        if validated_data.node_type is not None:
+            target_node.node_type = validated_data.node_type
+        if validated_data.parent_id is not None:
+            parent = validated_data.parent_id
             target_node.parent_id = ObjectId(parent) if parent else None
 
         # Update the embedded payload based on node_type.
-        if target_node.node_type == 'characteristic' and 'characteristic_data' in data:
-            char_data = data['characteristic_data']
+        if target_node.node_type == 'characteristic' and validated_data.characteristic_data:
+            char_data = validated_data.characteristic_data
             target_node.characteristic_data = CharacteristicEmbedded(
                 _id=ObjectId(char_data.get('_id')),
                 char_type=char_data.get('char_type'),
                 name=char_data.get('name')
             )
-        elif target_node.node_type == 'treatment' and 'treatment_data' in data:
-            target_node.treatment_data = TreatmentEmbedded(**data['treatment_data'])
-        elif target_node.node_type == 'followup' and 'followup_data' in data:
-            target_node.followup_data = FollowupEmbedded(**data['followup_data'])
+        elif target_node.node_type == 'treatment' and validated_data.treatment_data:
+            target_node.treatment_data = TreatmentEmbedded(**validated_data.treatment_data)
+        elif target_node.node_type == 'followup' and validated_data.followup_data:
+            target_node.followup_data = FollowupEmbedded(**validated_data.followup_data)
 
         # Optionally, update children if provided.
-        if 'children' in data:
-            target_node.children = data['children']
+        if validated_data.children:
+            target_node.children = validated_data.children
 
         # Recompute the tree_hash over the entire tree.
         hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
@@ -1001,7 +992,7 @@ def get_followups():
 @api_blueprint.route('/followups', methods=['POST'])
 @login_required
 @validate_request(FollowupCreate, location='json')
-def create_followup():
+def create_followup(validated_data):
     """
     Expected JSON body:
     {
@@ -1012,11 +1003,10 @@ def create_followup():
     }
     """
     try:
-        data = request.get_json()
-        name = data.get('name')
-        overall_survival = data.get('overall_survival')
-        patient_id = data.get('patient_id')
-        parent_id = data.get('parent_id')
+        name = validated_data.name
+        overall_survival = validated_data.overall_survival
+        patient_id = validated_data.patient_id
+        parent_id = validated_data.parent_id
         if not name or overall_survival is None or not patient_id or not parent_id:
             return jsonify({'error': 'Missing required fields: name, overall_survival, patient_id, and parent_id'}), 400
 
@@ -1040,7 +1030,7 @@ def create_followup():
 @api_blueprint.route('/followups/<followup_id>', methods=['PUT'])
 @login_required
 @validate_request(FollowupUpdate, location='json')
-def update_followup(followup_id):
+def update_followup(validated_data, followup_id):
     """
     Expected JSON body (any subset):
     {
@@ -1049,15 +1039,14 @@ def update_followup(followup_id):
     }
     """
     try:
-        data = request.get_json()
         followup = FollowupDriver.find(id=followup_id).first()
         if not followup:
             return jsonify({'error': 'Followup not found'}), 404
 
-        if 'name' in data:
-            followup.name = data['name']
-        if 'overall_survival' in data:
-            followup.overall_survival = data['overall_survival']
+        if validated_data.name is not None:
+            followup.name = validated_data.name
+        if validated_data.overall_survival is not None:
+            followup.overall_survival = validated_data.overall_survival
         FollowupDriver.update(followup)
         return jsonify({'message': 'Followup updated'}), 200
     except NotUniqueError:

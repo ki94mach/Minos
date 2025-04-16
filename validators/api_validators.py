@@ -148,7 +148,7 @@ class TreatmentCreate(BaseModel):
             raise ValueError(f'Type must be one of {ALLOWED_TREATMENT_TYPES}')
         return v
     
-    @field_validator('regimen', always=True)
+    @field_validator('regimen')
     @classmethod
     def validate_regimen_field(cls, v, values):
         treatment_type = values.get('type')
@@ -267,21 +267,21 @@ class PatientNode(BaseModel):
             raise ValueError(f"node_type must be one of {ALLOWED_NODE_TYPES}")
         return v
 
-    @field_validator('characteristic_data', mode='after', always=True)
+    @field_validator('characteristic_data', mode='after')
     @classmethod
     def check_characteristic_data(cls, v, info):
         if info.data.get('node_type') == "characteristic" and v is None:
             raise ValueError("characteristic_data is required for characteristic nodes")
         return v
 
-    @field_validator('treatment_data', mode='after', always=True)
+    @field_validator('treatment_data', mode='after')
     @classmethod
     def check_treatment_data(cls, v, info):
         if info.data.get('node_type') == "treatment" and v is None:
             raise ValueError("treatment_data is required for treatment nodes")
         return v
 
-    @field_validator('followup_data', mode='after', always=True)
+    @field_validator('followup_data', mode='after')
     @classmethod
     def check_followup_data(cls, v, info):
         if info.data.get('node_type') == "followup" and v is None:
