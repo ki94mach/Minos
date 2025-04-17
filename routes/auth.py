@@ -16,9 +16,21 @@ from models.user.driver import UserDriver
 from models.token.driver import TokenDriver
 from datetime import datetime
 from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import generate_csrf
 
 auth_blueprint = Blueprint('auth', __name__)
 
+@auth_blueprint.route('/csrf-token', methods=['GET'])
+def csrf_token():
+    token = generate_csrf()
+    return jsonify({'csrfToken': token})
+
+
+def get_csrf_token_route():
+    from flask_wtf.csrf import generate_csrf
+    response = jsonify({'csrfToken': generate_csrf()})
+    response.headers['X-CSRFToken'] = generate_csrf()  # for convenience
+    return response
 
 @auth_blueprint.route('/login', methods=['GET'])
 def login_get():

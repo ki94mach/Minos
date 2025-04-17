@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate  } from "react-router-dom";
+import axios from "axios";
 import {
     AppBar,
     Toolbar,
@@ -9,9 +10,11 @@ import {
     List,
     ListItem,
     ListItemText,
-    Box
+    Box,
+    Divider
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import LogoutIcon from "@mui/icons-material/Logout";
 
 const Navbar: React.FC = () => {
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -20,12 +23,24 @@ const Navbar: React.FC = () => {
         setDrawerOpen(open);
     };
 
+    const navigate = useNavigate();
+
+    const handleLogout = async () => {
+        try {
+            await axios.get("http://localhost:5000/auth/logout", { withCredentials: true });
+            navigate("/auth/login");
+        } catch (error) {
+            console.error("Logout failed:", error);
+        }
+    };
+
     const menuItems = [
-        { text: "Home", path: "/" },
+        { text: "Home", path: "/home" },
         { text: "Characteristics", path: "/characteristics" },
         { text: "Drugs", path: "/drugs" },
         { text: "Patients", path: "/patients" },
-        { text: "Treatments", path: "/treatments" }
+        { text: "Treatments", path: "/treatments" },
+        { text: "Change Password", path: "/auth/change-password" }
     ];
 
     return (
@@ -48,12 +63,23 @@ const Navbar: React.FC = () => {
                     onClick={toggleDrawer(false)}
                     onKeyDown={toggleDrawer(false)}
                 >
-                    <List>
+                    <List sx={{ "& .MuiListItemText-primary": { fontSize: "24px", fontWeight: 500 } }}>
                         {menuItems.map((item) => (
                             <ListItem component={Link} to={item.path} key={item.text}>
                                 <ListItemText primary={item.text} />
                             </ListItem>
                         ))}
+                        <Divider />
+                        <ListItem 
+                                component={Link} 
+                                to="#" 
+                                onClick={(e) => {
+                                    e.preventDefault(); 
+                                    handleLogout();
+                                }}>
+                            <LogoutIcon sx={{ mr: 2 }} />
+                            <ListItemText primary="Logout" />
+                        </ListItem>
                     </List>
                 </Box>
             </Drawer>

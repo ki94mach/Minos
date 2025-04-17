@@ -22,12 +22,18 @@ from utils.config_utils import (
 
 # Initialize Redis client
 def get_redis_client():
-    """Create and return Redis client based on environment variables."""
+    host = os.environ.get('REDIS_HOST', 'localhost')
+    port = int(os.environ.get('REDIS_PORT', 6379))
+    password = os.environ.get('REDIS_PASSWORD')
+    db = int(os.environ.get('REDIS_DB', 0))
+
+    print("Connecting to Redis at:", host, port, "DB:", db)
+
     return redis.Redis(
-        host=os.environ.get('REDIS_HOST'),
-        port=int(os.environ.get('REDIS_PORT')),
-        password=os.environ.get('REDIS_PASSWORD'),
-        db=int(os.environ.get('REDIS_DB', 0)),
+        host=host,
+        port=port,
+        password=password,
+        db=db,
         decode_responses=False
     )
 

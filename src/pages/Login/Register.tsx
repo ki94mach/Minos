@@ -16,17 +16,18 @@ const Register: React.FC = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
-  // const [csrfToken, setCsrfToken] = useState("");
+  const [csrfToken, setCsrfToken] = useState("");
 
-  // useEffect(() => {
-  //   axios.get("http://localhost:5000/auth/csrf-token", { withCredentials: true })
-  //     .then(res => {
-  //       setCsrfToken(res.data.csrf_token);
-  //     })
-  //     .catch(err => {
-  //       console.error("Failed to get CSRF token", err);
-  //     });
-  // }, []);
+  useEffect(() => {
+    axios.get("http://localhost:5000/auth/csrf-token", { withCredentials: true })
+      .then(res => {
+        console.log("CSRF response:", res.data);
+        setCsrfToken(res.data.csrfToken);
+      })
+      .catch(err => {
+        console.error("Failed to get CSRF token", err);
+      });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,10 +39,8 @@ const Register: React.FC = () => {
     }
 
     try {
-      const csrfToken = (document.querySelector("meta[name='csrf-token']") as HTMLMetaElement)?.content;
       console.log("CSRF:", csrfToken);
       
-
       await axios.post(
         "http://localhost:5000/auth/register",
         { email, password },
@@ -54,7 +53,7 @@ const Register: React.FC = () => {
         }
       );
 
-      navigate("/api/characteristics");
+      navigate("/home");
     } catch (error: any) {
       const errMsg = error.response?.data?.error || "An error occurred. Please try again.";
       setMessage(errMsg);

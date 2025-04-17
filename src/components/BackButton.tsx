@@ -10,7 +10,7 @@ const BackButton: React.FC = () => {
         <Button
             variant="outlined"
             startIcon={<ArrowBackIcon />}
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/home")}
             sx={{ mb: 2 }}
         >
             Back to Home

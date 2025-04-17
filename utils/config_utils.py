@@ -32,6 +32,8 @@ def configure_security(app):
     # Initialize CSRF protection
     csrf.init_app(app)
 
+    from routes.api import api_blueprint
+
 def configure_email(app):
     """Configure email settings."""
     app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER')
@@ -60,7 +62,7 @@ def configure_session(app, redis_client):
     lifetime_hours = int(os.environ.get('SESSION_LIFETIME_HOURS', 24))
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=lifetime_hours)
     
-    app.config['SESSION_KEY_PREFIX'] = os.environ.get('SESSION_KEY_PREFIX')
+    app.config['SESSION_KEY_PREFIX'] = os.environ.get('SESSION_KEY_PREFIX', 'session:')
     
     # Common session settings
     app.config['SESSION_COOKIE_NAME'] = 'session'
