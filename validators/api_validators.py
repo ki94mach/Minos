@@ -44,42 +44,74 @@ class PyObjectId(str):
 
 class CharacteristicCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    type: str = Field(..., alias='type')
-    name: str
+    type: str = Field(..., alias='type', min_length=1)
+    name: str = Field(..., min_length=1)
+
+    @field_validator('type', 'name', mode='after')
+    @classmethod
+    def validate_non_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Field must not be empty")
+        return v.strip().title()  # Convert to title case for consistency
 
 class CharacteristicUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     type: Optional[str] = Field(None, alias='type')
     name: Optional[str]
 
+    @field_validator('type', 'name', mode='after')
+    @classmethod
+    def validate_optional_fields(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            if not v.strip():
+                raise ValueError("If provided, field must not be empty")
+            return v.strip().title()  # Convert to title case for consistency
+        return v
+
 # ------------------------------------------------------------------------------
 # DRUG VALIDATORS
 # ------------------------------------------------------------------------------
 
 class DrugCreate(BaseModel):
-    name: str
-    strength: int
+    name: str = Field(..., min_length=1)
+    strength: int = Field(..., gt=0)
     unit: str
+
+    @field_validator('name', mode='after')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Drug name must not be empty")
+        return v.strip().title()
 
     @field_validator('unit', mode='after')
     @classmethod
     def validate_unit(cls, v: str) -> str:
         if v not in ALLOWED_UNITS:
             raise ValueError(f'Unit must be one of {ALLOWED_UNITS}')
-        return v
+        return v.lower()  # Normalize unit to lowercase
 
 class DrugUpdate(BaseModel):
-    name: Optional[str]
-    strength: Optional[int]
-    unit: Optional[str]
+    name: Optional[str] = Field(None, min_length=1)
+    strength: Optional[int] = Field(None, gt=0)
+    unit: Optional[str] = None
+
+    @field_validator('name', mode='after')
+    @classmethod
+    def validate_optional_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            if not v.strip():
+                raise ValueError("If provided, drug name must not be empty")
+            return v.strip().title()
+        return v
 
     @field_validator('unit', mode='after')
     @classmethod
     def validate_unit(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        if v not in ALLOWED_UNITS:
-            raise ValueError(f'Unit must be one of {ALLOWED_UNITS}')
+        if v is not None:
+            if v not in ALLOWED_UNITS:
+                raise ValueError(f'Unit must be one of {ALLOWED_UNITS}')
+            return v.lower()  # Normalize unit to lowercase
         return v
 
 # ------------------------------------------------------------------------------
@@ -185,14 +217,49 @@ class TreatmentUpdate(BaseModel):
 # ------------------------------------------------------------------------------
 
 class FollowupCreate(BaseModel):
-    name: str
-    overall_survival: float
+    name: str = Field(..., min_length=1)
+    overall_survival: float = Field(..., ge=0.0, le=1.0)
     patient_id: PyObjectId
     parent_id: PyObjectId
 
+    @field_validator('name', mode='after')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Followup name must not be empty")
+        return v.strip()
+
+    @model_validator(mode="after")
+    def validate_ids(self) -> "FollowupCreate":
+        from models.patient.driver import PatientDriver
+        # Validate that patient exists
+        patient = PatientDriver.find(id=self.patient_id).first()
+        if not patient:
+            raise ValueError(f"Patient with id {self.patient_id} not found")
+        # Validate that parent node exists in patient tree
+        def find_node(node, target_id):
+            if str(node._id) == str(self.parent_id):
+                return True
+            for child in node.children:
+                if find_node(child, target_id):
+                    return True
+            return False
+        if not find_node(patient.tree, self.parent_id):
+            raise ValueError(f"Parent node {self.parent_id} not found in patient tree")
+        return self
+
 class FollowupUpdate(BaseModel):
-    name: Optional[str]
-    overall_survival: Optional[float]
+    name: Optional[str] = Field(None, min_length=1)
+    overall_survival: Optional[float] = Field(None, ge=0.0, le=1.0)
+
+    @field_validator('name', mode='after')
+    @classmethod
+    def validate_optional_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            if not v.strip():
+                raise ValueError("If provided, followup name must not be empty")
+            return v.strip()
+        return v
 
 # ------------------------------------------------------------------------------
 # EMBEDDED DATA FOR NODE PAYLOADS
@@ -219,12 +286,32 @@ class TreatmentData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     id: PyObjectId = Field(..., alias="_id")
     name: str = Field(..., min_length=1)
-   
+    type: str
+    regimen: Optional[Regimen] = None
+    alternatives: Optional[List[AlternativeTreatment]] = None
+
     @field_validator("name", mode='after')
     @classmethod
     def name_must_be_non_empty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("Treatment name must not be empty")
+        return v
+
+    @field_validator('type', mode='after')
+    @classmethod
+    def validate_treatment_type(cls, v: str) -> str:
+        if v not in ALLOWED_TREATMENT_TYPES:
+            raise ValueError(f'Type must be one of {ALLOWED_TREATMENT_TYPES}')
+        return v
+
+    @field_validator('regimen', mode='after')
+    @classmethod
+    def validate_regimen_field(cls, v: Optional[Regimen], info: ValidationInfo) -> Optional[Regimen]:
+        treatment_type = info.data.get('type')
+        if treatment_type == 'Alternative' and v is not None:
+            raise ValueError('For Alternative treatments, regimen must be empty')
+        if treatment_type == 'Regimen' and v is None:
+            raise ValueError('For Regimen type, regimen must be provided')
         return v
 
     @model_validator(mode="after")
@@ -234,6 +321,22 @@ class TreatmentData(BaseModel):
             raise ValueError(f"Treatment with id {self.id} not found in the database")
         if self.name != db_treatment.name:
             raise ValueError("Embedded Treatment: 'name' does not match the database record")
+        if self.type != db_treatment.type:
+            raise ValueError("Embedded Treatment: 'type' does not match the database record")
+        
+        # Validate regimen/alternatives based on type
+        if self.type == 'Regimen':
+            if not self.regimen or self.regimen.model_dump() != db_treatment.regimen.model_dump():
+                raise ValueError("Embedded Treatment: 'regimen' does not match the database record")
+        elif self.type == 'Alternative':
+            if not self.alternatives:
+                raise ValueError("Alternatives are required for Alternative type treatments")
+            # Compare alternatives
+            if len(self.alternatives) != len(db_treatment.alternatives):
+                raise ValueError("Embedded Treatment: 'alternatives' count does not match the database record")
+            for alt, db_alt in zip(self.alternatives, db_treatment.alternatives):
+                if alt.model_dump() != db_alt.model_dump():
+                    raise ValueError("Embedded Treatment: 'alternatives' content does not match the database record")
         return self
 
 class FollowupData(BaseModel):
@@ -256,8 +359,8 @@ class FollowupData(BaseModel):
 
 class PatientNode(BaseModel):
     node_type: str
-    rate: float
-    size: float
+    rate: float = Field(..., ge=0.0, le=1.0)
+    size: float = Field(..., gt=0.0)
     parent_id: Optional[PyObjectId] = None
     characteristic_data: Optional[CharacteristicData] = None
     treatment_data: Optional[TreatmentData] = None
@@ -274,23 +377,42 @@ class PatientNode(BaseModel):
     @field_validator('characteristic_data', mode='after')
     @classmethod
     def check_characteristic_data(cls, v: Optional[CharacteristicData], info: ValidationInfo) -> Optional[CharacteristicData]:
-        if info.data.get('node_type') == "characteristic" and v is None:
-            raise ValueError("characteristic_data is required for characteristic nodes")
+        if info.data.get('node_type') == "characteristic":
+            if v is None:
+                raise ValueError("characteristic_data is required for characteristic nodes")
+        elif v is not None:
+            raise ValueError("characteristic_data should only be present for characteristic nodes")
         return v
 
     @field_validator('treatment_data', mode='after')
     @classmethod
     def check_treatment_data(cls, v: Optional[TreatmentData], info: ValidationInfo) -> Optional[TreatmentData]:
-        if info.data.get('node_type') == "treatment" and v is None:
-            raise ValueError("treatment_data is required for treatment nodes")
+        if info.data.get('node_type') == "treatment":
+            if v is None:
+                raise ValueError("treatment_data is required for treatment nodes")
+        elif v is not None:
+            raise ValueError("treatment_data should only be present for treatment nodes")
         return v
 
     @field_validator('followup_data', mode='after')
     @classmethod
     def check_followup_data(cls, v: Optional[FollowupData], info: ValidationInfo) -> Optional[FollowupData]:
-        if info.data.get('node_type') == "followup" and v is None:
-            raise ValueError("followup_data is required for followup nodes")
+        if info.data.get('node_type') == "followup":
+            if v is None:
+                raise ValueError("followup_data is required for followup nodes")
+        elif v is not None:
+            raise ValueError("followup_data should only be present for followup nodes")
         return v
+
+    @model_validator(mode="after")
+    def validate_tree_structure(self) -> "PatientNode":
+        # Validate that children's parent_ids point to this node
+        if self.children:
+            my_id = str(self._id) if hasattr(self, '_id') else None
+            for child in self.children:
+                if child.parent_id and str(child.parent_id) != my_id:
+                    raise ValueError("Child node's parent_id must match parent node's _id")
+        return self
 
     class Config:
         arbitrary_types_allowed = True
@@ -298,18 +420,38 @@ class PatientNode(BaseModel):
 class PatientCreate(BaseModel):
     node: PatientNode
 
+    @model_validator(mode="after")
+    def validate_root_node(self) -> "PatientCreate":
+        if self.node.parent_id is not None:
+            raise ValueError("Root node must not have a parent_id")
+        return self
+
 class PatientUpdate(BaseModel):
-    size: Optional[float] = None
+    size: Optional[float] = Field(None, gt=0.0)
     tree: Optional[PatientNode] = None
+
+    @model_validator(mode="after")
+    def validate_tree_update(self) -> "PatientUpdate":
+        if self.tree and self.tree.parent_id is not None:
+            raise ValueError("Root node must not have a parent_id")
+        return self
 
 class AddNode(BaseModel):
     parent_node_id: Optional[PyObjectId] = None
     node: PatientNode
     children: Optional[List[PatientNode]] = None
 
+    @model_validator(mode="after")
+    def validate_parent_child_relationship(self) -> "AddNode":
+        if self.parent_node_id:
+            if self.node.parent_id and str(self.node.parent_id) != str(self.parent_node_id):
+                raise ValueError("Node's parent_id must match parent_node_id if both are provided")
+            self.node.parent_id = self.parent_node_id
+        return self
+
 class UpdateNode(BaseModel):
-    rate: Optional[float] = None
-    size: Optional[float] = None
+    rate: Optional[float] = Field(None, ge=0.0, le=1.0)
+    size: Optional[float] = Field(None, gt=0.0)
     node_type: Optional[str] = None
     parent_id: Optional[PyObjectId] = None
     characteristic_data: Optional[CharacteristicData] = None
@@ -323,3 +465,14 @@ class UpdateNode(BaseModel):
         if v and v not in ALLOWED_NODE_TYPES:
             raise ValueError(f"node_type must be one of {ALLOWED_NODE_TYPES}")
         return v
+
+    @model_validator(mode="after")
+    def validate_data_fields(self) -> "UpdateNode":
+        # If node_type is changing, validate corresponding data field is provided
+        if self.node_type == "characteristic" and not self.characteristic_data:
+            raise ValueError("characteristic_data is required when changing node_type to characteristic")
+        elif self.node_type == "treatment" and not self.treatment_data:
+            raise ValueError("treatment_data is required when changing node_type to treatment")
+        elif self.node_type == "followup" and not self.followup_data:
+            raise ValueError("followup_data is required when changing node_type to followup")
+        return self

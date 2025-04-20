@@ -21,11 +21,7 @@ from models.treatment.driver import TreatmentDriver
 from models.tables import (Characteristic, Drug, Followup, PatientTree)
 from models.tables import (Node, CharacteristicEmbedded,
                            TreatmentEmbedded, FollowupEmbedded)
-from models.tables import (
-    Treatment     as TreatmentDoc,
-    Regimen       as RegimenDoc,
-    AlternativeTreatment as AltTreatDoc,
-)
+
 
 # Import validators and required decorators
 from validators.api_validators import (CharacteristicCreate, CharacteristicUpdate,
@@ -34,6 +30,15 @@ from validators.api_validators import (CharacteristicCreate, CharacteristicUpdat
                                        AddNode, UpdateNode, FollowupUpdate, FollowupCreate)
 from utils.validate_request import validate_request
 from utils.auth_security import login_required
+
+# Importing validation utilities
+from utils.business_rules import (
+    process_node_payload,
+    validate_patient_tree_structure,
+    validate_and_transform_characteristic,
+    validate_and_transform_treatment_embedded,
+    validate_and_transform_followup_embedded
+)
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -63,14 +68,14 @@ def create_characteristic(validated_data):
       "type": "Primary Indication",
       "name": "Lung Cancer"
     }
+    Names and types will be automatically converted to title case.
     """
     try:
+        # Data is already validated and transformed by Pydantic
         char_type = validated_data.type
         name = validated_data.name
-        if not char_type or not name:
-            return jsonify({'error': 'Missing required fields: type and name'}), 400
 
-        # Create the master Characteristic document using the same field names as before.
+        # Create the characteristic document
         char = Characteristic(char_type=char_type, name=name)
         char_id = CharacteristicDriver.insert(char)
         return jsonify({'id': str(char_id)}), 201
@@ -89,20 +94,28 @@ def update_characteristic(validated_data, char_id):
     """
     Expected JSON body (any subset):
     {
-      "type": "updated type",
-      "name": "updated name"
+      "type": "Updated Type",
+      "name": "Updated Name"
     }
+    Names and types will be automatically converted to title case.
     """
     try:
         char = CharacteristicDriver.find(id=char_id).first()
         if not char:
             return jsonify({'error': 'Characteristic not found'}), 404
 
+        # Update only provided fields, data is already validated and transformed
+        updates = {}
         if validated_data.type is not None:
-            char.char_type = validated_data.type
+            updates['char_type'] = validated_data.type
         if validated_data.name is not None:
-            char.name = validated_data.name
-        CharacteristicDriver.update(char)
+            updates['name'] = validated_data.name
+
+        if updates:
+            for key, value in updates.items():
+                setattr(char, key, value)
+            CharacteristicDriver.update(char)
+        
         return jsonify({'message': 'Characteristic updated'}), 200
     except NotUniqueError:
         logging.error("Duplicate characteristic detected during update.")
@@ -150,13 +163,13 @@ def create_drug(validated_data):
       "strength": 450,
       "unit": "mg"
     }
+    Name will be automatically converted to title case and unit to lowercase.
     """
     try:
+        # Data is already validated and transformed by Pydantic
         name = validated_data.name
         strength = validated_data.strength
         unit = validated_data.unit
-        if not name or strength is None or not unit:
-            return jsonify({'error': 'Missing required fields: name, strength, and unit'}), 400
 
         drug = Drug(name=name, strength=strength, unit=unit)
         drug_id = DrugDriver.insert(drug)
@@ -181,19 +194,27 @@ def update_drug(validated_data, drug_id):
       "strength": 450,
       "unit": "mg"
     }
+    Name will be automatically converted to title case and unit to lowercase if provided.
     """
     try:
         drug = DrugDriver.find(id=drug_id).first()
         if not drug:
             return jsonify({'error': 'Drug not found'}), 404
 
+        # Update only provided fields, data is already validated and transformed
+        updates = {}
         if validated_data.name is not None:
-            drug.name = validated_data.name
+            updates['name'] = validated_data.name
         if validated_data.strength is not None:
-            drug.strength = validated_data.strength
-        if validated_data is not None:
-            drug.unit = validated_data.unit
-        DrugDriver.update(drug)
+            updates['strength'] = validated_data.strength
+        if validated_data.unit is not None:
+            updates['unit'] = validated_data.unit
+
+        if updates:
+            for key, value in updates.items():
+                setattr(drug, key, value)
+            DrugDriver.update(drug)
+        
         return jsonify({'message': 'Drug updated'}), 200
     except NotUniqueError:
         logging.error("Duplicate drug detected during update.")
@@ -332,20 +353,31 @@ def create_treatment(validated_data: TreatmentCreate):
     Note: "treatment_hash" is auto-generated.
     """
     try:
-        # 1️⃣ Dump EVERYTHING to plain dicts, using alias="_id" keys
+        # 1️⃣ Get validated data as dict with proper MongoDB _id fields
         payload = validated_data.model_dump(by_alias=True)
+        
+        # 2️⃣ Extract and validate components based on treatment type
+        treatment_type = payload["type"]
         raw_regimen = payload.get("regimen")
-        raw_alts   = payload.get("alternatives", [])
+        raw_alts = payload.get("alternatives", [])
 
-        # 2️⃣ Build the proper MongoEngine EmbeddedDocuments
-        regimen_doc = RegimenDoc(**raw_regimen) if raw_regimen else None
+        # 3️⃣ Build MongoEngine embedded documents
+        from models.tables import Treatment as TreatmentDoc
+        from models.tables import Regimen as RegimenDoc
+        from models.tables import AlternativeTreatment as AltTreatDoc
 
+        regimen_doc = None
         alts_docs = []
-        if payload["type"] == "Alternative":
-            # only for Alternative do we consume the alternatives list
+
+        if treatment_type == "Regimen":
+            if not raw_regimen:
+                return jsonify({'error': 'Regimen is required for treatment type "Regimen"'}), 400
+            regimen_doc = RegimenDoc(**raw_regimen)
+        
+        elif treatment_type == "Alternative":
+            if not raw_alts:
+                return jsonify({'error': 'Alternatives are required for treatment type "Alternative"'}), 400
             for alt in raw_alts:
-                # each alt is a dict with keys "_id", "name", "regimen", "ratio"
-                # and "regimen" itself is a nested dict. We construct one level at a time:
                 alt_regimen = alt["regimen"]
                 alt_regimen_doc = RegimenDoc(**alt_regimen)
                 alts_docs.append(
@@ -353,29 +385,32 @@ def create_treatment(validated_data: TreatmentCreate):
                         _id=alt["_id"],
                         name=alt["name"],
                         regimen=alt_regimen_doc,
-                        ratio=alt["ratio"],
+                        ratio=alt["ratio"]
                     )
                 )
 
-        # 3️⃣ Hash & insert the Treatment document
-        hash_input     = payload["name"] + payload["type"] + str(raw_regimen) + str(raw_alts)
+        # 4️⃣ Generate treatment hash and create document
+        hash_input = payload["name"] + treatment_type + str(raw_regimen) + str(raw_alts)
         treatment_hash = hashlib.sha256(hash_input.encode()).hexdigest()
 
         treatment = TreatmentDoc(
             name=payload["name"],
-            type=payload["type"],
+            type=treatment_type,
             regimen=regimen_doc,
             alternatives=alts_docs,
-            treatment_hash=treatment_hash,
+            treatment_hash=treatment_hash
         )
+
         treatment_id = TreatmentDriver.insert(treatment)
         return jsonify({"id": str(treatment_id)}), 201
 
     except NotUniqueError:
-        return jsonify({"error": "Duplicate treatment"}), 409
+        logging.error("Duplicate treatment detected.")
+        return jsonify({"error": "A treatment with similar properties already exists"}), 409
     except Exception as e:
-        import traceback; traceback.print_exc()
+        logging.error(f"Error creating treatment: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 @api_blueprint.route('/treatments/<treatment_id>', methods=['PUT'])
 @login_required
@@ -481,104 +516,31 @@ def create_patient(validated_data):
       5. Creates a PatientTree document with the single root node.
     """
     try:
-        node_data = validated_data.node
-
-        # Validate common node fields.
-        node_type = node_data.get('node_type')
-        rate = node_data.get('rate')
-        node_size = node_data.get('size')
-        if node_type not in ['characteristic', 'treatment', 'followup']:
-            return jsonify(
-                {'error': 'Invalid node_type. Must be one of "characteristic", "treatment", or "followup".'}), 400
-        if rate is None or node_size is None:
-            return jsonify({'error': 'Missing required node fields: rate and size'}), 400
-
-        # Import embedded classes for node payload.
-        from models.tables import Node, CharacteristicEmbedded
-        # Validate embedded payloads based on node_type.
-        if node_type == 'characteristic':
-            char_payload = node_data.get('characteristic_data')
-            if not char_payload:
-                return jsonify({'error': 'Missing characteristic_data for a characteristic node'}), 400
-            char_id_str = char_payload.get('_id')
-            if not char_id_str:
-                return jsonify({'error': 'Missing _id in characteristic_data'}), 400
-
-            # Validate that the referenced master Characteristic exists.
-            existing_char = CharacteristicDriver.find(id=ObjectId(char_id_str)).first()
-            if not existing_char:
-                return jsonify({'error': 'Referenced characteristic does not exist.'}), 400
-
-            # Create a CharacteristicEmbedded instance.
-            embedded_char = CharacteristicEmbedded(
-                _id=ObjectId(char_id_str),
-                char_type=char_payload.get('char_type'),
-                name=char_payload.get('name')
-            )
-            node_data['characteristic_data'] = embedded_char
-
-        elif node_type == 'treatment':
-            treatment_payload = node_data.get('treatment_data')
-            if not treatment_payload:
-                return jsonify({'error': 'Missing treatment_data for a treatment node'}), 400
-            treatment_id_str = treatment_payload.get('_id')
-            if not treatment_id_str:
-                return jsonify({'error': 'Missing _id in treatment_data'}), 400
-            # Validate existence using TreatmentDriver.
-            from models.treatment.driver import TreatmentDriver
-            existing_treatment = TreatmentDriver.find(id=treatment_id_str).first()
-            if not existing_treatment:
-                return jsonify({'error': 'Referenced treatment does not exist.'}), 400
-            # (Assume treatment_data is valid; conversion to TreatmentEmbedded can be added if needed.)
-
-        elif node_type == 'followup':
-            followup_payload = node_data.get('followup_data')
-            if not followup_payload:
-                return jsonify({'error': 'Missing followup_data for a followup node'}), 400
-            followup_id_str = followup_payload.get('_id')
-            if not followup_id_str:
-                return jsonify({'error': 'Missing _id in followup_data'}), 400
-            from models.followup.driver import FollowupDriver
-            existing_followup = FollowupDriver.find(id=followup_id_str).first()
-            if not existing_followup:
-                return jsonify({'error': 'Referenced followup does not exist.'}), 400
-            # (Conversion to FollowupEmbedded can be added if needed.)
-
-        # Process parent_id: for a root node, parent_id is set to None.
-        parent_id = node_data.get('parent_id')
-        if parent_id:
-            node_data['parent_id'] = ObjectId(parent_id)
-        else:
-            node_data['parent_id'] = None
-
-        # Create a new Node instance.
-        new_node = Node(
-            _id=ObjectId(),
-            rate=rate,
-            size=node_size,
-            node_type=node_type,
-            parent_id=node_data.get('parent_id'),
-            children=node_data.get('children', [])
-        )
-        if node_type == 'characteristic':
-            new_node.characteristic_data = node_data.get('characteristic_data')
-        elif node_type == 'treatment':
-            new_node.treatment_data = node_data.get('treatment_data')
-        elif node_type == 'followup':
-            new_node.followup_data = node_data.get('followup_data')
-
-        # Generate a unique tree_hash using the patient size and the node’s Mongo representation.
-        hash_input = f"{node_size}{new_node.to_mongo().to_dict()}".encode('utf-8')
+        # Get the validated node data
+        node_data = validated_data.node.model_dump(by_alias=True)
+        
+        # Process and validate the entire node payload including embedded data
+        processed_node = process_node_payload(node_data)
+        
+        # Create the Node instance with processed data
+        new_node = Node(**processed_node)
+        
+        # Generate tree hash
+        hash_input = f"{new_node.to_mongo().to_dict()}".encode('utf-8')
         tree_hash = hashlib.sha256(hash_input).hexdigest()
 
-        # Create the PatientTree document with the single root node.
+        # Create and save the PatientTree
         patient_tree = PatientTree(
             tree=new_node,
             tree_hash=tree_hash
         )
         patient_id = PatientDriver.insert(patient_tree)
+        
         return jsonify({'id': str(patient_id)}), 201
 
+    except ValueError as ve:
+        logging.error(f"Validation error creating patient: {ve}")
+        return jsonify({'error': str(ve)}), 400
     except NotUniqueError:
         logging.error("Duplicate patient tree detected.")
         return jsonify({'error': "A patient with a similar tree structure already exists."}), 409
@@ -690,53 +652,56 @@ def add_node(validated_data, patient_id):
       5. Replaces the entire PatientTree document in the database.
     """
     try:
-        new_node_data = validated_data.get('node')
-        # Merge top-level "children" into the node dictionary if provided.
-        if validated_data.children is not None:
-            new_node_data['children'] = validated_data.get('children')
+        # Get the validated node data
+        new_node_data = validated_data.node.model_dump(by_alias=True)
+        parent_node_id = validated_data.parent_node_id
         
-        parent_node_id = validated_data.get('parent_node_id')  # May be None for root-level addition.
-        if not new_node_data:
-            return jsonify({'error': 'Missing node data'}), 400
-
-        # Recursively create the new node (and its children) from the provided dictionary.
-        new_node = create_node_from_dict(new_node_data, parent_id=ObjectId(parent_node_id) if parent_node_id else None)
-
-        # Fetch the PatientTree document.
+        # Add children to node data if provided
+        if validated_data.children:
+            new_node_data['children'] = [
+                child.model_dump(by_alias=True) for child in validated_data.children
+            ]
+        
+        # Process and validate the node payload
+        processed_node = process_node_payload(new_node_data)
+        
+        # Fetch the patient tree
         patient_tree = PatientDriver.find(id=patient_id).first()
         if not patient_tree:
             return jsonify({'error': 'Patient not found'}), 404
 
-        # Recursive function to find the parent node in the tree.
-        def find_node(node, target_id):
-            if str(node._id) == target_id:
-                return node
-            for child in node.children:
-                result = find_node(child, target_id)
-                if result:
-                    return result
-            return None
-
+        # Create new node instance with processed data
+        new_node = Node(**processed_node)
+        
         if parent_node_id:
-            parent_node = find_node(patient_tree.tree, parent_node_id)
+            # Find and validate parent node
+            parent_node = find_node(patient_tree.tree, str(parent_node_id))
             if not parent_node:
                 return jsonify({'error': 'Parent node not found'}), 404
+                
+            # Validate parent-child relationship
+            validate_patient_tree_structure(new_node.to_mongo(), str(parent_node._id))
             parent_node.children.append(new_node)
         else:
-            # If no parent_node_id is provided, add the new node as a child of the root.
+            # Adding to root level
+            validate_patient_tree_structure(new_node.to_mongo())
             patient_tree.tree.children.append(new_node)
 
-        # Recompute the tree_hash over the entire tree.
+        # Recompute tree hash
         hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
         patient_tree.tree_hash = hashlib.sha256(hash_input).hexdigest()
 
-        # Replace the entire document in the database.
-        from mongoengine.connection import get_db
-        db = get_db()
-        db['patients'].replace_one({'_id': patient_tree.id}, patient_tree.to_mongo().to_dict())
+        # Update the document
+        PatientDriver.update(patient_tree)
+        
+        return jsonify({
+            'message': 'Node added successfully',
+            'tree_hash': patient_tree.tree_hash
+        }), 200
 
-        return jsonify({'message': 'Node added successfully', 'tree_hash': patient_tree.tree_hash}), 200
-
+    except ValueError as ve:
+        logging.error(f"Validation error adding node: {ve}")
+        return jsonify({'error': str(ve)}), 400
     except Exception as e:
         logging.error(f"Error adding node: {e}")
         return jsonify({'error': "An unexpected error occurred while adding the node."}), 500
@@ -988,9 +953,7 @@ def delete_node(patient_id, node_id):
 def get_followups():
     """
     Retrieve all followups.
-
-    Legacy:
-      Followups were created using names like "Followup for Patient X" along with overall_survival.
+    Legacy: Followups were created using names like "Followup for Patient X" along with overall_survival.
     """
     try:
         followups = FollowupDriver.find()
@@ -999,7 +962,6 @@ def get_followups():
     except Exception as e:
         logging.error(f"Error fetching followups: {e}")
         return jsonify({'error': "Failed to retrieve followups."}), 500
-
 
 @api_blueprint.route('/followups', methods=['POST'])
 @login_required
@@ -1015,12 +977,11 @@ def create_followup(validated_data):
     }
     """
     try:
+        # Data is already validated by Pydantic including patient and parent node existence
         name = validated_data.name
         overall_survival = validated_data.overall_survival
         patient_id = validated_data.patient_id
         parent_id = validated_data.parent_id
-        if not name or overall_survival is None or not patient_id or not parent_id:
-            return jsonify({'error': 'Missing required fields: name, overall_survival, patient_id, and parent_id'}), 400
 
         followup = Followup(
             name=name,
@@ -1036,8 +997,7 @@ def create_followup(validated_data):
             {'error': "A followup with the given name, overall survival, patient, and parent already exists."}), 409
     except Exception as e:
         logging.error(f"Error creating followup: {e}")
-        return jsonify({'error': "An unexpected error occurred while creating the followup."}), 500
-
+        return jsonify({'error': str(e)}), 500
 
 @api_blueprint.route('/followups/<followup_id>', methods=['PUT'])
 @login_required
@@ -1055,20 +1015,25 @@ def update_followup(validated_data, followup_id):
         if not followup:
             return jsonify({'error': 'Followup not found'}), 404
 
+        # Update only provided fields, data is already validated
+        updates = {}
         if validated_data.name is not None:
-            followup.name = validated_data.name
+            updates['name'] = validated_data.name
         if validated_data.overall_survival is not None:
-            followup.overall_survival = validated_data.overall_survival
-        FollowupDriver.update(followup)
+            updates['overall_survival'] = validated_data.overall_survival
+
+        if updates:
+            for key, value in updates.items():
+                setattr(followup, key, value)
+            FollowupDriver.update(followup)
+
         return jsonify({'message': 'Followup updated'}), 200
     except NotUniqueError:
         logging.error("Duplicate followup detected during update.")
-        return jsonify(
-            {'error': "Update failed: A followup with the given name and overall survival already exists."}), 409
+        return jsonify({'error': "Update failed: A followup with similar properties already exists."}), 409
     except Exception as e:
         logging.error(f"Error updating followup: {e}")
         return jsonify({'error': "An unexpected error occurred while updating the followup."}), 500
-
 
 @api_blueprint.route('/followups/<followup_id>', methods=['DELETE'])
 @login_required

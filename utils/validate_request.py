@@ -1,52 +1,69 @@
 #utils/validate_requests.py
 from functools import wraps
 from flask import request, jsonify
+from pydantic import ValidationError
+import logging
+from typing import Type, TypeVar, Callable
+from pydantic import BaseModel
 
-def validate_request(model_class, location='json'):
+T = TypeVar('T', bound=BaseModel)
+
+def validate_request(model: Type[T], location: str = 'json'):
     """
-    A decorator to validate incoming request data against a specified model class.
-    This decorator extracts data from the request based on the specified location 
-    ('json', 'query', or 'form'), validates it by instantiating the provided model class, 
-    and passes the validated data to the decorated function.
+    A decorator that validates incoming request data against a Pydantic model.
+    
     Args:
-        model_class (type): The class used to validate the incoming request data. 
-                            It should accept keyword arguments corresponding to the request data.
-        location (str, optional): The location of the request data. 
-                                  Options are:
-                                  - 'json': Extracts data from the JSON body of the request.
-                                  - 'query': Extracts data from the query parameters of the request.
-                                  - 'form': Extracts data from the form-encoded body of the request.
-                                  Defaults to 'json'.
+        model: The Pydantic model class to validate against
+        location: Where to look for data ('json' or 'form')
+    
     Returns:
-        function: A decorator that wraps the target function, providing it with validated data.
+        The decorated function
+        
     Raises:
-        Exception: If the data cannot be validated (e.g., missing or invalid fields), 
-                   an error message is returned in the response with a 400 status code.
-    Example:
-        @validate_request(MyModel, location='json')
-        def my_view_function(validated_data):
-            # Use the validated_data object here
-            pass
+        ValidationError: If the request data fails validation
     """
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
+    def decorator(f: Callable):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
             try:
+                # Get request data based on location
                 if location == 'json':
                     data = request.get_json()
-                elif location == 'query':
-                    data = request.args.to_dict()
                 elif location == 'form':
                     data = request.form.to_dict()
                 else:
-                    return jsonify({'error': 'Invalid location'}), 400
+                    return jsonify({'error': f'Invalid location: {location}'}), 400
+
+                if not data:
+                    return jsonify({'error': 'No data provided'}), 400
+
+                # Validate data against the model
+                try:
+                    validated = model(**data)
+                except ValidationError as e:
+                    # Enhanced error handling with detailed validation errors
+                    errors = []
+                    for error in e.errors():
+                        loc = ' -> '.join(str(x) for x in error['loc'])
+                        msg = error['msg']
+                        errors.append(f"Field '{loc}': {msg}")
+                    
+                    error_msg = {
+                        'error': 'Validation failed',
+                        'details': errors
+                    }
+                    logging.error(f"Validation error for {model.__name__}: {errors}")
+                    return jsonify(error_msg), 422
+
+                # Log successful validation for debugging
+                logging.debug(f"Successfully validated {model.__name__}")
                 
-              
-                validated_data = model_class(**data)
-                return func(*args, validated_data=validated_data, **kwargs)
-            
+                # Pass the validated model instance to the wrapped function
+                return f(validated, *args, **kwargs)
+                
             except Exception as e:
-                return jsonify({'error': str(e)}), 400
-        
-        return wrapper
+                logging.error(f"Unexpected error in validate_request: {str(e)}")
+                return jsonify({'error': 'An unexpected error occurred during validation'}), 500
+                
+        return decorated_function
     return decorator
