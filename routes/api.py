@@ -35,9 +35,6 @@ from utils.auth_security import login_required
 from utils.business_rules import (
     process_node_payload,
     validate_patient_tree_structure,
-    validate_and_transform_characteristic,
-    validate_and_transform_treatment_embedded,
-    validate_and_transform_followup_embedded,
     find_node
 )
 

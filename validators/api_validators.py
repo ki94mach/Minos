@@ -185,10 +185,15 @@ class AlternativeTreatment(BaseModel):
         return self
 
 class TreatmentCreate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1)
     type: str
     regimen: Optional[Regimen] = None
     alternatives: Optional[List[AlternativeTreatment]] = None
+
+    @field_validator('name', mode='after')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        return validate_non_empty(v, "Treatment name")
 
     @field_validator('type', mode='after')
     @classmethod
@@ -205,21 +210,87 @@ class TreatmentCreate(BaseModel):
             raise ValueError('For Alternative treatments, regimen must be empty')
         if treatment_type == 'Regimen' and v is None:
             raise ValueError('For Regimen type, regimen must be provided')
+        if v is not None:
+            v.validate_drugs_consistency()
+        return v
+
+    @field_validator('alternatives', mode='after')
+    @classmethod
+    def validate_alternatives_field(cls, v: Optional[List[AlternativeTreatment]], info: ValidationInfo) -> Optional[List[AlternativeTreatment]]:
+        treatment_type = info.data.get('type')
+        if treatment_type == 'Alternative' and not v:
+            raise ValueError('For Alternative type, alternatives must be provided')
+        if treatment_type != 'Alternative' and v:
+            raise ValueError('Alternatives can only be present for Alternative type')
+        if v:
+            # Validate each alternative and check ratios
+            alt_ids = []
+            ratios_sum = 0.0
+            for alt in v:
+                alt_ids.append(str(alt.id))
+                ratios_sum += alt.ratio
+            
+            # Check for duplicates
+            if len(alt_ids) != len(set(alt_ids)):
+                raise ValueError("Duplicate alternative treatments are not allowed")
+            
+            # Validate ratio sum
+            if not (0.99 <= ratios_sum <= 1.01):
+                raise ValueError("Alternative treatment ratios must sum to 1.0")
         return v
 
 class TreatmentUpdate(BaseModel):
-    name: Optional[str]
+    name: Optional[str] = Field(None, min_length=1)
     type: Optional[str]
     regimen: Optional[Regimen] = None
     alternatives: Optional[List[AlternativeTreatment]] = None
 
+    @field_validator('name', mode='after')
+    @classmethod
+    def validate_optional_name(cls, v: Optional[str]) -> Optional[str]:
+        return validate_optional_string(v, "Treatment name")
+
     @field_validator('type', mode='after')
     @classmethod
     def validate_treatment_type(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        if v not in ALLOWED_TREATMENT_TYPES:
-            raise ValueError(f'Type must be one of {ALLOWED_TREATMENT_TYPES}')
+        if v is not None:
+            if v not in ALLOWED_TREATMENT_TYPES:
+                raise ValueError(f'Type must be one of {ALLOWED_TREATMENT_TYPES}')
+        return v
+
+    @field_validator('regimen', mode='after')
+    @classmethod
+    def validate_optional_regimen(cls, v: Optional[Regimen], info: ValidationInfo) -> Optional[Regimen]:
+        if v is not None:
+            treatment_type = info.data.get('type')
+            if treatment_type == 'Alternative':
+                raise ValueError('For Alternative treatments, regimen must be empty')
+            v.validate_drugs_consistency()
+        return v
+
+    @field_validator('alternatives', mode='after')
+    @classmethod
+    def validate_optional_alternatives(cls, v: Optional[List[AlternativeTreatment]], info: ValidationInfo) -> Optional[List[AlternativeTreatment]]:
+        if v is not None:
+            treatment_type = info.data.get('type')
+            if treatment_type and treatment_type != 'Alternative':
+                raise ValueError('Alternatives can only be present for Alternative type')
+            
+            # Validate each alternative and check ratios
+            alt_ids = []
+            ratios_sum = 0.0
+            for alt in v:
+                alt.validate_against_database()  # This will validate the embedded regimen too
+                alt_ids.append(str(alt.id))
+                ratios_sum += alt.ratio
+            
+            # Check for duplicates
+            if len(alt_ids) != len(set(alt_ids)):
+                raise ValueError("Duplicate alternative treatments are not allowed")
+            
+            # Validate ratio sum
+            if not (0.99 <= ratios_sum <= 1.01):
+                raise ValueError("Alternative treatment ratios must sum to 1.0")
         return v
 
 # ------------------------------------------------------------------------------
@@ -293,7 +364,7 @@ class TreatmentData(BaseModel):
     regimen: Optional[Regimen] = None
     alternatives: Optional[List[AlternativeTreatment]] = None
 
-    @field_validator("name", mode='after')
+    @field_validator('name', mode='after')
     @classmethod
     def name_must_be_non_empty(cls, v: str) -> str:
         return validate_non_empty(v, "Treatment name")
@@ -313,10 +384,46 @@ class TreatmentData(BaseModel):
             raise ValueError('For Alternative treatments, regimen must be empty')
         if treatment_type == 'Regimen' and v is None:
             raise ValueError('For Regimen type, regimen must be provided')
+        if v is not None:
+            v.validate_drugs_consistency()
+        return v
+
+    @field_validator('alternatives', mode='after')
+    @classmethod
+    def validate_alternatives_field(cls, v: Optional[List[AlternativeTreatment]], info: ValidationInfo) -> Optional[List[AlternativeTreatment]]:
+        treatment_type = info.data.get('type')
+        if treatment_type == 'Alternative' and not v:
+            raise ValueError('For Alternative type, alternatives must be provided')
+        if treatment_type != 'Alternative' and v:
+            raise ValueError('Alternatives can only be present for Alternative type')
+        if v:
+            # Validate each alternative treatment
+            alt_ids = []
+            ratios_sum = 0.0
+            for alt in v:
+                alt.validate_against_database()
+                alt_ids.append(str(alt.id))
+                ratios_sum += alt.ratio
+            
+            # Check for duplicate alternatives
+            if len(alt_ids) != len(set(alt_ids)):
+                raise ValueError("Duplicate alternative treatments are not allowed")
+            
+            # Validate that ratios sum to 1
+            if not (0.99 <= ratios_sum <= 1.01):  # Allow small floating point imprecision
+                raise ValueError("Alternative treatment ratios must sum to 1.0")
         return v
 
     @model_validator(mode="after")
     def validate_against_database(self) -> "TreatmentData":
+        # First validate embedded documents
+        if self.regimen:
+            self.regimen.validate_drugs_consistency()
+        if self.alternatives:
+            for alt in self.alternatives:
+                alt.validate_against_database()
+
+        # Then validate against database record
         treatment_data = {
             '_id': str(self.id),
             'name': self.name,
@@ -324,7 +431,7 @@ class TreatmentData(BaseModel):
             'regimen': self.regimen.model_dump() if self.regimen else None,
             'alternatives': [alt.model_dump() for alt in self.alternatives] if self.alternatives else None
         }
-        validate_and_transform_treatment_embedded(treatment_data)  # This will raise ValueError if validation fails
+        validate_and_transform_treatment_embedded(treatment_data)
         return self
 
 class FollowupData(BaseModel):
@@ -332,13 +439,22 @@ class FollowupData(BaseModel):
     id: PyObjectId = Field(..., alias="_id")
     overall_survival: float = Field(..., ge=0.0, le=1.0)
 
+    @field_validator('overall_survival')
+    @classmethod
+    def validate_survival_rate(cls, v: float) -> float:
+        return validate_rate(v)  # Reuse rate validation since it's the same constraint
+
     @model_validator(mode="after")
     def validate_against_database(self) -> "FollowupData":
+        # First validate the overall survival rate
+        self.validate_survival_rate(self.overall_survival)
+        
+        # Then validate against database record
         followup_data = {
             '_id': str(self.id),
             'overall_survival': self.overall_survival
         }
-        validate_and_transform_followup_embedded(followup_data)  # This will raise ValueError if validation fails
+        validate_and_transform_followup_embedded(followup_data)
         return self
 
 # ------------------------------------------------------------------------------
@@ -448,10 +564,40 @@ class AddNode(BaseModel):
 
     @model_validator(mode="after")
     def validate_parent_child_relationship(self) -> "AddNode":
+        # Validate parent-child relationship
         if self.parent_node_id:
             if self.node.parent_id and str(self.node.parent_id) != str(self.parent_node_id):
                 raise ValueError("Node's parent_id must match parent_node_id if both are provided")
             self.node.parent_id = self.parent_node_id
+
+        # Validate the main node's embedded data based on type
+        if self.node.node_type == "characteristic":
+            if not self.node.characteristic_data:
+                raise ValueError("characteristic_data is required for characteristic nodes")
+            self.node.characteristic_data.validate_against_database()
+        elif self.node.node_type == "treatment":
+            if not self.node.treatment_data:
+                raise ValueError("treatment_data is required for treatment nodes")
+            self.node.treatment_data.validate_against_database()
+        elif self.node.node_type == "followup":
+            if not self.node.followup_data:
+                raise ValueError("followup_data is required for followup nodes")
+            self.node.followup_data.validate_against_database()
+
+        # Recursively validate children if present
+        if self.children:
+            for child in self.children:
+                # Set parent ID for children
+                child.parent_id = self.node._id if hasattr(self.node, '_id') else None
+                
+                # Validate child's embedded data
+                if child.node_type == "characteristic" and child.characteristic_data:
+                    child.characteristic_data.validate_against_database()
+                elif child.node_type == "treatment" and child.treatment_data:
+                    child.treatment_data.validate_against_database()
+                elif child.node_type == "followup" and child.followup_data:
+                    child.followup_data.validate_against_database()
+
         return self
 
 class UpdateNode(BaseModel):
