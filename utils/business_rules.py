@@ -2,6 +2,7 @@
 
 from bson import ObjectId
 import logging
+from typing import Optional
 
 # Import your document models for lookups
 from models.tables import Drug, Characteristic, Treatment
@@ -11,6 +12,42 @@ def to_title_format(value: str) -> str:
     if value is None:
         return None
     return value.strip().title()
+
+def validate_non_empty(value: str, field_name: str) -> str:
+    """Common validation for non-empty string fields."""
+    if not value or not value.strip():
+        raise ValueError(f"{field_name} must not be empty")
+    return value.strip()
+
+def validate_optional_string(value: Optional[str], field_name: str) -> Optional[str]:
+    """Common validation for optional string fields."""
+    if value is not None:
+        return validate_non_empty(value, field_name)
+    return value
+
+def validate_rate(rate: float) -> float:
+    """Validate that a rate is between 0 and 1."""
+    if not isinstance(rate, (int, float)) or not (0 <= rate <= 1):
+        raise ValueError("Rate must be a number between 0 and 1")
+    return rate
+
+def validate_size(size: float) -> float:
+    """Validate that a size is positive."""
+    if not isinstance(size, (int, float)) or size <= 0:
+        raise ValueError("Size must be a positive number")
+    return size
+
+def validate_strength(strength: int) -> int:
+    """Validate that a strength value is positive."""
+    if not isinstance(strength, int) or strength <= 0:
+        raise ValueError("Strength must be a positive integer")
+    return strength
+
+def validate_unit(unit: str, allowed_units: list) -> str:
+    """Validate that a unit is in the allowed list."""
+    if unit not in allowed_units:
+        raise ValueError(f"Unit must be one of {allowed_units}")
+    return unit.lower()
 
 def validate_and_transform_drug(drug_data: dict) -> dict:
     """

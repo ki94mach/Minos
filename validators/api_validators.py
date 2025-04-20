@@ -16,6 +16,21 @@ from models.treatment.driver import TreatmentDriver
 from models.characteristic.driver import CharacteristicDriver
 from models.followup.driver import FollowupDriver
 
+# Import business rules functions at the top
+from utils.business_rules import (
+    validate_non_empty,
+    validate_optional_string,
+    validate_rate,
+    validate_size,
+    validate_strength,
+    validate_unit,
+    validate_and_transform_drug,
+    validate_and_transform_characteristic,
+    validate_and_transform_treatment_embedded,
+    validate_and_transform_followup_embedded,
+    to_title_format
+)
+
 # Constants for allowed values.
 ALLOWED_UNITS = ['mg', 'g', 'ng', 'mcg', 'IU']
 ALLOWED_TREATMENT_TYPES = ['Treatment', 'Regimen', 'Alternative']
@@ -50,9 +65,7 @@ class CharacteristicCreate(BaseModel):
     @field_validator('type', 'name', mode='after')
     @classmethod
     def validate_non_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("Field must not be empty")
-        return v.strip().title()  # Convert to title case for consistency
+        return validate_non_empty(v, "Field")
 
 class CharacteristicUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -62,11 +75,7 @@ class CharacteristicUpdate(BaseModel):
     @field_validator('type', 'name', mode='after')
     @classmethod
     def validate_optional_fields(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            if not v.strip():
-                raise ValueError("If provided, field must not be empty")
-            return v.strip().title()  # Convert to title case for consistency
-        return v
+        return validate_optional_string(v, "Field")
 
 # ------------------------------------------------------------------------------
 # DRUG VALIDATORS
@@ -80,16 +89,17 @@ class DrugCreate(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("Drug name must not be empty")
-        return v.strip().title()
+        return to_title_format(validate_non_empty(v, "Drug name"))
+
+    @field_validator('strength', mode='after')
+    @classmethod
+    def validate_drug_strength(cls, v: int) -> int:
+        return validate_strength(v)
 
     @field_validator('unit', mode='after')
     @classmethod
-    def validate_unit(cls, v: str) -> str:
-        if v not in ALLOWED_UNITS:
-            raise ValueError(f'Unit must be one of {ALLOWED_UNITS}')
-        return v.lower()  # Normalize unit to lowercase
+    def validate_drug_unit(cls, v: str) -> str:
+        return validate_unit(v, ALLOWED_UNITS)
 
 class DrugUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1)
@@ -99,19 +109,20 @@ class DrugUpdate(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_optional_name(cls, v: Optional[str]) -> Optional[str]:
+        return validate_optional_string(v, "Drug name")
+
+    @field_validator('strength', mode='after')
+    @classmethod
+    def validate_optional_strength(cls, v: Optional[int]) -> Optional[int]:
         if v is not None:
-            if not v.strip():
-                raise ValueError("If provided, drug name must not be empty")
-            return v.strip().title()
+            return validate_strength(v)
         return v
 
     @field_validator('unit', mode='after')
     @classmethod
     def validate_unit(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
-            if v not in ALLOWED_UNITS:
-                raise ValueError(f'Unit must be one of {ALLOWED_UNITS}')
-            return v.lower()  # Normalize unit to lowercase
+            return validate_unit(v, ALLOWED_UNITS)
         return v
 
 # ------------------------------------------------------------------------------
@@ -135,15 +146,14 @@ class DrugSubItem(BaseModel):
     
     @model_validator(mode="after")
     def validate_against_database(self) -> "DrugSubItem":
-        db_drug = DrugDriver.get_by_id(self.id)
-        if db_drug is None:
-            raise ValueError(f"Drug with id {self.id} not found in the database")
-        if self.name != db_drug.name:
-            raise ValueError("Embedded drug: 'name' does not match the database record")
-        if self.strength != db_drug.strength:
-            raise ValueError("Embedded drug: 'strength' does not match the database record")
-        if self.unit != db_drug.unit:
-            raise ValueError("Embedded drug: 'unit' does not match the database record")
+        # Use the business rule function instead of duplicating logic
+        drug_data = {
+            '_id': str(self.id),
+            'name': self.name,
+            'strength': self.strength,
+            'unit': self.unit
+        }
+        validate_and_transform_drug(drug_data)  # This will raise ValueError if validation fails
         return self
     
 class TreatmentDrugItem(BaseModel):
@@ -225,9 +235,7 @@ class FollowupCreate(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("Followup name must not be empty")
-        return v.strip()
+        return validate_non_empty(v, "Followup name")
 
     @model_validator(mode="after")
     def validate_ids(self) -> "FollowupCreate":
@@ -255,11 +263,7 @@ class FollowupUpdate(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_optional_name(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            if not v.strip():
-                raise ValueError("If provided, followup name must not be empty")
-            return v.strip()
-        return v
+        return validate_optional_string(v, "Followup name")
 
 # ------------------------------------------------------------------------------
 # EMBEDDED DATA FOR NODE PAYLOADS
@@ -273,13 +277,12 @@ class CharacteristicData(BaseModel):
 
     @model_validator(mode="after")
     def validate_against_database(self) -> "CharacteristicData":
-        db_char = CharacteristicDriver.find(id=self.id).first()
-        if db_char is None:
-            raise ValueError(f"Characteristic with id {self.id} not found in the database")
-        if self.char_type != db_char.char_type:
-            raise ValueError("Embedded characteristic: 'char_type' does not match the database record")
-        if self.name != db_char.name:
-            raise ValueError("Embedded characteristic: 'name' does not match the database record")
+        char_data = {
+            '_id': str(self.id),
+            'char_type': self.char_type,
+            'name': self.name
+        }
+        validate_and_transform_characteristic(char_data)  # This will raise ValueError if validation fails
         return self
 
 class TreatmentData(BaseModel):
@@ -293,9 +296,7 @@ class TreatmentData(BaseModel):
     @field_validator("name", mode='after')
     @classmethod
     def name_must_be_non_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("Treatment name must not be empty")
-        return v
+        return validate_non_empty(v, "Treatment name")
 
     @field_validator('type', mode='after')
     @classmethod
@@ -316,27 +317,14 @@ class TreatmentData(BaseModel):
 
     @model_validator(mode="after")
     def validate_against_database(self) -> "TreatmentData":
-        db_treatment = TreatmentDriver.find(id=self.id).first()
-        if db_treatment is None:
-            raise ValueError(f"Treatment with id {self.id} not found in the database")
-        if self.name != db_treatment.name:
-            raise ValueError("Embedded Treatment: 'name' does not match the database record")
-        if self.type != db_treatment.type:
-            raise ValueError("Embedded Treatment: 'type' does not match the database record")
-        
-        # Validate regimen/alternatives based on type
-        if self.type == 'Regimen':
-            if not self.regimen or self.regimen.model_dump() != db_treatment.regimen.model_dump():
-                raise ValueError("Embedded Treatment: 'regimen' does not match the database record")
-        elif self.type == 'Alternative':
-            if not self.alternatives:
-                raise ValueError("Alternatives are required for Alternative type treatments")
-            # Compare alternatives
-            if len(self.alternatives) != len(db_treatment.alternatives):
-                raise ValueError("Embedded Treatment: 'alternatives' count does not match the database record")
-            for alt, db_alt in zip(self.alternatives, db_treatment.alternatives):
-                if alt.model_dump() != db_alt.model_dump():
-                    raise ValueError("Embedded Treatment: 'alternatives' content does not match the database record")
+        treatment_data = {
+            '_id': str(self.id),
+            'name': self.name,
+            'type': self.type,
+            'regimen': self.regimen.model_dump() if self.regimen else None,
+            'alternatives': [alt.model_dump() for alt in self.alternatives] if self.alternatives else None
+        }
+        validate_and_transform_treatment_embedded(treatment_data)  # This will raise ValueError if validation fails
         return self
 
 class FollowupData(BaseModel):
@@ -346,11 +334,11 @@ class FollowupData(BaseModel):
 
     @model_validator(mode="after")
     def validate_against_database(self) -> "FollowupData":
-        db_followup = FollowupDriver.find(id=self.id).first()
-        if db_followup is None:
-            raise ValueError(f"Followup with id {self.id} not found in the database")
-        if self.overall_survival != db_followup.overall_survival:
-            raise ValueError("Embedded Followup: 'overall_survival' does not match the database record")
+        followup_data = {
+            '_id': str(self.id),
+            'overall_survival': self.overall_survival
+        }
+        validate_and_transform_followup_embedded(followup_data)  # This will raise ValueError if validation fails
         return self
 
 # ------------------------------------------------------------------------------
@@ -373,6 +361,16 @@ class PatientNode(BaseModel):
         if v not in ALLOWED_NODE_TYPES:
             raise ValueError(f"node_type must be one of {ALLOWED_NODE_TYPES}")
         return v
+
+    @field_validator('rate', mode='after')
+    @classmethod
+    def validate_node_rate(cls, v: float) -> float:
+        return validate_rate(v)
+
+    @field_validator('size', mode='after')
+    @classmethod
+    def validate_node_size(cls, v: float) -> float:
+        return validate_size(v)
 
     @field_validator('characteristic_data', mode='after')
     @classmethod
@@ -430,6 +428,13 @@ class PatientUpdate(BaseModel):
     size: Optional[float] = Field(None, gt=0.0)
     tree: Optional[PatientNode] = None
 
+    @field_validator('size', mode='after')
+    @classmethod
+    def validate_optional_size(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None:
+            return validate_size(v)
+        return v
+
     @model_validator(mode="after")
     def validate_tree_update(self) -> "PatientUpdate":
         if self.tree and self.tree.parent_id is not None:
@@ -464,6 +469,20 @@ class UpdateNode(BaseModel):
     def validate_optional_node_type(cls, v: Optional[str]) -> Optional[str]:
         if v and v not in ALLOWED_NODE_TYPES:
             raise ValueError(f"node_type must be one of {ALLOWED_NODE_TYPES}")
+        return v
+
+    @field_validator('rate', mode='after')
+    @classmethod
+    def validate_optional_rate(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None:
+            return validate_rate(v)
+        return v
+
+    @field_validator('size', mode='after')
+    @classmethod
+    def validate_optional_size(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None:
+            return validate_size(v)
         return v
 
     @model_validator(mode="after")
