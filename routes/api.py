@@ -18,10 +18,14 @@ from models.patient.driver import PatientDriver
 from models.treatment.driver import TreatmentDriver
 
 # Import model classes from tables for creating new instances.
-from models.tables import (Characteristic, Drug, Followup,
-                           Treatment, PatientTree)
+from models.tables import (Characteristic, Drug, Followup, PatientTree)
 from models.tables import (Node, CharacteristicEmbedded,
                            TreatmentEmbedded, FollowupEmbedded)
+from models.tables import (
+    Treatment     as TreatmentDoc,
+    Regimen       as RegimenDoc,
+    AlternativeTreatment as AltTreatDoc,
+)
 
 # Import validators and required decorators
 from validators.api_validators import (CharacteristicCreate, CharacteristicUpdate,
@@ -230,7 +234,7 @@ def get_treatments():
 @api_blueprint.route('/treatments', methods=['POST'])
 @login_required
 @validate_request(TreatmentCreate, location='json')
-def create_treatment(validated_data):
+def create_treatment(validated_data: TreatmentCreate):
     """
     Expected JSON body:
     E.g 1:
@@ -328,42 +332,50 @@ def create_treatment(validated_data):
     Note: "treatment_hash" is auto-generated.
     """
     try:
-        name = validated_data.name
-        _type = validated_data.type
-        if not name or not _type:
-            return jsonify({'error': 'Missing required fields: name and type'}), 400
+        # 1️⃣ Dump EVERYTHING to plain dicts, using alias="_id" keys
+        payload = validated_data.model_dump(by_alias=True)
+        raw_regimen = payload.get("regimen")
+        raw_alts   = payload.get("alternatives", [])
 
-        # Get the regimen and alternatives from the request
-        regimen_data = validated_data.get('regimen')
-        alternatives_data = validated_data.get('alternatives', [])
+        # 2️⃣ Build the proper MongoEngine EmbeddedDocuments
+        regimen_doc = RegimenDoc(**raw_regimen) if raw_regimen else None
 
-        # For an Alternative type treatment, we don't expect a top-level regimen.
-        if _type == "Alternative":
-            regimen_data = None
-        elif regimen_data:
-            # If regimen is provided for Regimen type, ignore alternatives.
-            alternatives_data = []
+        alts_docs = []
+        if payload["type"] == "Alternative":
+            # only for Alternative do we consume the alternatives list
+            for alt in raw_alts:
+                # each alt is a dict with keys "_id", "name", "regimen", "ratio"
+                # and "regimen" itself is a nested dict. We construct one level at a time:
+                alt_regimen = alt["regimen"]
+                alt_regimen_doc = RegimenDoc(**alt_regimen)
+                alts_docs.append(
+                    AltTreatDoc(
+                        _id=alt["_id"],
+                        name=alt["name"],
+                        regimen=alt_regimen_doc,
+                        ratio=alt["ratio"],
+                    )
+                )
 
-        hash_input = name + _type + str(regimen_data) + str(alternatives_data)
-        treatment_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+        # 3️⃣ Hash & insert the Treatment document
+        hash_input     = payload["name"] + payload["type"] + str(raw_regimen) + str(raw_alts)
+        treatment_hash = hashlib.sha256(hash_input.encode()).hexdigest()
 
-        treatment = Treatment(
-            name=name,
-            type=_type,
-            regimen=regimen_data,         # Will be None if not applicable
-            alternatives=alternatives_data,
-            treatment_hash=treatment_hash
+        treatment = TreatmentDoc(
+            name=payload["name"],
+            type=payload["type"],
+            regimen=regimen_doc,
+            alternatives=alts_docs,
+            treatment_hash=treatment_hash,
         )
         treatment_id = TreatmentDriver.insert(treatment)
+        return jsonify({"id": str(treatment_id)}), 201
 
-        return jsonify({'id': str(treatment_id)}), 201
     except NotUniqueError:
-        logging.error("Duplicate treatment detected.")
-        return jsonify({'error': "A treatment with similar properties already exists."}), 409
+        return jsonify({"error": "Duplicate treatment"}), 409
     except Exception as e:
-        logging.error(f"Error creating treatment: {e}")
-        return jsonify({'error': "An unexpected error occurred while creating the treatment."}), 500
-
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 @api_blueprint.route('/treatments/<treatment_id>', methods=['PUT'])
 @login_required
