@@ -151,6 +151,23 @@ def validate_and_transform_followup_embedded(followup_data: dict) -> dict:
     
     return followup_data
 
+def find_node(node, target_id):
+    """
+    Recursively find a node with the given target_id in the tree.
+    Args:
+        node: The root node to start searching from
+        target_id: The id of the node to find (as string)
+    Returns:
+        The found node or None if not found
+    """
+    if str(node._id) == target_id:
+        return node
+    for child in node.children:
+        found = find_node(child, target_id)
+        if found:
+            return found
+    return None
+
 def process_node_payload(node_payload: dict) -> dict:
     """
     Process an incoming node payload and apply validations/transformations

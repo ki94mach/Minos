@@ -37,7 +37,8 @@ from utils.business_rules import (
     validate_patient_tree_structure,
     validate_and_transform_characteristic,
     validate_and_transform_treatment_embedded,
-    validate_and_transform_followup_embedded
+    validate_and_transform_followup_embedded,
+    find_node
 )
 
 api_blueprint = Blueprint('api', __name__)
