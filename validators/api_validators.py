@@ -29,7 +29,8 @@ from utils.business_rules import (
     validate_and_transform_treatment_embedded,
     validate_and_transform_followup_embedded,
     to_title_format,
-    validate_regimen_consistency
+    validate_regimen_consistency,
+    validate_and_transform_alternative
 )
 
 # Constants for allowed values.
@@ -183,15 +184,18 @@ class AlternativeTreatment(BaseModel):
 
     @model_validator(mode="after")
     def validate_against_database(self) -> "AlternativeTreatment":
-        db_treatment = TreatmentDriver.get_by_id(self.id)
-        if db_treatment is None:
-            raise ValueError(f"Treatment with id {self.id} not found in the database")
-        if self.name != db_treatment.name:
-            raise ValueError("Embedded Treatment: 'name' does not match the database record")
-        if self.regimen.model_dump() != db_treatment.regimen.model_dump():
-            raise ValueError("Embedded Treatment: 'regimen' does not match the database record")
-        if self.ratio != db_treatment.ratio:
-            raise ValueError("Embedded Treatment: 'ratio' does not match the database record")
+        # First validate the regimen if present
+        if self.regimen:
+            self.regimen.validate_drugs_consistency()
+
+        # Then use the business rule function to validate against database
+        alternative_data = {
+            '_id': str(self.id),
+            'name': self.name,
+            'regimen': self.regimen.model_dump() if self.regimen else None,
+            'ratio': self.ratio
+        }
+        validate_and_transform_alternative(alternative_data)  # This will raise ValueError if validation fails
         return self
 
 class TreatmentCreate(BaseModel):

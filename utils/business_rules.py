@@ -188,6 +188,49 @@ def validate_and_transform_followup_embedded(followup_data: dict) -> dict:
     
     return followup_data
 
+def validate_and_transform_alternative(alternative_data: dict) -> dict:
+    """
+    Validate that the alternative treatment referenced by its _id exists.
+    Transform the fields and validate against database record.
+    """
+    alt_id = alternative_data.get('_id')
+    if not alt_id:
+        raise ValueError("Alternative treatment data must include an '_id' field.")
+    
+    from models.tables import Treatment
+    from models.treatment.driver import TreatmentDriver
+    treatment = TreatmentDriver.find(id=ObjectId(alt_id)).first()
+    if not treatment:
+        raise ValueError(f"Treatment with _id {alt_id} not found.")
+    
+    if treatment.type != 'Regimen':
+        raise ValueError(f"Referenced treatment must be of type 'Regimen', got {treatment.type}")
+    
+    if 'name' in alternative_data:
+        alternative_data['name'] = to_title_format(alternative_data['name'])
+    
+    # Validate that the transformed data matches the database record
+    if alternative_data.get('name') != treatment.name:
+        raise ValueError("Name does not match the database record")
+    
+    # Validate regimen if present
+    if 'regimen' in alternative_data:
+        if not treatment.regimen:
+            raise ValueError("Referenced treatment must have a regimen")
+            
+        # Validate regimen structure matches
+        alt_regimen = alternative_data['regimen']
+        db_regimen = treatment.regimen.to_mongo().to_dict()
+        
+        if len(alt_regimen.get('drugs', [])) != len(db_regimen.get('drugs', [])):
+            raise ValueError("Regimen drugs do not match the database record")
+            
+        for drug_item in alternative_data['regimen'].get('drugs', []):
+            if 'drug' in drug_item:
+                drug_item['drug'] = validate_and_transform_drug(drug_item['drug'])
+    
+    return alternative_data
+
 def validate_regimen_consistency(regimen: dict) -> None:
     """
     Make sure every DrugSubItem embedded in *regimen* exists in the Drug collection
