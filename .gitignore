@@ -84,4 +84,4 @@ flask_session/
 docs
 
 # Test files
-.tests/
+tests/
