@@ -188,6 +188,39 @@ def validate_and_transform_followup_embedded(followup_data: dict) -> dict:
     
     return followup_data
 
+def validate_regimen_consistency(regimen: dict) -> None:
+    """
+    Make sure every DrugSubItem embedded in *regimen* exists in the Drug collection
+    and that its name, strength and unit match the authoritative record.
+
+    Raises
+    -------
+    ValueError  – whenever a drug is missing or one of the attributes differs.
+    """
+
+    from models.drug.driver import DrugDriver
+    for item in regimen.drugs:
+        drug_id = ObjectId(item.drug.id)
+        drug = DrugDriver.find(id=drug_id).first()
+        if drug is None:
+            raise ValueError(f"Drug with _id {drug_id} not found in the database")
+
+        if item.drug.name != drug.name:
+            raise ValueError(
+                f"Embedded drug name '{item.drug.name}' "
+                f"does not match DB value '{drug.name}'"
+            )
+        if item.drug.strength != drug.strength:
+            raise ValueError(
+                f"Embedded strength {item.drug.strength} "
+                f"does not match DB value {drug.strength}"
+            )
+        if item.drug.unit.lower() != drug.unit.lower():
+            raise ValueError(
+                f"Embedded unit '{item.drug.unit}' "
+                f"does not match DB value '{drug.unit}'"
+            )
+
 def find_node(node, target_id):
     """
     Recursively find a node with the given target_id in the tree.

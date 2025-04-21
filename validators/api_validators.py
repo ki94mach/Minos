@@ -28,7 +28,8 @@ from utils.business_rules import (
     validate_and_transform_characteristic,
     validate_and_transform_treatment_embedded,
     validate_and_transform_followup_embedded,
-    to_title_format
+    to_title_format,
+    validate_regimen_consistency
 )
 
 # Constants for allowed values.
@@ -62,10 +63,10 @@ class CharacteristicCreate(BaseModel):
     type: str = Field(..., alias='type', min_length=1)
     name: str = Field(..., min_length=1)
 
-    @field_validator('type', 'name', mode='after')
+    @field_validator('name', 'type', mode='after')
     @classmethod
-    def validate_non_empty(cls, v: str) -> str:
-        return validate_non_empty(v, "Field")
+    def validate_name(cls, v: str) -> str:
+        return to_title_format(validate_non_empty(v, "Characteristic name"))
 
 class CharacteristicUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -75,7 +76,7 @@ class CharacteristicUpdate(BaseModel):
     @field_validator('type', 'name', mode='after')
     @classmethod
     def validate_optional_fields(cls, v: Optional[str]) -> Optional[str]:
-        return validate_optional_string(v, "Field")
+        return to_title_format(validate_optional_string(v, "Field"))
 
 # ------------------------------------------------------------------------------
 # DRUG VALIDATORS
@@ -160,8 +161,17 @@ class TreatmentDrugItem(BaseModel):
     drug: DrugSubItem
     annual_patient_con: int
 
+    @field_validator('annual_patient_con', mode='after')
+    @classmethod
+    def validate_consumtion_size(cls, v: float) -> float:
+        return validate_size(v)
+
 class Regimen(BaseModel):
     drugs: List[TreatmentDrugItem]
+    
+    def validate_drugs_consistency(self) -> None:
+        validate_regimen_consistency(self)
+
 
 # For nested models in Alternative treatments
 class AlternativeTreatment(BaseModel):

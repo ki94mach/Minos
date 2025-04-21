@@ -56,7 +56,7 @@ def configure_session(app, redis_client):
     # Redis Session Configuration
     app.config['SESSION_TYPE'] = 'redis'
     app.config['SESSION_REDIS'] = redis_client
-    app.config['SESSION_USE_SIGNER'] = True
+    # app.config['SESSION_USE_SIGNER'] = True
     app.config['SESSION_PERMANENT'] = True
     
     # Convert hours to seconds for session lifetime
