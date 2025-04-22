@@ -519,7 +519,9 @@ def create_patient(validated_data):
         
         # Process and validate the entire node payload including embedded data
         processed_node = process_node_payload(node_data)
-        
+        if '_id' not in processed_node:
+            processed_node['_id'] = ObjectId()
+
         # Create the Node instance with processed data
         new_node = Node(**processed_node)
         
