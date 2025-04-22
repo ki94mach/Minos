@@ -234,11 +234,11 @@ def validate_and_transform_alternative(alternative_data: dict) -> dict:
 def validate_regimen_consistency(regimen: dict) -> None:
     """
     Make sure every DrugSubItem embedded in *regimen* exists in the Drug collection
-    and that its name, strength and unit match the authoritative record.
+    and that its name, strength, unit and annual_patient_con match the authoritative record.
 
     Raises
     -------
-    ValueError  – whenever a drug is missing or one of the attributes differs.
+    ValueError – whenever a drug is missing or one of the attributes differs.
     """
 
     from models.drug.driver import DrugDriver
@@ -263,6 +263,10 @@ def validate_regimen_consistency(regimen: dict) -> None:
                 f"Embedded unit '{item.drug.unit}' "
                 f"does not match DB value '{drug.unit}'"
             )
+            
+        # Validate annual_patient_con
+        if not isinstance(item.annual_patient_con, int) or item.annual_patient_con <= 0:
+            raise ValueError("Annual patient consumption must be a positive integer")
 
 def find_node(node, target_id):
     """
