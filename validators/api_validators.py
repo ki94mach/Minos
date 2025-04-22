@@ -170,8 +170,10 @@ class TreatmentDrugItem(BaseModel):
 class Regimen(BaseModel):
     drugs: List[TreatmentDrugItem]
     
-    def validate_drugs_consistency(self) -> None:
-        validate_regimen_consistency(self)
+    def validate_against_database(self, treatment_id: Optional[str] = None) -> "Regimen":
+        regimen_dict = self.model_dump(by_alias=True)
+        validate_regimen_consistency(regimen_dict, treatment_id)
+        return self
 
 
 # For nested models in Alternative treatments
@@ -186,13 +188,14 @@ class AlternativeTreatment(BaseModel):
     def validate_against_database(self) -> "AlternativeTreatment":
         # First validate the regimen if present
         if self.regimen:
-            self.regimen.validate_drugs_consistency()
+            self.regimen.validate_against_database(str(self.id))
 
+        regimen_data = self.regimen.model_dump(by_alias=True) if self.regimen else None
         # Then use the business rule function to validate against database
         alternative_data = {
             '_id': str(self.id),
             'name': self.name,
-            'regimen': self.regimen.model_dump() if self.regimen else None,
+            'regimen': regimen_data,
             'ratio': self.ratio
         }
         validate_and_transform_alternative(alternative_data)  # This will raise ValueError if validation fails
@@ -225,7 +228,7 @@ class TreatmentCreate(BaseModel):
         if treatment_type == 'Regimen' and v is None:
             raise ValueError('For Regimen type, regimen must be provided')
         if v is not None:
-            v.validate_drugs_consistency()
+            v.validate_against_database()   
         return v
 
     @field_validator('alternatives', mode='after')
@@ -279,7 +282,7 @@ class TreatmentUpdate(BaseModel):
             treatment_type = info.data.get('type')
             if treatment_type == 'Alternative':
                 raise ValueError('For Alternative treatments, regimen must be empty')
-            v.validate_drugs_consistency()
+            v.validate_against_database()
         return v
 
     @field_validator('alternatives', mode='after')
@@ -399,7 +402,7 @@ class TreatmentData(BaseModel):
         if treatment_type == 'Regimen' and v is None:
             raise ValueError('For Regimen type, regimen must be provided')
         if v is not None:
-            v.validate_drugs_consistency()
+            v.validate_against_database()
         return v
 
     @field_validator('alternatives', mode='after')

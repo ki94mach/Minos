@@ -54,7 +54,7 @@ def validate_and_transform_drug(drug_data: dict) -> dict:
     Validate that the drug referenced by its _id exists.
     Transform the 'name' to title format and normalize unit case.
     """
-    drug_id = drug_data.get('_id')
+    drug_id = drug_data.get('_id') or drug_data.pop('id', None)
     if not drug_id:
         raise ValueError("Drug data must include an '_id' field.")
     
@@ -231,42 +231,58 @@ def validate_and_transform_alternative(alternative_data: dict) -> dict:
     
     return alternative_data
 
-def validate_regimen_consistency(regimen: dict) -> None:
+def validate_regimen_consistency(
+        regimen_data: dict,
+        treatment_id: Optional[str] = None
+) -> None:
     """
-    Make sure every DrugSubItem embedded in *regimen* exists in the Drug collection
-    and that its name, strength, unit and annual_patient_con match the authoritative record.
+    • If *treatment_id* is supplied, compare the payload’s
+      `annual_patient_con` values with the authoritative
+      regimen that is stored inside that Treatment document.
 
-    Raises
-    -------
-    ValueError – whenever a drug is missing or one of the attributes differs.
+    • If no *treatment_id* is given (e.g. you are creating a brand‑new
+      Regimen treatment), we only make sure the numbers are positive.
+
+    NOTE: Drug attributes (name, strength, unit) are **already**
+          guaranteed by DrugSubItem, so we do **not** re‑check them here.
     """
+    if treatment_id:
+        from models.treatment.driver import TreatmentDriver
 
-    from models.drug.driver import DrugDriver
-    for item in regimen.drugs:
-        drug_id = ObjectId(item.drug.id)
-        drug = DrugDriver.find(id=drug_id).first()
-        if drug is None:
-            raise ValueError(f"Drug with _id {drug_id} not found in the database")
+        treatment = TreatmentDriver.find(id=ObjectId(treatment_id)).first()
+        if not treatment:
+            raise ValueError(f"Treatment with _id {treatment_id} not found")
 
-        if item.drug.name != drug.name:
-            raise ValueError(
-                f"Embedded drug name '{item.drug.name}' "
-                f"does not match DB value '{drug.name}'"
-            )
-        if item.drug.strength != drug.strength:
-            raise ValueError(
-                f"Embedded strength {item.drug.strength} "
-                f"does not match DB value {drug.strength}"
-            )
-        if item.drug.unit.lower() != drug.unit.lower():
-            raise ValueError(
-                f"Embedded unit '{item.drug.unit}' "
-                f"does not match DB value '{drug.unit}'"
-            )
-            
-        # Validate annual_patient_con
-        if not isinstance(item.annual_patient_con, int) or item.annual_patient_con <= 0:
-            raise ValueError("Annual patient consumption must be a positive integer")
+        if not treatment.regimen:
+            raise ValueError("Referenced treatment does not contain a regimen")
+
+        # build a quick lookup: str(drug_id) → annual_patient_con
+        db_map = {
+            str(item.drug._id): item.annual_patient_con
+            for item in treatment.regimen.drugs
+        }
+
+        if len(db_map) != len(regimen_data["drugs"]):
+            raise ValueError("Number of drugs in payload does not match database record")
+
+        for item in regimen_data["drugs"]:
+            drug_id = str(item["drug"]["_id"])
+            db_val = db_map.get(drug_id)
+            if db_val is None:
+                raise ValueError(f"Drug {drug_id} not found in treatment {treatment_id}")
+
+            if item["annual_patient_con"] != db_val:
+                raise ValueError(
+                    f"annual_patient_con mismatch for drug {drug_id}: "
+                    f"{item['annual_patient_con']} (payload) ≠ {db_val} (DB)"
+                )
+
+        return
+    
+    for item in regimen_data["drugs"]:
+        apc = item["annual_patient_con"]
+        if not isinstance(apc, int) or apc <= 0:
+            raise ValueError("annual_patient_con must be a positive integer")
 
 def find_node(node, target_id):
     """
