@@ -32,11 +32,7 @@ from utils.validate_request import validate_request
 from utils.auth_security import login_required
 
 # Importing validation utilities
-from utils.business_rules import (
-    process_node_payload,
-    validate_patient_tree_structure,
-    find_node
-)
+from utils.business_rules import find_node
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -518,12 +514,11 @@ def create_patient(validated_data):
         node_data = validated_data.node.model_dump(by_alias=True)
         
         # Process and validate the entire node payload including embedded data
-        processed_node = process_node_payload(node_data)
-        if '_id' not in processed_node:
-            processed_node['_id'] = ObjectId()
+        if '_id' not in node_data:
+            node_data['_id'] = ObjectId()
 
         # Create the Node instance with processed data
-        new_node = Node(**processed_node)
+        new_node = Node(**node_data)
         
         # Generate tree hash
         hash_input = f"{new_node.to_mongo().to_dict()}".encode('utf-8')
@@ -662,16 +657,20 @@ def add_node(validated_data, patient_id):
                 child.model_dump(by_alias=True) for child in validated_data.children
             ]
         
-        # Process and validate the node payload
-        processed_node = process_node_payload(new_node_data)
-        
+    
         # Fetch the patient tree
         patient_tree = PatientDriver.find(id=patient_id).first()
         if not patient_tree:
             return jsonify({'error': 'Patient not found'}), 404
 
-        # Create new node instance with processed data
-        new_node = Node(**processed_node)
+        # Make sure embedded Node has its own ObjectId
+        if '_id' not in new_node_data:
+            new_node_data['_id'] = ObjectId()
+        # If we're attaching under a parent, record that too
+        if parent_node_id:
+            new_node_data['parent_id'] = ObjectId(str(parent_node_id))
+
+        new_node = Node(**new_node_data)
         
         if parent_node_id:
             # Find and validate parent node
@@ -679,12 +678,8 @@ def add_node(validated_data, patient_id):
             if not parent_node:
                 return jsonify({'error': 'Parent node not found'}), 404
                 
-            # Validate parent-child relationship
-            validate_patient_tree_structure(new_node.to_mongo(), str(parent_node._id))
             parent_node.children.append(new_node)
         else:
-            # Adding to root level
-            validate_patient_tree_structure(new_node.to_mongo())
             patient_tree.tree.children.append(new_node)
 
         # Recompute tree hash

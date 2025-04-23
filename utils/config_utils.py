@@ -27,7 +27,7 @@ def configure_security(app):
     """Configure security settings including CSRF protection."""
     # CSRF Protection configuration
     app.config['WTF_CSRF_ENABLED'] = True
-    app.config['WTF_CSRF_TIME_LIMIT'] = 3600  # 1 hour in seconds
+    app.config['WTF_CSRF_TIME_LIMIT'] = 7200  # 1 hour in seconds
     app.config['WTF_CSRF_SSL_STRICT'] = os.environ.get('FLASK_ENV') == 'production'
     app.config['WTF_CSRF_METHODS'] = ['POST', 'PUT', 'PATCH', 'DELETE']
     app.config['WTF_CSRF_CHECK_DEFAULT'] = True
