@@ -31,8 +31,8 @@ auth_blueprint = Blueprint('auth', __name__)
 
 @auth_blueprint.route('/login', methods=['GET'])
 def login_get():
-    if session.get('user_id'):
-        return redirect(url_for('api.get_characteristics'))
+    # if session.get('user_id'):
+    #     return redirect(url_for('api.get_characteristics'))
     return render_template('login.html')
 
 

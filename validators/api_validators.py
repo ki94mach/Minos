@@ -187,8 +187,8 @@ class AlternativeTreatment(BaseModel):
     @model_validator(mode="after")
     def validate_against_database(self) -> "AlternativeTreatment":
         # First validate the regimen if present
-        if self.regimen:
-            self.regimen.validate_against_database(str(self.id))
+        # if self.regimen:
+        #     self.regimen.validate_against_database(str(self.id))
 
         regimen_data = self.regimen.model_dump(by_alias=True) if self.regimen else None
         # Then use the business rule function to validate against database
