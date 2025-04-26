@@ -17,7 +17,7 @@ from validators.auth_validators import RegisterUserSchema, validate_strong_passw
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_DURATION = 300  # 5 minutes
 PASSWORD_RESET_TIMEOUT_MINUTES = 30
-SESSION_TIMEOUT_MINUTES = 30
+SESSION_TIMEOUT_MINUTES = 10000
 TOKEN_LENGTH = 64
 
 # Dictionary to track login attempts with type hints

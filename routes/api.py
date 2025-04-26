@@ -670,7 +670,22 @@ def add_node(validated_data, patient_id):
         if parent_node_id:
             new_node_data['parent_id'] = ObjectId(str(parent_node_id))
 
-        new_node = Node(**new_node_data)
+        # new_node = Node(**new_node_data)
+        
+        wrapper = {
+            'node': validated_data.node.model_dump(
+                by_alias=True,
+                exclude_none=True
+            )
+        }
+
+        if validated_data.children:
+            wrapper['node']['children'] = [
+                c.model_dump(by_alias=True, exclude_none=True) for c in validated_data.children
+            ]
+        new_node = create_node_from_dict(wrapper,
+                                parent_id=ObjectId(parent_node_id)
+                                if parent_node_id else None)
         
         if parent_node_id:
             # Find and validate parent node

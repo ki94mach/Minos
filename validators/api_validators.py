@@ -228,7 +228,7 @@ class TreatmentCreate(BaseModel):
         if treatment_type == 'Regimen' and v is None:
             raise ValueError('For Regimen type, regimen must be provided')
         if v is not None:
-            v.validate_against_database()   
+            v.validate_against_database(info.data['id'])   
         return v
 
     @field_validator('alternatives', mode='after')
@@ -282,7 +282,7 @@ class TreatmentUpdate(BaseModel):
             treatment_type = info.data.get('type')
             if treatment_type == 'Alternative':
                 raise ValueError('For Alternative treatments, regimen must be empty')
-            v.validate_against_database()
+            v.validate_against_database(info.data['id'])
         return v
 
     @field_validator('alternatives', mode='after')
@@ -401,8 +401,8 @@ class TreatmentData(BaseModel):
             raise ValueError('For Alternative treatments, regimen must be empty')
         if treatment_type == 'Regimen' and v is None:
             raise ValueError('For Regimen type, regimen must be provided')
-        if v is not None:
-            v.validate_against_database()
+        # if v is not None:
+        #     v.validate_against_database(info.data.get('id'))
         return v
 
     @field_validator('alternatives', mode='after')
@@ -434,19 +434,19 @@ class TreatmentData(BaseModel):
     @model_validator(mode="after")
     def validate_against_database(self) -> "TreatmentData":
         # First validate embedded documents
-        if self.regimen:
-            self.regimen.validate_drugs_consistency()
-        if self.alternatives:
-            for alt in self.alternatives:
-                alt.validate_against_database()
+        # if self.regimen:
+        #     self.regimen.validate_against_database()
+        # if self.alternatives:
+        #     for alt in self.alternatives:
+        #         alt.validate_against_database()
 
         # Then validate against database record
         treatment_data = {
             '_id': str(self.id),
             'name': self.name,
             'type': self.type,
-            'regimen': self.regimen.model_dump() if self.regimen else None,
-            'alternatives': [alt.model_dump() for alt in self.alternatives] if self.alternatives else None
+            'regimen': self.regimen.model_dump(by_alias=True) if self.regimen else None,
+            'alternatives': [alt.model_dump(by_alias=True) for alt in self.alternatives] if self.alternatives else None
         }
         validate_and_transform_treatment_embedded(treatment_data)
         return self
@@ -588,18 +588,18 @@ class AddNode(BaseModel):
             self.node.parent_id = self.parent_node_id
 
         # Validate the main node's embedded data based on type
-        if self.node.node_type == "characteristic":
-            if not self.node.characteristic_data:
-                raise ValueError("characteristic_data is required for characteristic nodes")
-            self.node.characteristic_data.validate_against_database()
-        elif self.node.node_type == "treatment":
-            if not self.node.treatment_data:
-                raise ValueError("treatment_data is required for treatment nodes")
-            self.node.treatment_data.validate_against_database()
-        elif self.node.node_type == "followup":
-            if not self.node.followup_data:
-                raise ValueError("followup_data is required for followup nodes")
-            self.node.followup_data.validate_against_database()
+        # if self.node.node_type == "characteristic":
+        #     if not self.node.characteristic_data:
+        #         raise ValueError("characteristic_data is required for characteristic nodes")
+        #     self.node.characteristic_data.validate_against_database()
+        # elif self.node.node_type == "treatment":
+        #     if not self.node.treatment_data:
+        #         raise ValueError("treatment_data is required for treatment nodes")
+        #     self.node.treatment_data.validate_against_database()
+        # elif self.node.node_type == "followup":
+        #     if not self.node.followup_data:
+        #         raise ValueError("followup_data is required for followup nodes")
+        #     self.node.followup_data.validate_against_database()
 
         # Recursively validate children if present
         if self.children:

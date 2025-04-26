@@ -145,7 +145,7 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
                 drug_item['drug'] = validate_and_transform_drug(drug_item['drug'])
     
     # Handle alternatives validation if present
-    if 'alternatives' in treatment_data:
+    if treatment_data['alternatives']:
         if treatment.type != 'Alternative':
             raise ValueError("Alternatives can only be present for treatment type 'Alternative'")
         for alt in treatment_data['alternatives']:
