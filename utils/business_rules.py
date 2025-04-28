@@ -137,7 +137,7 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
         raise ValueError("Type does not match the database record")
     
     # Handle regimen validation if present
-    if 'regimen' in treatment_data:
+    if treatment_data.get('regimen'):
         if treatment.type != 'Regimen':
             raise ValueError("Regimen can only be present for treatment type 'Regimen'")
         for drug_item in treatment_data['regimen'].get('drugs', []):
@@ -148,11 +148,11 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
     if treatment_data['alternatives']:
         if treatment.type != 'Alternative':
             raise ValueError("Alternatives can only be present for treatment type 'Alternative'")
-        for alt in treatment_data['alternatives']:
-            if 'regimen' in alt:
-                for drug_item in alt['regimen'].get('drugs', []):
-                    if 'drug' in drug_item:
-                        drug_item['drug'] = validate_and_transform_drug(drug_item['drug'])
+        # for alt in treatment_data['alternatives']:
+        #     if 'regimen' in alt:
+        #         for drug_item in alt['regimen'].get('drugs', []):
+        #             if 'drug' in drug_item:
+        #                 drug_item['drug'] = validate_and_transform_drug(drug_item['drug'])
     
     return treatment_data
 
@@ -225,9 +225,9 @@ def validate_and_transform_alternative(alternative_data: dict) -> dict:
         if len(alt_regimen.get('drugs', [])) != len(db_regimen.get('drugs', [])):
             raise ValueError("Regimen drugs do not match the database record")
             
-        for drug_item in alternative_data['regimen'].get('drugs', []):
-            if 'drug' in drug_item:
-                drug_item['drug'] = validate_and_transform_drug(drug_item['drug'])
+        # for drug_item in alternative_data['regimen'].get('drugs', []):
+        #     if 'drug' in drug_item:
+        #         drug_item['drug'] = validate_and_transform_drug(drug_item['drug'])
     
     return alternative_data
 

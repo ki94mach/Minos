@@ -363,15 +363,15 @@ class CharacteristicData(BaseModel):
     char_type: str
     name: str
 
-    @model_validator(mode="after")
-    def validate_against_database(self) -> "CharacteristicData":
-        char_data = {
-            '_id': str(self.id),
-            'char_type': self.char_type,
-            'name': self.name
-        }
-        validate_and_transform_characteristic(char_data)  # This will raise ValueError if validation fails
-        return self
+    # @model_validator(mode="after")
+    # def validate_against_database(self) -> "CharacteristicData":
+    #     char_data = {
+    #         '_id': str(self.id),
+    #         'char_type': self.char_type,
+    #         'name': self.name
+    #     }
+    #     validate_and_transform_characteristic(char_data)  # This will raise ValueError if validation fails
+    #     return self
 
 class TreatmentData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -393,63 +393,63 @@ class TreatmentData(BaseModel):
             raise ValueError(f'Type must be one of {ALLOWED_TREATMENT_TYPES}')
         return v
 
-    @field_validator('regimen', mode='after')
-    @classmethod
-    def validate_regimen_field(cls, v: Optional[Regimen], info: ValidationInfo) -> Optional[Regimen]:
-        treatment_type = info.data.get('type')
-        if treatment_type == 'Alternative' and v is not None:
-            raise ValueError('For Alternative treatments, regimen must be empty')
-        if treatment_type == 'Regimen' and v is None:
-            raise ValueError('For Regimen type, regimen must be provided')
-        # if v is not None:
-        #     v.validate_against_database(info.data.get('id'))
-        return v
+    # @field_validator('regimen', mode='after')
+    # @classmethod
+    # def validate_regimen_field(cls, v: Optional[Regimen], info: ValidationInfo) -> Optional[Regimen]:
+    #     treatment_type = info.data.get('type')
+    #     if treatment_type == 'Alternative' and v is not None:
+    #         raise ValueError('For Alternative treatments, regimen must be empty')
+    #     if treatment_type == 'Regimen' and v is None:
+    #         raise ValueError('For Regimen type, regimen must be provided')
+    #     # if v is not None:
+    #     #     v.validate_against_database(info.data.get('id'))
+    #     return v
 
-    @field_validator('alternatives', mode='after')
-    @classmethod
-    def validate_alternatives_field(cls, v: Optional[List[AlternativeTreatment]], info: ValidationInfo) -> Optional[List[AlternativeTreatment]]:
-        treatment_type = info.data.get('type')
-        if treatment_type == 'Alternative' and not v:
-            raise ValueError('For Alternative type, alternatives must be provided')
-        if treatment_type != 'Alternative' and v:
-            raise ValueError('Alternatives can only be present for Alternative type')
-        if v:
-            # Validate each alternative treatment
-            alt_ids = []
-            ratios_sum = 0.0
-            for alt in v:
-                alt.validate_against_database()
-                alt_ids.append(str(alt.id))
-                ratios_sum += alt.ratio
+    # @field_validator('alternatives', mode='after')
+    # @classmethod
+    # def validate_alternatives_field(cls, v: Optional[List[AlternativeTreatment]], info: ValidationInfo) -> Optional[List[AlternativeTreatment]]:
+    #     treatment_type = info.data.get('type')
+    #     if treatment_type == 'Alternative' and not v:
+    #         raise ValueError('For Alternative type, alternatives must be provided')
+    #     if treatment_type != 'Alternative' and v:
+    #         raise ValueError('Alternatives can only be present for Alternative type')
+    #     if v:
+    #         # Validate each alternative treatment
+    #         alt_ids = []
+    #         ratios_sum = 0.0
+    #         for alt in v:
+    #             # alt.validate_against_database()
+    #             alt_ids.append(str(alt.id))
+    #             ratios_sum += alt.ratio
             
-            # Check for duplicate alternatives
-            if len(alt_ids) != len(set(alt_ids)):
-                raise ValueError("Duplicate alternative treatments are not allowed")
+    #         # Check for duplicate alternatives
+    #         if len(alt_ids) != len(set(alt_ids)):
+    #             raise ValueError("Duplicate alternative treatments are not allowed")
             
-            # Validate that ratios sum to 1
-            if not (0.99 <= ratios_sum <= 1.01):  # Allow small floating point imprecision
-                raise ValueError("Alternative treatment ratios must sum to 1.0")
-        return v
+    #         # Validate that ratios sum to 1
+    #         if not (0.99 <= ratios_sum <= 1.01):  # Allow small floating point imprecision
+    #             raise ValueError("Alternative treatment ratios must sum to 1.0")
+    #     return v
 
-    @model_validator(mode="after")
-    def validate_against_database(self) -> "TreatmentData":
-        # First validate embedded documents
-        # if self.regimen:
-        #     self.regimen.validate_against_database()
-        # if self.alternatives:
-        #     for alt in self.alternatives:
-        #         alt.validate_against_database()
+    # @model_validator(mode="after")
+    # def validate_against_database(self) -> "TreatmentData":
+    #     # First validate embedded documents
+    #     # if self.regimen:
+    #     #     self.regimen.validate_against_database()
+    #     # if self.alternatives:
+    #     #     for alt in self.alternatives:
+    #     #         alt.validate_against_database()
 
-        # Then validate against database record
-        treatment_data = {
-            '_id': str(self.id),
-            'name': self.name,
-            'type': self.type,
-            'regimen': self.regimen.model_dump(by_alias=True) if self.regimen else None,
-            'alternatives': [alt.model_dump(by_alias=True) for alt in self.alternatives] if self.alternatives else None
-        }
-        validate_and_transform_treatment_embedded(treatment_data)
-        return self
+    #     # Then validate against database record
+    #     treatment_data = {
+    #         '_id': str(self.id),
+    #         'name': self.name,
+    #         'type': self.type,
+    #         'regimen': self.regimen.model_dump(by_alias=True) if self.regimen else None,
+    #         'alternatives': [alt.model_dump(by_alias=True) for alt in self.alternatives] if self.alternatives else None
+    #     }
+    #     validate_and_transform_treatment_embedded(treatment_data)
+    #     return self
 
 class FollowupData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
