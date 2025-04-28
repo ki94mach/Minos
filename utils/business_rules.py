@@ -137,23 +137,32 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
         raise ValueError("Type does not match the database record")
     
     # Handle regimen validation if present
-    if treatment_data.get('regimen'):
-        if treatment.type != 'Regimen':
-            raise ValueError("Regimen can only be present for treatment type 'Regimen'")
-        for drug_item in treatment_data['regimen'].get('drugs', []):
-            if 'drug' in drug_item:
-                drug_item['drug'] = validate_and_transform_drug(drug_item['drug'])
+    # if treatment_data.get('regimen'):
+    #     if treatment.type != 'Regimen':
+    #         raise ValueError("Regimen can only be present for treatment type 'Regimen'")
+    #     for drug_item in treatment_data['regimen'].get('drugs', []):
+    #         if 'drug' in drug_item:
+    #             drug_item['drug'] = validate_and_transform_drug(drug_item['drug'])
     
     # Handle alternatives validation if present
     if treatment_data['alternatives']:
         if treatment.type != 'Alternative':
             raise ValueError("Alternatives can only be present for treatment type 'Alternative'")
-        # for alt in treatment_data['alternatives']:
-        #     if 'regimen' in alt:
-        #         for drug_item in alt['regimen'].get('drugs', []):
-        #             if 'drug' in drug_item:
-        #                 drug_item['drug'] = validate_and_transform_drug(drug_item['drug'])
-    
+        db_map = { str(alt._id): alt.ratio for alt in treatment.alternatives }
+        payload_map = { str(alt['_id']): alt['ratio'] for alt in treatment_data['alternatives'] }
+        # compare IDs
+        if set(db_map) != set(payload_map):
+            raise ValueError(
+                f"Alternatives mismatch: DB has {set(db_map)}, payload has {set(payload_map)}"
+            )
+
+        # compare ratios
+        for alt_id in db_map:
+            if payload_map[alt_id] != db_map[alt_id]:
+                raise ValueError(
+                    f"Ratio mismatch for alternative {alt_id}: "
+                    f"{payload_map[alt_id]} (payload) ≠ {db_map[alt_id]} (DB)"
+                )
     return treatment_data
 
 def validate_and_transform_followup_embedded(followup_data: dict) -> dict:
@@ -202,6 +211,10 @@ def validate_and_transform_alternative(alternative_data: dict) -> dict:
     treatment = TreatmentDriver.find(id=ObjectId(alt_id)).first()
     if not treatment:
         raise ValueError(f"Treatment with _id {alt_id} not found.")
+    
+    ratio = alternative_data.get("ratio")
+    if not isinstance(ratio, (int, float)):
+        raise ValueError(f"Ratio must be a number, got {ratio!r}")
     
     if treatment.type != 'Regimen':
         raise ValueError(f"Referenced treatment must be of type 'Regimen', got {treatment.type}")

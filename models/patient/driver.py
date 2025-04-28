@@ -25,6 +25,7 @@ class PatientDriver:
     @staticmethod
     def update(patient: Patient):
         try:
+            patient._mark_as_changed('tree')
             patient.save()
             logging.info(f"Updated Patient with id: {patient.id}")
         except Exception as e:

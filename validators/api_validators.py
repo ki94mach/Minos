@@ -431,25 +431,25 @@ class TreatmentData(BaseModel):
     #             raise ValueError("Alternative treatment ratios must sum to 1.0")
     #     return v
 
-    # @model_validator(mode="after")
-    # def validate_against_database(self) -> "TreatmentData":
-    #     # First validate embedded documents
-    #     # if self.regimen:
-    #     #     self.regimen.validate_against_database()
-    #     # if self.alternatives:
-    #     #     for alt in self.alternatives:
-    #     #         alt.validate_against_database()
+    @model_validator(mode="after")
+    def validate_against_database(self) -> "TreatmentData":
+        # First validate embedded documents
+        # if self.regimen:
+        #     self.regimen.validate_against_database()
+        # if self.alternatives:
+        #     for alt in self.alternatives:
+        #         alt.validate_against_database()
 
-    #     # Then validate against database record
-    #     treatment_data = {
-    #         '_id': str(self.id),
-    #         'name': self.name,
-    #         'type': self.type,
-    #         'regimen': self.regimen.model_dump(by_alias=True) if self.regimen else None,
-    #         'alternatives': [alt.model_dump(by_alias=True) for alt in self.alternatives] if self.alternatives else None
-    #     }
-    #     validate_and_transform_treatment_embedded(treatment_data)
-    #     return self
+        # Then validate against database record
+        treatment_data = {
+            '_id': str(self.id),
+            'name': self.name,
+            'type': self.type,
+            'regimen': self.regimen.model_dump(by_alias=True) if self.regimen else None,
+            'alternatives': [alt.model_dump(by_alias=True) for alt in self.alternatives] if self.alternatives else None
+        }
+        validate_and_transform_treatment_embedded(treatment_data)
+        return self
 
 class FollowupData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -602,18 +602,18 @@ class AddNode(BaseModel):
         #     self.node.followup_data.validate_against_database()
 
         # Recursively validate children if present
-        if self.children:
-            for child in self.children:
-                # Set parent ID for children
-                child.parent_id = self.node._id if hasattr(self.node, '_id') else None
+        # if self.children:
+        #     for child in self.children:
+        #         # Set parent ID for children
+        #         child.parent_id = self.node._id if hasattr(self.node, '_id') else None
                 
-                # Validate child's embedded data
-                if child.node_type == "characteristic" and child.characteristic_data:
-                    child.characteristic_data.validate_against_database()
-                elif child.node_type == "treatment" and child.treatment_data:
-                    child.treatment_data.validate_against_database()
-                elif child.node_type == "followup" and child.followup_data:
-                    child.followup_data.validate_against_database()
+        #         # Validate child's embedded data
+        #         if child.node_type == "characteristic" and child.characteristic_data:
+        #             child.characteristic_data.validate_against_database()
+        #         elif child.node_type == "treatment" and child.treatment_data:
+        #             child.treatment_data.validate_against_database()
+        #         elif child.node_type == "followup" and child.followup_data:
+        #             child.followup_data.validate_against_database()
 
         return self
 

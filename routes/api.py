@@ -700,7 +700,7 @@ def add_node(validated_data, patient_id):
         # Recompute tree hash
         hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
         patient_tree.tree_hash = hashlib.sha256(hash_input).hexdigest()
-
+        
         # Update the document
         PatientDriver.update(patient_tree)
         
