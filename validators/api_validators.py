@@ -10,11 +10,6 @@ from pydantic import (
 from typing import Optional, List, Any
 from bson import ObjectId
 
-# Drivers
-from models.drug.driver import DrugDriver
-from models.treatment.driver import TreatmentDriver
-from models.characteristic.driver import CharacteristicDriver
-from models.followup.driver import FollowupDriver
 
 # Import business rules functions at the top
 from utils.business_rules import (
@@ -29,7 +24,6 @@ from utils.business_rules import (
     validate_and_transform_treatment_embedded,
     validate_and_transform_followup_embedded,
     to_title_format,
-    validate_regimen_consistency,
     validate_and_transform_alternative
 )
 
@@ -48,7 +42,9 @@ class PyObjectId(str):
         yield cls.validate
 
     @classmethod
-    def validate(cls, v: Any, info: ValidationInfo) -> "PyObjectId":
+    def validate(
+        cls, v: Any, info: ValidationInfo
+        ) -> "PyObjectId":
         try:
             oid = ObjectId(v)
             return cls(str(oid))
@@ -67,7 +63,9 @@ class CharacteristicCreate(BaseModel):
     @field_validator('name', 'type', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return to_title_format(validate_non_empty(v, "Characteristic name"))
+        return to_title_format(
+            validate_non_empty(v, "Characteristic name")
+            )
 
 class CharacteristicUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -76,8 +74,12 @@ class CharacteristicUpdate(BaseModel):
 
     @field_validator('type', 'name', mode='after')
     @classmethod
-    def validate_optional_fields(cls, v: Optional[str]) -> Optional[str]:
-        return to_title_format(validate_optional_string(v, "Field"))
+    def validate_optional_fields(
+        cls, v: Optional[str]
+        ) -> Optional[str]:
+        return to_title_format(
+            validate_optional_string(v, "Field")
+            )
 
 # ------------------------------------------------------------------------------
 # DRUG VALIDATORS
@@ -91,7 +93,9 @@ class DrugCreate(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return to_title_format(validate_non_empty(v, "Drug name"))
+        return to_title_format(
+            validate_non_empty(v, "Drug name")
+            )
 
     @field_validator('strength', mode='after')
     @classmethod
@@ -110,12 +114,17 @@ class DrugUpdate(BaseModel):
 
     @field_validator('name', mode='after')
     @classmethod
-    def validate_optional_name(cls, v: Optional[str]) -> Optional[str]:
+    def validate_optional_name(
+        cls, v: Optional[str]
+        ) -> Optional[str]:
         return validate_optional_string(v, "Drug name")
 
     @field_validator('strength', mode='after')
     @classmethod
-    def validate_optional_strength(cls, v: Optional[int]) -> Optional[int]:
+    def validate_optional_strength(
+        cls, v: Optional[int]
+        ) -> Optional[int]:
+
         if v is not None:
             return validate_strength(v)
         return v
@@ -142,7 +151,9 @@ class DrugSubItem(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return to_title_format(validate_non_empty(v, "Regimen name"))
+        return to_title_format(
+            validate_non_empty(v, "Regimen name")
+            )
 
     @field_validator('unit', mode='after')
     @classmethod
@@ -153,14 +164,13 @@ class DrugSubItem(BaseModel):
     
     @model_validator(mode="after")
     def validate_against_database(self) -> "DrugSubItem":
-        # Use the business rule function instead of duplicating logic
         drug_data = {
             '_id': str(self.id),
             'name': self.name,
             'strength': self.strength,
             'unit': self.unit
         }
-        validate_and_transform_drug(drug_data)  # This will raise ValueError if validation fails
+        validate_and_transform_drug(drug_data)
         return self
     
 class TreatmentDrugItem(BaseModel):
@@ -175,11 +185,6 @@ class TreatmentDrugItem(BaseModel):
 class Regimen(BaseModel):
     drugs: List[TreatmentDrugItem]
     
-    def validate_against_database(self, treatment_id: Optional[str] = None) -> "Regimen":
-        regimen_dict = self.model_dump(by_alias=True)
-        validate_regimen_consistency(regimen_dict, treatment_id)
-        return self
-
 
 # For nested models in Alternative treatments
 class AlternativeTreatment(BaseModel):
@@ -192,7 +197,9 @@ class AlternativeTreatment(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return to_title_format(validate_non_empty(v, "Alternative name"))
+        return to_title_format(
+            validate_non_empty(v, "Alternative name")
+            )
 
     @model_validator(mode="after")
     def validate_against_database(self) -> "AlternativeTreatment":
@@ -200,16 +207,17 @@ class AlternativeTreatment(BaseModel):
         # if self.regimen:
         #     self.regimen.validate_against_database(str(self.id))
 
-        regimen_data = self.regimen.model_dump(by_alias=True) if self.regimen else None
-        # Then use the business rule function to validate against database
+        regimen_data = (
+            self.regimen.model_dump(by_alias=True)
+            if self.regimen else None
+        )
         alternative_data = {
             '_id': str(self.id),
             'name': self.name,
             'regimen': regimen_data,
             'ratio': self.ratio
         }
-        validate_and_transform_alternative(alternative_data)  # This will raise ValueError if validation fails
-        return self
+        validate_and_transform_alternative(alternative_data)
 
 class TreatmentCreate(BaseModel):
     name: str = Field(..., min_length=1)
@@ -231,24 +239,37 @@ class TreatmentCreate(BaseModel):
     
     @field_validator('regimen', mode='after')
     @classmethod
-    def validate_regimen_field(cls, v: Optional[Regimen], info: ValidationInfo) -> Optional[Regimen]:
+    def validate_regimen_field(
+        cls, v: Optional[Regimen], info: ValidationInfo
+        ) -> Optional[Regimen]:
+
         treatment_type = info.data.get('type')
         if treatment_type == 'Alternative' and v is not None:
-            raise ValueError('For Alternative treatments, regimen must be empty')
+            raise ValueError(
+                'For Alternative treatments, regimen must be empty'
+                )
         if treatment_type == 'Regimen' and v is None:
-            raise ValueError('For Regimen type, regimen must be provided')
-        # if v is not None:
-        #     v.validate_against_database(info.data['id'])   
+            raise ValueError(
+                'For Regimen type, regimen must be provided'
+                )
         return v
 
     @field_validator('alternatives', mode='after')
     @classmethod
-    def validate_alternatives_field(cls, v: Optional[List[AlternativeTreatment]], info: ValidationInfo) -> Optional[List[AlternativeTreatment]]:
+    def validate_alternatives_field(
+        cls, v: Optional[List[AlternativeTreatment]],
+        info: ValidationInfo
+        ) -> Optional[List[AlternativeTreatment]]:
+
         treatment_type = info.data.get('type')
         if treatment_type == 'Alternative' and not v:
-            raise ValueError('For Alternative type, alternatives must be provided')
+            raise ValueError(
+                'For Alternative type, alternatives must be provided'
+                )
         if treatment_type != 'Alternative' and v:
-            raise ValueError('Alternatives can only be present for Alternative type')
+            raise ValueError(
+                'Alternatives can only be present for Alternative type'
+                )
         if v:
             # Validate each alternative and check ratios
             alt_ids = []
@@ -259,11 +280,15 @@ class TreatmentCreate(BaseModel):
             
             # Check for duplicates
             if len(alt_ids) != len(set(alt_ids)):
-                raise ValueError("Duplicate alternative treatments are not allowed")
+                raise ValueError(
+                    "Duplicate alternative treatments are not allowed"
+                    )
             
             # Validate ratio sum
             if not (0.99 <= ratios_sum <= 1.01):
-                raise ValueError("Alternative treatment ratios must sum to 1.0")
+                raise ValueError(
+                    "Alternative treatment ratios must sum to 1.0"
+                    )
         return v
 
 class TreatmentUpdate(BaseModel):
@@ -274,12 +299,18 @@ class TreatmentUpdate(BaseModel):
 
     @field_validator('name', mode='after')
     @classmethod
-    def validate_optional_name(cls, v: Optional[str]) -> Optional[str]:
+    def validate_optional_name(
+        cls, v: Optional[str]
+        ) -> Optional[str]:
+
         return validate_optional_string(v, "Treatment name")
 
     @field_validator('type', mode='after')
     @classmethod
-    def validate_treatment_type(cls, v: Optional[str]) -> Optional[str]:
+    def validate_treatment_type(
+        cls, v: Optional[str]
+        ) -> Optional[str]:
+
         if v is not None:
             if v not in ALLOWED_TREATMENT_TYPES:
                 raise ValueError(f'Type must be one of {ALLOWED_TREATMENT_TYPES}')
@@ -287,21 +318,31 @@ class TreatmentUpdate(BaseModel):
 
     @field_validator('regimen', mode='after')
     @classmethod
-    def validate_optional_regimen(cls, v: Optional[Regimen], info: ValidationInfo) -> Optional[Regimen]:
+    def validate_optional_regimen(
+        cls, v: Optional[Regimen], info: ValidationInfo
+        ) -> Optional[Regimen]:
+
         if v is not None:
             treatment_type = info.data.get('type')
             if treatment_type == 'Alternative':
-                raise ValueError('For Alternative treatments, regimen must be empty')
-            v.validate_against_database(info.data['id'])
+                raise ValueError(
+                    'For Alternative treatments, regimen must be empty'
+                    )
         return v
 
     @field_validator('alternatives', mode='after')
     @classmethod
-    def validate_optional_alternatives(cls, v: Optional[List[AlternativeTreatment]], info: ValidationInfo) -> Optional[List[AlternativeTreatment]]:
+    def validate_optional_alternatives(
+        cls, v: Optional[List[AlternativeTreatment]],
+        info: ValidationInfo
+        ) -> Optional[List[AlternativeTreatment]]:
+
         if v is not None:
             treatment_type = info.data.get('type')
             if treatment_type and treatment_type != 'Alternative':
-                raise ValueError('Alternatives can only be present for Alternative type')
+                raise ValueError(
+                    'Alternatives can only be present for Alternative type'
+                    )
             
             # Validate each alternative and check ratios
             alt_ids = []
@@ -313,11 +354,15 @@ class TreatmentUpdate(BaseModel):
             
             # Check for duplicates
             if len(alt_ids) != len(set(alt_ids)):
-                raise ValueError("Duplicate alternative treatments are not allowed")
+                raise ValueError(
+                    "Duplicate alternative treatments are not allowed"
+                    )
             
             # Validate ratio sum
             if not (0.99 <= ratios_sum <= 1.01):
-                raise ValueError("Alternative treatment ratios must sum to 1.0")
+                raise ValueError(
+                    "Alternative treatment ratios must sum to 1.0"
+                    )
         return v
 
 # ------------------------------------------------------------------------------
@@ -338,11 +383,11 @@ class FollowupCreate(BaseModel):
     @model_validator(mode="after")
     def validate_ids(self) -> "FollowupCreate":
         from models.patient.driver import PatientDriver
-        # Validate that patient exists
         patient = PatientDriver.find(id=self.patient_id).first()
         if not patient:
-            raise ValueError(f"Patient with id {self.patient_id} not found")
-        # Validate that parent node exists in patient tree
+            raise ValueError(
+                f"Patient with id {self.patient_id} not found"
+                )
         def find_node(node, target_id):
             if str(node._id) == str(self.parent_id):
                 return True
@@ -351,7 +396,9 @@ class FollowupCreate(BaseModel):
                     return True
             return False
         if not find_node(patient.tree, self.parent_id):
-            raise ValueError(f"Parent node {self.parent_id} not found in patient tree")
+            raise ValueError(
+                f"Parent node {self.parent_id} not found in patient tree"
+                )
         return self
 
 class FollowupUpdate(BaseModel):
@@ -360,7 +407,10 @@ class FollowupUpdate(BaseModel):
 
     @field_validator('name', mode='after')
     @classmethod
-    def validate_optional_name(cls, v: Optional[str]) -> Optional[str]:
+    def validate_optional_name(
+        cls, v: Optional[str]
+        ) -> Optional[str]:
+
         return validate_optional_string(v, "Followup name")
 
 # ------------------------------------------------------------------------------
@@ -373,6 +423,12 @@ class CharacteristicData(BaseModel):
     char_type: str
     name: str
 
+    @field_validator('name', 'type', mode='after')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        return to_title_format(
+            validate_non_empty(v, "Characteristic name")
+            )
     @model_validator(mode="after")
     def validate_against_database(self) -> "CharacteristicData":
         char_data = {
@@ -380,7 +436,7 @@ class CharacteristicData(BaseModel):
             'char_type': self.char_type,
             'name': self.name
         }
-        validate_and_transform_characteristic(char_data)  # This will raise ValueError if validation fails
+        validate_and_transform_characteristic(char_data)
         return self
 
 class TreatmentData(BaseModel):
@@ -400,7 +456,9 @@ class TreatmentData(BaseModel):
     @classmethod
     def validate_treatment_type(cls, v: str) -> str:
         if v not in ALLOWED_TREATMENT_TYPES:
-            raise ValueError(f'Type must be one of {ALLOWED_TREATMENT_TYPES}')
+            raise ValueError(
+                f'Type must be one of {ALLOWED_TREATMENT_TYPES}'
+                )
         return v
 
     # @field_validator('regimen', mode='after')
@@ -456,7 +514,10 @@ class TreatmentData(BaseModel):
             'name': self.name,
             'type': self.type,
             'regimen': self.regimen.model_dump(by_alias=True) if self.regimen else None,
-            'alternatives': [alt.model_dump(by_alias=True) for alt in self.alternatives] if self.alternatives else None
+            'alternatives': [
+                alt.model_dump(by_alias=True)
+                for alt in self.alternatives]
+                if self.alternatives else None
         }
         validate_and_transform_treatment_embedded(treatment_data)
         return self
@@ -502,7 +563,9 @@ class PatientNode(BaseModel):
     @classmethod
     def validate_node_type(cls, v: str) -> str:
         if v not in ALLOWED_NODE_TYPES:
-            raise ValueError(f"node_type must be one of {ALLOWED_NODE_TYPES}")
+            raise ValueError(
+                f"node_type must be one of {ALLOWED_NODE_TYPES}"
+                )
         return v
 
     @field_validator('rate', mode='after')
@@ -517,7 +580,11 @@ class PatientNode(BaseModel):
 
     @field_validator('characteristic_data', mode='after')
     @classmethod
-    def check_characteristic_data(cls, v: Optional[CharacteristicData], info: ValidationInfo) -> Optional[CharacteristicData]:
+    def check_characteristic_data(
+        cls, v: Optional[CharacteristicData],
+        info: ValidationInfo
+        ) -> Optional[CharacteristicData]:
+
         if info.data.get('node_type') == "characteristic":
             if v is None:
                 raise ValueError("characteristic_data is required for characteristic nodes")
@@ -527,22 +594,38 @@ class PatientNode(BaseModel):
 
     @field_validator('treatment_data', mode='after')
     @classmethod
-    def check_treatment_data(cls, v: Optional[TreatmentData], info: ValidationInfo) -> Optional[TreatmentData]:
+    def check_treatment_data(
+        cls, v: Optional[TreatmentData],
+        info: ValidationInfo
+        ) -> Optional[TreatmentData]:
+
         if info.data.get('node_type') == "treatment":
             if v is None:
-                raise ValueError("treatment_data is required for treatment nodes")
+                raise ValueError(
+                    "treatment_data is required for treatment nodes"
+                    )
         elif v is not None:
-            raise ValueError("treatment_data should only be present for treatment nodes")
+            raise ValueError(
+                "treatment_data should only be present for treatment nodes"
+                )
         return v
 
     @field_validator('followup_data', mode='after')
     @classmethod
-    def check_followup_data(cls, v: Optional[FollowupData], info: ValidationInfo) -> Optional[FollowupData]:
+    def check_followup_data(
+        cls, v: Optional[FollowupData],
+        info: ValidationInfo
+        ) -> Optional[FollowupData]:
+
         if info.data.get('node_type') == "followup":
             if v is None:
-                raise ValueError("followup_data is required for followup nodes")
+                raise ValueError(
+                    "followup_data is required for followup nodes"
+                    )
         elif v is not None:
-            raise ValueError("followup_data should only be present for followup nodes")
+            raise ValueError(
+                "followup_data should only be present for followup nodes"
+                )
         return v
 
     @model_validator(mode="after")
@@ -552,7 +635,9 @@ class PatientNode(BaseModel):
             my_id = str(self._id) if hasattr(self, '_id') else None
             for child in self.children:
                 if child.parent_id and str(child.parent_id) != my_id:
-                    raise ValueError("Child node's parent_id must match parent node's _id")
+                    raise ValueError(
+                        "Child node's parent_id must match parent node's _id"
+                        )
         return self
 
     class Config:
@@ -573,7 +658,10 @@ class PatientUpdate(BaseModel):
 
     @field_validator('size', mode='after')
     @classmethod
-    def validate_optional_size(cls, v: Optional[float]) -> Optional[float]:
+    def validate_optional_size(
+        cls, v: Optional[float]
+        ) -> Optional[float]:
+
         if v is not None:
             return validate_size(v)
         return v
@@ -594,7 +682,9 @@ class AddNode(BaseModel):
         # Validate parent-child relationship
         if self.parent_node_id:
             if self.node.parent_id and str(self.node.parent_id) != str(self.parent_node_id):
-                raise ValueError("Node's parent_id must match parent_node_id if both are provided")
+                raise ValueError(
+                    "Node's parent_id must match parent_node_id if both are provided"
+                    )
             self.node.parent_id = self.parent_node_id
 
         # Validate the main node's embedded data based on type
@@ -639,21 +729,30 @@ class UpdateNode(BaseModel):
 
     @field_validator('node_type', mode='after')
     @classmethod
-    def validate_optional_node_type(cls, v: Optional[str]) -> Optional[str]:
+    def validate_optional_node_type(
+        cls, v: Optional[str]
+        ) -> Optional[str]:
+
         if v and v not in ALLOWED_NODE_TYPES:
             raise ValueError(f"node_type must be one of {ALLOWED_NODE_TYPES}")
         return v
 
     @field_validator('rate', mode='after')
     @classmethod
-    def validate_optional_rate(cls, v: Optional[float]) -> Optional[float]:
+    def validate_optional_rate(
+        cls, v: Optional[float]
+        ) -> Optional[float]:
+
         if v is not None:
             return validate_rate(v)
         return v
 
     @field_validator('size', mode='after')
     @classmethod
-    def validate_optional_size(cls, v: Optional[float]) -> Optional[float]:
+    def validate_optional_size(
+        cls, v: Optional[float]
+        ) -> Optional[float]:
+        
         if v is not None:
             return validate_size(v)
         return v

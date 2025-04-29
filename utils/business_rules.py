@@ -241,12 +241,28 @@ def validate_and_transform_alternative(alternative_data: dict) -> dict:
             raise ValueError("Referenced treatment must have a regimen")
             
         # Validate regimen structure matches
-        alt_regimen = alternative_data['regimen']
-        db_regimen = treatment.regimen.to_mongo().to_dict()
+        regimen_data = alternative_data['regimen']
+        db_map = {
+            str(item.drug._id): item.annual_patient_con
+            for item in treatment.regimen.drugs
+        }
+
+        if len(db_map) != len(regimen_data["drugs"]):
+            raise ValueError("Number of drugs in payload does not match database record")
+
+        for item in regimen_data["drugs"]:
+            drug_id = str(item["drug"]["_id"])
+            db_val = db_map.get(drug_id)
+            if db_val is None:
+                raise ValueError(f"Drug {drug_id} not found in treatment {alt_id}")
+
+            if item["annual_patient_con"] != db_val:
+                raise ValueError(
+                    f"annual_patient_con mismatch for drug {drug_id}: "
+                    f"{item['annual_patient_con']} (payload) ≠ {db_val} (DB)"
+                )
         
-        if len(alt_regimen.get('drugs', [])) != len(db_regimen.get('drugs', [])):
-            raise ValueError("Regimen drugs do not match the database record")
-            
+
         # for drug_item in alternative_data['regimen'].get('drugs', []):
         #     if 'drug' in drug_item:
         #         drug_item['drug'] = validate_and_transform_drug(drug_item['drug'])
