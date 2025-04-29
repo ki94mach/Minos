@@ -56,7 +56,10 @@ class PyObjectId(str):
 # ------------------------------------------------------------------------------
 
 class CharacteristicCreate(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(
+        validate_by_name = True,
+        validate_by_alias = True
+    )
     type: str = Field(..., alias='type', min_length=1)
     name: str = Field(..., min_length=1)
 
@@ -68,7 +71,10 @@ class CharacteristicCreate(BaseModel):
             )
 
 class CharacteristicUpdate(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(
+        validate_by_name = True,
+        validate_by_alias = True
+    )
     type: Optional[str] = Field(None, alias='type')
     name: Optional[str]
 
@@ -142,7 +148,10 @@ class DrugUpdate(BaseModel):
 
 # For nested models in Regimen treatments
 class DrugSubItem(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(
+        validate_by_name = True,
+        validate_by_alias = True
+    )
     id: PyObjectId = Field(..., alias="_id")
     name: str
     strength: int
@@ -188,7 +197,10 @@ class Regimen(BaseModel):
 
 # For nested models in Alternative treatments
 class AlternativeTreatment(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(
+        validate_by_name = True,
+        validate_by_alias = True
+    )
     id: PyObjectId = Field(..., alias="_id")
     name: str
     regimen: Regimen
@@ -218,6 +230,7 @@ class AlternativeTreatment(BaseModel):
             'ratio': self.ratio
         }
         validate_and_transform_alternative(alternative_data)
+        return self
 
 class TreatmentCreate(BaseModel):
     name: str = Field(..., min_length=1)
@@ -228,7 +241,9 @@ class TreatmentCreate(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return validate_non_empty(v, "Treatment name")
+        return to_title_format(
+            validate_non_empty(v, "Treatment name")
+        )
 
     @field_validator('type', mode='after')
     @classmethod
@@ -348,7 +363,7 @@ class TreatmentUpdate(BaseModel):
             alt_ids = []
             ratios_sum = 0.0
             for alt in v:
-                alt.validate_against_database()  # This will validate the embedded regimen too
+                alt.validate_against_database()
                 alt_ids.append(str(alt.id))
                 ratios_sum += alt.ratio
             
@@ -378,7 +393,9 @@ class FollowupCreate(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return validate_non_empty(v, "Followup name")
+        return to_title_format(
+            validate_non_empty(v, "Followup name")
+        )
 
     @model_validator(mode="after")
     def validate_ids(self) -> "FollowupCreate":
@@ -418,12 +435,15 @@ class FollowupUpdate(BaseModel):
 # ------------------------------------------------------------------------------
 
 class CharacteristicData(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(
+        validate_by_name = True,
+        validate_by_alias = True
+    )
     id: PyObjectId = Field(..., alias="_id")
     char_type: str
     name: str
 
-    @field_validator('name', 'type', mode='after')
+    @field_validator('name', 'char_type', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
         return to_title_format(
@@ -440,7 +460,10 @@ class CharacteristicData(BaseModel):
         return self
 
 class TreatmentData(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(
+        validate_by_name = True,
+        validate_by_alias = True
+    )
     id: PyObjectId = Field(..., alias="_id")
     name: str = Field(..., min_length=1)
     type: str
@@ -450,7 +473,9 @@ class TreatmentData(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def name_must_be_non_empty(cls, v: str) -> str:
-        return validate_non_empty(v, "Treatment name")
+        return to_title_format(
+            validate_non_empty(v, "Treatment name")
+        )
 
     @field_validator('type', mode='after')
     @classmethod
@@ -523,7 +548,10 @@ class TreatmentData(BaseModel):
         return self
 
 class FollowupData(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(
+        validate_by_name = True,
+        validate_by_alias = True
+    )
     id: PyObjectId = Field(..., alias="_id")
     overall_survival: float = Field(..., ge=0.0, le=1.0)
 
@@ -752,7 +780,7 @@ class UpdateNode(BaseModel):
     def validate_optional_size(
         cls, v: Optional[float]
         ) -> Optional[float]:
-        
+
         if v is not None:
             return validate_size(v)
         return v
