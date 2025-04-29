@@ -601,44 +601,42 @@ def create_node_from_dict(node_dict, parent_id=None):
 def add_node(validated_data, patient_id):
     """
     Expected JSON body example:
-    {
-      "parent_node_id": "67c44e28e0ff95ef4bd2a2a4", // Optional for root-level addition.
-      "node": {
-          "node_type": "characteristic",
-          "rate": 0.343,
-          "characteristic_data": {
-              "_id": "67d01f899e8a82122fb0331d",
-              "char_type": "Metastasis",
-              "name": "Bone Metastasis"
-          }
-      },
-      "children": [
-          {
-              "node": {
-                  "node_type": "treatment",
-                  "rate": 1,
-                  "treatment_data": {
-                      "_id": "67d05523af3304f08c7e9fb1",
-                      "name": "Denosumab Treatment",
-                      "type": "Regimen",
-                      "regimen": {
-                          "drugs": [
-                              {
-                                  "drug": {
-                                      "_id": "67d020989e8a82122fb0332b",
-                                      "name": "Denosumab",
-                                      "strength": 120,
-                                      "unit": "mg"
-                                  },
-                                  "annual_patient_con": 13
-                              }
-                          ]
-                      }
-                  }
-              }
-          }
-      ]
-    }
+{
+    "parent_node_id": "67c44e28e0ff95ef4bd2a2a4", // Optional for root-level addition.
+    "node": {
+        "node_type": "characteristic",
+        "rate": 0.343,
+        "characteristic_data": {
+            "_id": "67d01f899e8a82122fb0331d",
+            "char_type": "Metastasis",
+            "name": "Bone Metastasis"
+        }
+    },
+    "children": [
+        {
+            "node_type": "treatment",
+            "rate": 1,
+            "treatment_data": {
+                "_id": "67d05523af3304f08c7e9fb1",
+                "name": "Denosumab Treatment",
+                "type": "Regimen",
+                "regimen": {
+                    "drugs": [
+                        {
+                            "drug": {
+                                "_id": "67d020989e8a82122fb0332b",
+                                "name": "Denosumab",
+                                "strength": 120,
+                                "unit": "mg"
+                            },
+                            "annual_patient_con": 13
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
     This endpoint:
       1. Fetches the PatientTree document.
       2. Locates the parent node (if provided) by recursively traversing the tree.
@@ -651,11 +649,11 @@ def add_node(validated_data, patient_id):
         new_node_data = validated_data.node.model_dump(by_alias=True)
         parent_node_id = validated_data.parent_node_id
         
-        # Add children to node data if provided
-        if validated_data.children:
-            new_node_data['children'] = [
-                child.model_dump(by_alias=True) for child in validated_data.children
-            ]
+        # # Add children to node data if provided
+        # if validated_data.children:
+        #     new_node_data['children'] = [
+        #         child.model_dump(by_alias=True) for child in validated_data.children
+        #     ]
         
     
         # Fetch the patient tree

@@ -4,8 +4,6 @@ from bson import ObjectId
 import logging
 from typing import Optional
 
-# Import your document models for lookups
-from models.tables import Drug, Characteristic, Treatment
 
 def to_title_format(value: str) -> str:
     """Convert a string to title case, handling None values."""
@@ -58,7 +56,6 @@ def validate_and_transform_drug(drug_data: dict) -> dict:
     if not drug_id:
         raise ValueError("Drug data must include an '_id' field.")
     
-    from models.tables import Drug
     from models.drug.driver import DrugDriver
     drug = DrugDriver.find(id=ObjectId(drug_id)).first()
     if not drug:
@@ -88,7 +85,6 @@ def validate_and_transform_characteristic(characteristic_data: dict) -> dict:
     if not char_id:
         raise ValueError("Characteristic data must include an '_id' field.")
     
-    from models.tables import Characteristic
     from models.characteristic.driver import CharacteristicDriver
     characteristic = CharacteristicDriver.find(id=ObjectId(char_id)).first()
     if not characteristic:
@@ -116,7 +112,6 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
     if not treatment_id:
         raise ValueError("Treatment data must include an '_id' field.")
     
-    from models.tables import Treatment
     from models.treatment.driver import TreatmentDriver
     treatment = TreatmentDriver.find(id=ObjectId(treatment_id)).first()
     if not treatment:
@@ -137,12 +132,28 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
         raise ValueError("Type does not match the database record")
     
     # Handle regimen validation if present
-    # if treatment_data.get('regimen'):
-    #     if treatment.type != 'Regimen':
-    #         raise ValueError("Regimen can only be present for treatment type 'Regimen'")
-    #     for drug_item in treatment_data['regimen'].get('drugs', []):
-    #         if 'drug' in drug_item:
-    #             drug_item['drug'] = validate_and_transform_drug(drug_item['drug'])
+    if treatment_data.get('regimen'):
+        if treatment.type != 'Regimen':
+            raise ValueError("Regimen can only be present for treatment type 'Regimen'")
+        db_map = {
+            str(item.drug._id): item.annual_patient_con
+            for item in treatment.regimen.drugs
+        }
+
+        if len(db_map) != len(treatment_data['regimen']["drugs"]):
+            raise ValueError("Number of drugs in payload does not match database record")
+
+        for item in treatment_data['regimen']["drugs"]:
+            drug_id = str(item["drug"]["_id"])
+            db_val = db_map.get(drug_id)
+            if db_val is None:
+                raise ValueError(f"Drug {drug_id} not found in treatment {treatment_id}")
+
+            if item["annual_patient_con"] != db_val:
+                raise ValueError(
+                    f"annual_patient_con mismatch for drug {drug_id}: "
+                    f"{item['annual_patient_con']} (payload) ≠ {db_val} (DB)"
+                )
     
     # Handle alternatives validation if present
     if treatment_data['alternatives']:
@@ -174,7 +185,6 @@ def validate_and_transform_followup_embedded(followup_data: dict) -> dict:
     if not followup_id:
         raise ValueError("Followup data must include an '_id' field.")
     
-    from models.tables import Followup
     from models.followup.driver import FollowupDriver
     followup = FollowupDriver.find(id=ObjectId(followup_id)).first()
     if not followup:
@@ -206,7 +216,6 @@ def validate_and_transform_alternative(alternative_data: dict) -> dict:
     if not alt_id:
         raise ValueError("Alternative treatment data must include an '_id' field.")
     
-    from models.tables import Treatment
     from models.treatment.driver import TreatmentDriver
     treatment = TreatmentDriver.find(id=ObjectId(alt_id)).first()
     if not treatment:

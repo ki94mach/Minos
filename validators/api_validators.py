@@ -139,6 +139,11 @@ class DrugSubItem(BaseModel):
     strength: int
     unit: str
 
+    @field_validator('name', mode='after')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        return to_title_format(validate_non_empty(v, "Regimen name"))
+
     @field_validator('unit', mode='after')
     @classmethod
     def validate_unit(cls, v: str) -> str:
@@ -184,6 +189,11 @@ class AlternativeTreatment(BaseModel):
     regimen: Regimen
     ratio: float
 
+    @field_validator('name', mode='after')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        return to_title_format(validate_non_empty(v, "Alternative name"))
+
     @model_validator(mode="after")
     def validate_against_database(self) -> "AlternativeTreatment":
         # First validate the regimen if present
@@ -227,8 +237,8 @@ class TreatmentCreate(BaseModel):
             raise ValueError('For Alternative treatments, regimen must be empty')
         if treatment_type == 'Regimen' and v is None:
             raise ValueError('For Regimen type, regimen must be provided')
-        if v is not None:
-            v.validate_against_database(info.data['id'])   
+        # if v is not None:
+        #     v.validate_against_database(info.data['id'])   
         return v
 
     @field_validator('alternatives', mode='after')
@@ -363,15 +373,15 @@ class CharacteristicData(BaseModel):
     char_type: str
     name: str
 
-    # @model_validator(mode="after")
-    # def validate_against_database(self) -> "CharacteristicData":
-    #     char_data = {
-    #         '_id': str(self.id),
-    #         'char_type': self.char_type,
-    #         'name': self.name
-    #     }
-    #     validate_and_transform_characteristic(char_data)  # This will raise ValueError if validation fails
-    #     return self
+    @model_validator(mode="after")
+    def validate_against_database(self) -> "CharacteristicData":
+        char_data = {
+            '_id': str(self.id),
+            'char_type': self.char_type,
+            'name': self.name
+        }
+        validate_and_transform_characteristic(char_data)  # This will raise ValueError if validation fails
+        return self
 
 class TreatmentData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
