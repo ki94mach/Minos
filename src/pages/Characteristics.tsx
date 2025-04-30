@@ -3,6 +3,7 @@ import { TextField, Button, Typography, Container, Card, CardContent, List, List
 import { Edit, Delete } from "@mui/icons-material";
 import axios from "axios";
 import BackButton from "../components/BackButton";
+import Cookies from "js-cookie";
 
 interface Characteristic {
     _id: string;
@@ -16,6 +17,7 @@ const Characteristics: React.FC = () => {
     const [characteristics, setCharacteristics] = useState([]);
     const [editingId, setEditingId] = useState("");
     const [errors, setErrors] = useState("");
+    const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
         fetchCharacteristics();
@@ -39,21 +41,33 @@ const Characteristics: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+    
         try {
+            const csrfToken = Cookies.get("csrf_token");
+    
+            const config = {
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken || "", 
+                },
+                withCredentials: true, 
+            };
+    
             if (editingId) {
-                await axios.put(`http://localhost:5000/api/characteristics/${editingId}`, { type, name });
+                await axios.put(
+                    `http://localhost:5000/api/characteristics/${editingId}`,
+                    { type, name },
+                    config
+                );
                 setEditingId("");
             } else {
                 await axios.post(
                     "http://localhost:5000/api/characteristics",
                     { type, name },
-                    {
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                    }
-                  );
+                    config
+                );
             }
+    
             setType("");
             setName("");
             fetchCharacteristics();
@@ -64,6 +78,7 @@ const Characteristics: React.FC = () => {
         }
     };
     
+    
     const handleEdit = (char: Characteristic) => {
         setType(char.type);
         setName(char.name);
@@ -72,7 +87,15 @@ const Characteristics: React.FC = () => {
 
     const handleDelete = async (char_id: string) => {
         try {
-            await axios.delete(`http://localhost:5000/api/characteristics/${char_id}`);
+            const csrfToken = Cookies.get("csrf_token");
+
+            await axios.delete(`http://localhost:5000/api/characteristics/${char_id}`, {
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfToken || "",
+            },
+            withCredentials: true,
+        });
             fetchCharacteristics();
             alert("Characteristic deleted successfully!");
         } catch (error) {
@@ -108,8 +131,20 @@ const Characteristics: React.FC = () => {
                     </form>
                     {errors && <Typography color="error">{errors}</Typography>}
                     <List sx={{ backgroundColor: "#f0f0f0"}}>
-                        
-                        {characteristics.map((char: Characteristic) => (
+                        <TextField
+                            fullWidth
+                            label="Search Characteristics"
+                            variant="outlined"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            sx={{ mb: 2 }}
+                        />
+                        {characteristics
+                            .filter((char: Characteristic) =>
+                                char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                char.type.toLowerCase().includes(searchTerm.toLowerCase())
+                            )
+                        .map((char: Characteristic) => (
                             <ListItem key={char._id} sx={{ borderBottom: '1px solid #ccc', py: 1 }} secondaryAction={
                                 <>
                                     

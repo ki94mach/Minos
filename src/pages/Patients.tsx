@@ -26,6 +26,7 @@ import {
 import axios from "axios";
 import BackButton from "../components/BackButton";
 import CustomNode from "../components/CustomNode";
+import Cookies from "js-cookie";
 
 interface CustomNodeProps extends NodeProps {
     setNodes?: React.Dispatch<React.SetStateAction<any[]>>;
@@ -140,9 +141,26 @@ const Patients: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        let populationNumber = selectedPopulation === "Custom Population" ? Number(customPopulationNumber) : null;
+        if (selectedPopulation === "Custom Population" && customPopulationNumber === "") {
+            alert("Please enter a valid population number.");
+            return;
+        }
+    
+        const populationNumber = selectedPopulation === "Custom Population"
+            ? Number(customPopulationNumber)
+            : null;        
 
         try {
+            const csrfToken = Cookies.get("csrf_token");
+    
+            const config = {
+                withCredentials: true,
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken || "", 
+                },
+            };
+
             const response = await axios.post("http://localhost:5000/api/patients", {
                 node: {
                     node_type: "characteristic",
@@ -153,8 +171,10 @@ const Patients: React.FC = () => {
                         char_type: selectedCharType,
                         name: selectedCharName
                     }
-                }
-            });
+                }, 
+            },
+            config
+        );
 
             setNodes((prevNodes) => [
                 ...prevNodes,

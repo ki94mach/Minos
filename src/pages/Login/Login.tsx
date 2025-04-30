@@ -2,30 +2,22 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { TextField, Button, Typography, Box, Link } from "@mui/material";
+import Cookies from "js-cookie";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-  const [csrfToken, setCsrfToken] = useState("");
+  // const [csrfToken, setCsrfToken] = useState("");
+
+  const csrfToken = Cookies.get("csrf_token");
 
   // useEffect(() => {
-  //   // Fetch the CSRF token from the Flask endpoint
-  //   axios.get("/auth/csrf-token", { withCredentials: true })
-  //     .then(response => {
-  //       setCsrfToken(response.data.csrfToken);
-  //     })
-  //     .catch(error => {
-  //       console.error("Error fetching CSRF token:", error);
-  //     });
+  //   axios.get("http://localhost:5000/auth/csrf-token", { withCredentials: true })
+  //     .then(res => setCsrfToken(res.data.csrfToken))
+  //     .catch(err => console.error("CSRF token fetch failed:", err));
   // }, []);
-
-  useEffect(() => {
-    axios.get("http://localhost:5000/auth/csrf-token", { withCredentials: true })
-      .then(res => setCsrfToken(res.data.csrfToken))
-      .catch(err => console.error("CSRF token fetch failed:", err));
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +27,10 @@ const Login: React.FC = () => {
       const api = axios.create({
         baseURL: "http://localhost:5000",
         withCredentials: true,
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": csrfToken || "",
+            },
       });
 
       const response = await api.post(

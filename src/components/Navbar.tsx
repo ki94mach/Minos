@@ -27,10 +27,15 @@ const Navbar: React.FC = () => {
 
     const handleLogout = async () => {
         try {
-            await axios.get("http://localhost:5000/auth/logout", { withCredentials: true });
-            navigate("/auth/login");
+            await axios.get("http://localhost:5000/auth/logout", {
+                withCredentials: true,
+                validateStatus: (status) => status >= 200 && status < 400, 
+            });
         } catch (error) {
-            console.error("Logout failed:", error);
+            console.error("Logout error:", error);
+           
+        } finally {
+            navigate("/auth/login"); 
         }
     };
 

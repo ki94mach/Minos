@@ -1,7 +1,10 @@
 import React, {useEffect, useState} from "react";
-import { TextField, Button, Typography, Container, Card, CardContent, Select, MenuItem, FormControl, InputLabel, Box } from "@mui/material";
+import { TextField, Button, Typography, Container, Card, CardContent, Select, MenuItem, FormControl, InputLabel, Box, IconButton } from "@mui/material";
 import axios from "axios";
 import BackButton from "../components/BackButton";
+import Cookies from "js-cookie";
+import { Edit, Delete } from "@mui/icons-material";
+
 
 interface Drug {
     _id: string;
@@ -16,6 +19,8 @@ const Drugs: React.FC = () => {
     const [unit, setUnit] = useState("mg");
     const [drugs, setDrugs] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [editingId, setEditingId] = useState<string>("");
+    const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
         fetchDrugs();
@@ -25,10 +30,12 @@ const Drugs: React.FC = () => {
         setLoading(true);
         try {
             const response = await axios.get("http://localhost:5000/api/drugs");
-            const parsedDrugs = response.data.map((item: string) => JSON.parse(item));
+            const parsedDrugs = response.data.map((item: string) => {
+                const parsed = JSON.parse(item);
+                return { ...parsed, _id: parsed._id?.$oid || parsed._id, };
+              });
             setDrugs(parsedDrugs);
 
-            console.log("Parsed Drugs:", parsedDrugs);
         } catch (error) {
             console.error("Error fetching drugs:", error);
             alert("Error loading drugs.");
@@ -42,29 +49,73 @@ const Drugs: React.FC = () => {
             alert("Please enter a valid strength value");
             return;
         }
-
+    
         try {
-            await axios.post("http://localhost:5000/api/drugs", {
-                name,
-                strength: Number(strength),
-                unit
-            });
+            const csrfToken = Cookies.get("csrf_token");
+    
+            const config = {
+                withCredentials: true,
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken || "", 
+                },
+            };
+    
+            if (editingId) {                
+                await axios.put(
+                  `http://localhost:5000/api/drugs/${editingId}`,
+                  { name, strength: Number(strength), unit },
+                  config
+                );
+                setEditingId("");
+                alert("Drug updated successfully!");
+              } else {
+                await axios.post(
+                  "http://localhost:5000/api/drugs",
+                  { name, strength: Number(strength), unit },
+                  config
+                );
+                alert("Drug added successfully!");
+              }
 
-            // Clear form
             setName("");
             setStrength("");
             setUnit("mg");
 
-            // Refresh the drug list
             fetchDrugs();
-
-            alert("Drug added successfully!");
         } catch (error: any) {
             console.error("Error adding drug:", error);
             const errorMessage = error.response?.data?.error || "Error adding drug.";
             alert(errorMessage);
         }
     };
+    
+    const handleEdit = (drug: Drug) => {
+        setEditingId(drug._id);
+        setName(drug.name);
+        setStrength(drug.strength);
+        setUnit(drug.unit);
+      };
+    
+      const handleDelete = async (id: string) => {
+        try {
+          const csrfToken = Cookies.get("csrf_token");
+    
+          await axios.delete(`http://localhost:5000/api/drugs/${id}`, {
+            withCredentials: true,
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": csrfToken || "",
+            },
+          });
+    
+          fetchDrugs();
+          alert("Drug deleted successfully!");
+        } catch (error) {
+          console.error("Error deleting drug:", error);
+          alert("Error deleting drug.");
+        }
+      };
 
     return (
         <Container maxWidth="md" sx={{ mt: 5 }}>
@@ -114,25 +165,51 @@ const Drugs: React.FC = () => {
             </Card>
 
             <Card>
-                <CardContent>
-                    <Typography variant="h5" gutterBottom>Existing Drugs</Typography>
-                    {loading ? (
-                        <Typography>Loading drugs...</Typography>
-                    ) : drugs.length > 0 ? (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            {drugs.map((drug) => (
-                                <Card key={drug._id} variant="outlined" sx={{ p: 2 }}>
-                                    <Typography>
-                                        {drug.name} - {drug.strength} {drug.unit}
-                                    </Typography>
-                                </Card>
-                            ))}
-                        </Box>
-                    ) : (
-                        <Typography>No drugs found.</Typography>
-                    )}
-                </CardContent>
-            </Card>
+        <CardContent>
+          <TextField
+              fullWidth
+              label="Search Drugs"
+              variant="outlined"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              sx={{ mb: 2 }}
+          />
+          <Typography variant="h5" gutterBottom>
+            Existing Drugs
+          </Typography>
+          {loading ? (
+            <Typography>Loading drugs...</Typography>
+          ) : drugs.length > 0 ? (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {drugs
+                .filter((drug) =>
+                  drug.name.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+              .map((drug) => (
+                <Card
+                  key={drug._id}
+                  variant="outlined"
+                  sx={{ p: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                >
+                  <Typography>
+                    {drug.name} - {drug.strength} {drug.unit}
+                  </Typography>
+                  <Box>
+                    <IconButton onClick={() => handleEdit(drug)}>
+                      <Edit />
+                    </IconButton>
+                    <IconButton onClick={() => handleDelete(drug._id)}>
+                      <Delete />
+                    </IconButton>
+                  </Box>
+                </Card>
+              ))}
+            </Box>
+          ) : (
+            <Typography>No drugs found.</Typography>
+          )}
+        </CardContent>
+      </Card>
         </Container>
     );
 };

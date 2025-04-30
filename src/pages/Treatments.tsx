@@ -8,6 +8,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid"; // ✅ Used for temporary _id for alternatives
 import BackButton from "../components/BackButton";
+import { Edit, Delete } from "@mui/icons-material";
+import Cookies from "js-cookie";
 
 interface Drug {
     _id: string;
@@ -42,17 +44,21 @@ const Treatments: React.FC = () => {
     const [drugs, setDrugs] = useState<Drug[]>([]);
     const [treatments, setTreatments] = useState<Treatment[]>([]);
 
-    const [treatmentName, setTreatmentName] = useState("");
+    const [name, setName] = useState("");
     const [treatmentType, setTreatmentType] = useState("Treatment");
 
     const [selectedDrugId, setSelectedDrugId] = useState("");
-    const [annualPatientCon, setAnnualPatientCon] = useState<number>(0);
+    const [annualConsumption, setAnnualConsumption] = useState<number>(0);
     const [regimenDrugs, setRegimenDrugs] = useState<DrugWithCon[]>([]);
 
     const [alternativeRegimenDrugs, setAlternativeRegimenDrugs] = useState<DrugWithCon[]>([]);
     const [alternativeRatio, setAlternativeRatio] = useState<number>(0);
     const [alternativeName, setAlternativeName] = useState<string>("");
     const [alternatives, setAlternatives] = useState<Alternative[]>([]);
+    const [editingTreatmentId, setEditingTreatmentId] = useState<string | null>(null);
+    const regimenOptions = treatments.filter(t => t.type === "Regimen");
+    const [selectedRegimenId, setSelectedRegimenId] = useState<string>("");
+    const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
         fetchDrugs();
@@ -78,7 +84,10 @@ const Treatments: React.FC = () => {
     const fetchTreatments = async () => {
         try {
             const response = await axios.get("http://localhost:5000/api/treatments");
-            const parsedTreatments = response.data.map((item: string) => JSON.parse(item));
+            const parsedTreatments = response.data.map((item: string) => {
+                const obj = JSON.parse(item);
+                return { ...obj, _id: obj._id.$oid };
+              });
             setTreatments(parsedTreatments);
         } catch (error) {
             console.error("Error fetching treatments:", error);
@@ -86,7 +95,7 @@ const Treatments: React.FC = () => {
     };
 
     const addDrug = (toAlternative = false) => {
-        if (!selectedDrugId || annualPatientCon <= 0) {
+        if (!selectedDrugId || annualConsumption <= 0) {
             alert("Please select a drug and provide valid annual patient consumption.");
             return;
         }
@@ -98,69 +107,190 @@ const Treatments: React.FC = () => {
               ...selectedDrug,
               _id: selectedDrug._id 
             },
-            annual_patient_con: annualPatientCon
+            annual_patient_con: annualConsumption
           };
         
         toAlternative ? setAlternativeRegimenDrugs([...alternativeRegimenDrugs, drugWithCon])
             : setRegimenDrugs([...regimenDrugs, drugWithCon]);
 
         setSelectedDrugId("");
-        setAnnualPatientCon(0);
+        setAnnualConsumption(0);
     };
 
     const addAlternative = () => {
-        if (!alternativeName || alternativeRatio <= 0 || alternativeRatio > 1) {
-            alert("Add a name, valid ratio (0-1), and at least one drug to the alternative.");
-            return;
+        if (!selectedRegimenId || alternativeRatio <= 0 || alternativeRatio > 1) {
+          alert("Select a regimen and a valid ratio (0-1).");
+          return;
         }
+      
+        const selectedRegimen = regimenOptions.find(r => r._id === selectedRegimenId);
+        if (!selectedRegimen || !selectedRegimen.regimen) {
+          alert("Selected regimen not found.");
+          return;
+        }
+      
         const newAlt: Alternative = {
-            _id: uuidv4(),
-            name: alternativeName,
-            ratio: alternativeRatio,
-            regimen: {
-                drugs: alternativeRegimenDrugs.map((item) => ({
-                  drug: {
-                    ...item.drug,
-                    _id: item.drug._id, 
-                  },
-                  annual_patient_con: item.annual_patient_con,
-                }))
-              }
+          _id: uuidv4(),
+          name: selectedRegimen.name,
+          ratio: alternativeRatio,
+          regimen: {
+            drugs: selectedRegimen.regimen.drugs.map(item => ({
+              drug: {
+                ...item.drug,
+                _id: typeof item.drug._id === "object" && "$oid" in item.drug._id
+                  ? (item.drug._id as any)["$oid"]
+                  : item.drug._id,
+              },
+              annual_patient_con: item.annual_patient_con,
+            }))
+          }
         };
-        setAlternatives([...alternatives, newAlt]);
-        setAlternativeRegimenDrugs([]);
+      
+        setAlternatives(prev => [...prev, newAlt]);
+        setSelectedRegimenId("");
         setAlternativeRatio(0);
-        setAlternativeName("");
-    };
+      };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+      
         const payload: any = {
-            name: treatmentName,
-            type: treatmentType
+          name: name,
+          type: treatmentType,
         };
+      
         if (treatmentType === "Regimen") {
-            if (regimenDrugs.length === 0) return alert("Add at least one drug to the regimen.");
-            payload.regimen = { drugs: regimenDrugs };
+          if (regimenDrugs.length === 0) return alert("Add at least one drug to the regimen.");
+          payload.regimen = {
+            drugs: regimenDrugs.map((item) => ({
+              drug: {
+                ...item.drug,
+                _id: item.drug._id, 
+              },
+              annual_patient_con: item.annual_patient_con,
+            })),
+          };
         } else if (treatmentType === "Alternative") {
-            if (alternatives.length === 0) return alert("Add at least one alternative.");
-            payload.alternatives = alternatives;
+          if (alternatives.length === 0) return alert("Add at least one alternative.");
+          payload.alternatives = alternatives.map((alt) => ({
+            _id: alt._id,
+            name: alt.name,
+            ratio: alt.ratio,
+            regimen: {
+                drugs: alt.regimen.drugs.map((item) => ({
+                    drug: {
+                        _id: item.drug._id,
+                        name: item.drug.name,
+                        strength: item.drug.strength,
+                        unit: item.drug.unit
+                      },
+                  annual_patient_con: item.annual_patient_con,
+                })),
+              },
+            }));
+            // delete payload.regimen; 
         }
-        try {
-            await axios.post("http://localhost:5000/api/treatments", payload);
-            fetchTreatments();
-            resetForm();
-            alert("Treatment added.");
-        } catch (error: any) {
-            alert(error.response?.data?.error || "Error adding treatment");
-        }
-    };
+        console.log("Submitting Payload: ", JSON.stringify(payload, null, 2));
 
+        try {
+            const csrfToken = Cookies.get("csrf_token");
+    
+            const config = {
+                withCredentials: true,
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken || "", 
+                },
+            };
+    
+          console.log("Submitting payload:", JSON.stringify(payload, null, 2));
+
+          if (editingTreatmentId) {
+            await axios.put(
+              `http://localhost:5000/api/treatments/${editingTreatmentId}`,
+              payload,
+              config
+            );
+            alert("Treatment updated.");
+          } else {
+            await axios.post("http://localhost:5000/api/treatments", payload, config);
+            alert("Treatment added.");
+          }
+      
+          fetchTreatments();
+          resetForm();
+          setEditingTreatmentId(null); 
+        } catch (error: any) {
+          alert(error.response?.data?.error || "Error submitting treatment");
+        }
+      };
+      
+      
     const resetForm = () => {
-        setTreatmentName("");
+        setName("");
         setRegimenDrugs([]);
         setAlternatives([]);
     };
+
+    const handleEdit = (treatment: Treatment) => {
+        setEditingTreatmentId(treatment._id);
+        setName(treatment.name);
+        setTreatmentType(treatment.type);
+      
+        const extractId = (id: any): string =>
+          typeof id === "object" && id !== null && "$oid" in id
+            ? (id.$oid as string)
+            : (id as string);
+      
+        if (treatment.type === "Regimen" && treatment.regimen) {
+          const sanitizedDrugs = treatment.regimen.drugs.map((item) => ({
+            drug: {
+              ...item.drug,
+              _id: extractId(item.drug._id),
+            },
+            annual_patient_con: item.annual_patient_con,
+          }));
+          setRegimenDrugs(sanitizedDrugs);
+        } else if (treatment.type === "Alternative" && treatment.alternatives) {
+          const sanitizedAlternatives = treatment.alternatives.map((alt) => ({
+            ...alt,
+            regimen: {
+              drugs: alt.regimen.drugs.map((item) => ({
+                drug: {
+                  ...item.drug,
+                  _id: extractId(item.drug._id),
+                },
+                annual_patient_con: item.annual_patient_con,
+              })),
+            },
+          }));
+          setAlternatives(sanitizedAlternatives);
+        }
+      };
+      
+      
+      
+      const handleDelete = async (treatmentId: string) => {
+        if (!window.confirm("Are you sure you want to delete this treatment?")) return;
+          
+        try{
+            const csrfToken = Cookies.get("csrf_token");
+
+          await axios.delete(`http://localhost:5000/api/treatments/${treatmentId}`, {
+            withCredentials: true,
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": csrfToken || "",
+            },
+          });
+      
+          fetchTreatments();
+          alert("Treatment deleted.");
+        } catch (error: any) {
+          alert(error.response?.data?.error || "Error deleting treatment");
+        }
+      };
+      
 
     return (
         <Container maxWidth="md" sx={{ mt: 4 }}>
@@ -173,7 +303,7 @@ const Treatments: React.FC = () => {
                     <form onSubmit={handleSubmit}>
                         <Grid container spacing={2}>
                             <Grid item xs={12} sm={8}>
-                                <TextField fullWidth label="Treatment Name" value={treatmentName} onChange={(e) => setTreatmentName(e.target.value)} required />
+                                <TextField fullWidth label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
                             </Grid>
                             <Grid item xs={12} sm={4}>
                                 <FormControl fullWidth required>
@@ -211,7 +341,7 @@ const Treatments: React.FC = () => {
                                         </FormControl>
                                     </Grid>
                                     <Grid item xs={4}>
-                                        <TextField type="number" fullWidth label="Annual Patient Con" value={annualPatientCon} onChange={(e) => setAnnualPatientCon(Number(e.target.value))} />
+                                        <TextField type="number" fullWidth label="Annual Consumption" value={annualConsumption} onChange={(e) => setAnnualConsumption(Number(e.target.value))} />
                                     </Grid>
                                     <Grid item xs={2}>
                                         <Button variant="contained" onClick={() => addDrug(false)} fullWidth>Add</Button>
@@ -231,7 +361,20 @@ const Treatments: React.FC = () => {
                         {treatmentType === "Alternative" && (
                             <Box mt={3}>
                                 <Typography variant="subtitle1">Add Alternative Regimen</Typography>
-                                <TextField label="Alternative Name" value={alternativeName} onChange={(e) => setAlternativeName(e.target.value)} fullWidth sx={{ mb: 2 }} />
+                                <FormControl fullWidth sx={{ mb: 2 }}>
+                                    <InputLabel>Select Regimen</InputLabel>
+                                    <Select
+                                        value={selectedRegimenId}
+                                        label="Select Regimen"
+                                        onChange={(e) => setSelectedRegimenId(e.target.value)}
+                                    >
+                                        {regimenOptions.map((regimen) => (
+                                        <MenuItem key={regimen._id} value={regimen._id}>
+                                            {regimen.name}
+                                        </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
                                 <Grid container spacing={2}>
                                     
                                     
@@ -264,6 +407,56 @@ const Treatments: React.FC = () => {
                     </form>
                 </CardContent>
             </Card>
+            {treatments.length > 0 && (
+                <Card sx={{ mb: 4 }}>
+                    <CardContent>
+                    <TextField
+                        fullWidth
+                        label="Search Treatment"
+                        variant="outlined"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        sx={{ mb: 2 }}
+                    />
+                    <Typography variant="h6" gutterBottom>Available Treatments</Typography>
+                    <List>
+                        {treatments
+                          .filter((treatment) =>
+                            treatment.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            treatment.type.toLowerCase().includes(searchTerm.toLowerCase())
+                          )
+                          .map((treatment) => (
+                        <ListItem
+                        key={treatment._id}
+                        secondaryAction={
+                          <Box>
+                            <IconButton edge="end" aria-label="edit" onClick={() => handleEdit(treatment)}>
+                                        <Edit />
+                                    </IconButton>
+                                    <IconButton edge="end" aria-label="delete" onClick={() => handleDelete(treatment._id)}>
+                                        <Delete />
+                                    </IconButton>
+                          </Box>
+                        }
+                        sx={{ borderBottom: "1px solid #eee" }}
+                      >
+                        <ListItemText
+                          primary={`${treatment.name} (${treatment.type})`}
+                          secondary={
+                            treatment.regimen
+                              ? `Drugs: ${treatment.regimen.drugs.map(d => d.drug.name).join(", ")}`
+                              : treatment.alternatives
+                              ? `Alternatives: ${treatment.alternatives.map(a => a.name).join(", ")}`
+                              : "Basic treatment"
+                          }
+                        />
+                      </ListItem>
+                        
+                        ))}
+                    </List>
+                    </CardContent>
+                </Card>
+                )}
         </Container>
     );
 };

@@ -8,6 +8,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import Cookies from "js-cookie";
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -18,16 +19,50 @@ const Register: React.FC = () => {
   const [message, setMessage] = useState("");
   const [csrfToken, setCsrfToken] = useState("");
 
-  useEffect(() => {
-    axios.get("http://localhost:5000/auth/csrf-token", { withCredentials: true })
-      .then(res => {
-        console.log("CSRF response:", res.data);
-        setCsrfToken(res.data.csrfToken);
+  function setCookie(name: string, value: string, days = 1) {
+    const expires = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie = `${name}=${value}; expires=${expires}; path=/`;
+  }
+
+  // useEffect(() => {
+  //   // This triggers Flask to set CSRF cookie automatically
+  //   axios.get("http://localhost:5000/auth/register", {
+  //     withCredentials: true,
+  //   }).catch(err => {
+  //     console.error("Failed to initiate CSRF flow:", err);
+  //   });
+  // }, []);
+
+  
+    useEffect(() => {
+      axios.get("http://localhost:5000/auth/register", {
+        withCredentials: true,
+        responseType: "text",
       })
-      .catch(err => {
-        console.error("Failed to get CSRF token", err);
-      });
-  }, []);
+        .then(res => {
+        const html = res.data;
+        const match = html.match(
+          /<input[^>]*name="csrf_token"[^>]*value="([^"]+)"[^>]*>/
+        );
+        if (match && match[1]) {
+          const token = match[1];
+          console.log("Extracted CSRF Token:", token);
+          setCsrfToken(token);
+          setCookie("csrf_token", token);
+          // Cookies.set("csrf_token", token);
+          // document.cookie = `csrf_token=${token}; path=/`;
+          
+        }
+        else {
+          console.error("CSRF token not found in HTML.");
+          console.warn("CSRF token not found in response. Proceeding without it.");
+        } 
+        })
+        .catch(err => {
+          console.error("GET Error:", err.response || err.message);
+          // console.error("Failed to get CSRF token", err);
+        });
+    }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,16 +74,17 @@ const Register: React.FC = () => {
     }
 
     try {
-      console.log("CSRF:", csrfToken);
+      const token = Cookies.get("csrf_token") || csrfToken;
+      console.log("Using CSRF Token:", token);
       
       await axios.post(
         "http://localhost:5000/auth/register",
-        { email, password },
+        { email, password, csrf_token: token, },
         {
           withCredentials: true,
           headers: {
             "Content-Type": "application/json",
-            "X-CSRFToken": csrfToken || "",
+            "X-CSRFToken": token,
           },
         }
       );
