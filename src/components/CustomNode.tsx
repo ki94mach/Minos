@@ -5,13 +5,16 @@ const CustomNode = ({ id, data }: { id: string; data: any  }) => {
     const { setNodes, getNodes } = useReactFlow();
     const [isEditing, setIsEditing] = useState(false);
     const [label, setLabel] = useState(data.label);
-    const [number, setNumber] = useState(data.number.toString());
+    const [number, setNumber] = useState(() => {
+        const num = data?.number;
+        return typeof num === "number" || typeof num === "string" ? num.toString() : "1";
+    });
 
     const labelInputRef = useRef<HTMLInputElement>(null);
     const numberInputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const isTreatment = data.type === "treatment";
+    const isTreatment = data?.type === "treatment";
 
     useEffect(() => {
         if (isEditing) {
@@ -103,9 +106,9 @@ const CustomNode = ({ id, data }: { id: string; data: any  }) => {
                 </>
             ) : (
                 <>
-                    <strong>{data.label}</strong>
-                    <div>{data.number}</div>
-                    {isTreatment && data.drugs && (
+                    {data?.label && <strong>{data.label}</strong>}
+                    {data?.number && <div>{data.number}</div>}
+                    {isTreatment && Array.isArray(data?.drugs) && (
                         <ul style={{ padding: 0, margin: 0, listStyle: "none" }}>
                             {data.drugs.map((d: any, i: number) => (
                                 <li key={i} style={{ marginTop: "4px" }}>

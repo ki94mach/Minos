@@ -46,7 +46,6 @@ const Register: React.FC = () => {
         );
         if (match && match[1]) {
           const token = match[1];
-          console.log("Extracted CSRF Token:", token);
           setCsrfToken(token);
           setCookie("csrf_token", token);
           // Cookies.set("csrf_token", token);
@@ -75,7 +74,6 @@ const Register: React.FC = () => {
 
     try {
       const token = Cookies.get("csrf_token") || csrfToken;
-      console.log("Using CSRF Token:", token);
       
       await axios.post(
         "http://localhost:5000/auth/register",

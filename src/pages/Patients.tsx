@@ -56,7 +56,8 @@ const Patients: React.FC = () => {
         const fetchPatients = async () => {
             try {
                 const response = await axios.get("http://localhost:5000/api/patients");
-                const formattedNodes = response.data.map((patient: any, index: number) => {
+                const parsedPatients = response.data.map((item: string) => JSON.parse(item));
+                const formattedNodes = parsedPatients.map((patient: any, index: number) => {
                     const nodeType = patient.node.node_type;
                     const base = {
                         id: patient._id,
@@ -148,19 +149,23 @@ const Patients: React.FC = () => {
     
         const populationNumber = selectedPopulation === "Custom Population"
             ? Number(customPopulationNumber)
-            : null;        
-
+            : null;
+    
         try {
+            // await axios.get("http://localhost:5000/auth/register", {
+            //     withCredentials: true,
+            //   });
+
             const csrfToken = Cookies.get("csrf_token");
     
             const config = {
                 withCredentials: true,
                 headers: {
                     "Content-Type": "application/json",
-                    "X-CSRFToken": csrfToken || "", 
+                    "X-CSRFToken": csrfToken || "",
                 },
             };
-
+    
             const response = await axios.post("http://localhost:5000/api/patients", {
                 node: {
                     node_type: "characteristic",
@@ -169,29 +174,64 @@ const Patients: React.FC = () => {
                     characteristic_data: {
                         _id: selectedCharObj?._id,
                         char_type: selectedCharType,
-                        name: selectedCharName
-                    }
-                }, 
-            },
-            config
-        );
+                        name: selectedCharName,
+                    },
+                },
+            }, config);
+    
+            const newPatientId = response.data.id;
+    
+            const fullTreeResponse = await axios.get(`http://localhost:5000/api/patients`);
+            const fullTreeParsedPatients = fullTreeResponse.data.map((item: string) => JSON.parse(item));
 
-            setNodes((prevNodes) => [
-                ...prevNodes,
-                {
-                    id: response.data.id,
-                    position: { x: prevNodes.length * 200, y: 100 },
+            const newPatient = fullTreeParsedPatients.find((p: any) =>
+                (p._id?.$oid || p._id) === response.data.id
+              );
+            if (!newPatient) throw new Error("Patient not found in list.");
+    
+            const buildFlowNodes = (node: any, depth: number, index: number, parentId: string | null = null):  { nodes: any[]; edges: any[] } => {
+                const nodeId = node._id?.$oid || node._id || `${Math.random()}`;
+                const thisNode = {
+                    id: nodeId,
+                    position: { x: index * 250, y: depth * 180 },
                     type: "custom",
-                    data: { label: selectedCharName, number: prevNodes.length + 1, type: "characteristic" }
-                }
-            ]);
+                    data: {
+                    label: node.characteristic_data?.name || node.treatment_data?.name || "Node",
+                    type: node.node_type,
+                    rate: node.rate,
+                    size: node.size,
+                    drugs: node.treatment_data?.regimen?.drugs?.map((d: any) => d.drug) || [],
+                    },
+                };
 
-            alert("Patient tree created successfully!");
+                const edge = parentId
+                    ? [{ id: `${parentId}->${nodeId}`, source: parentId, target: nodeId }]
+                    : [];
+
+                const children = node.children || [];
+                const childResults = children.map((child: any, i: number) =>
+                    buildFlowNodes(child, depth + 1, i, nodeId)
+                );
+
+                return {
+                    nodes: [thisNode, ...childResults.flatMap((res: any) => res.nodes)],
+                    edges: [...edge, ...childResults.flatMap((res: any) => res.edges)],
+                };
+            };
+    
+            const { nodes: treeNodes, edges: treeEdges }  = buildFlowNodes(newPatient.tree, 0, 0);
+            setNodes(treeNodes);
+            setEdges(treeEdges);
+            console.log("Final treeNodes:", treeNodes);
+            console.log("Final treeEdges:", treeEdges);
+
+            alert("Patient tree created and displayed!");
         } catch (error) {
             console.error("Error during patient creation:", error);
             alert("Failed to create patient tree.");
         }
     };
+    
 
     return (
         <Container maxWidth="md" sx={{ mt: 5 }}>

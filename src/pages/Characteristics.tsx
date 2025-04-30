@@ -31,7 +31,6 @@ const Characteristics: React.FC = () => {
                 return { ...obj, _id: obj._id.$oid };
               });
 
-    console.log("Parsed:", parsed);
     setCharacteristics(parsed);
         } catch (error) {
             console.error("Error fetching characteristics:", error);

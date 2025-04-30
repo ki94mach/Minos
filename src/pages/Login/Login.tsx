@@ -10,8 +10,7 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   // const [csrfToken, setCsrfToken] = useState("");
-
-  const csrfToken = Cookies.get("csrf_token");
+  const [csrfReady, setCsrfReady] = useState(false);  
 
   // useEffect(() => {
   //   axios.get("http://localhost:5000/auth/csrf-token", { withCredentials: true })
@@ -19,27 +18,36 @@ const Login: React.FC = () => {
   //     .catch(err => console.error("CSRF token fetch failed:", err));
   // }, []);
 
+  useEffect(() => {
+    axios.get("http://localhost:5000/auth/login", { withCredentials: true })
+      .then(() => {
+        setCsrfReady(true);
+      })
+      .catch((err) => {
+        console.error("Error refreshing CSRF token:", err);
+      });
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage("");
 
-    try {
-      const api = axios.create({
-        baseURL: "http://localhost:5000",
-        withCredentials: true,
-            headers: {
-              "Content-Type": "application/json",
-              "X-CSRFToken": csrfToken || "",
-            },
-      });
+    if (!csrfReady) {
+      setMessage("CSRF token not initialized. Please wait...");
+      return;
+    }
 
-      const response = await api.post(
-        "/auth/login",
+    const csrfToken = Cookies.get("csrf_token") || "";
+
+    try {
+      const response = await axios.post(
+        "http://localhost:5000/auth/login",
         { email, password },
         {
+          withCredentials: true,
           headers: {
             "Content-Type": "application/json",
-            "X-CSRFToken": csrfToken || "",
+            "X-CSRFToken": csrfToken,
           },
         }
       );
