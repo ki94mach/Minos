@@ -1,5 +1,4 @@
 # routes/api.py
-# Import model classes from tables for creating new instances.
 from models.tables import (
     Regimen, AlternativeTreatment
 )
@@ -10,20 +9,16 @@ import hashlib
 from bson import ObjectId
 from mongoengine.errors import NotUniqueError
 
-# Import driver classes from the appropriate directories
 from models.characteristic.driver import CharacteristicDriver
 from models.drug.driver import DrugDriver
 from models.followup.driver import FollowupDriver
 from models.patient.driver import PatientDriver
 from models.treatment.driver import TreatmentDriver
 
-# Import model classes from tables for creating new instances.
 from models.tables import (Characteristic, Drug, Followup, PatientTree)
 from models.tables import (Node, CharacteristicEmbedded,
                            TreatmentEmbedded, FollowupEmbedded)
 
-
-# Import validators and required decorators
 from validators.api_validators import (CharacteristicCreate, CharacteristicUpdate,
                                        DrugCreate, DrugUpdate, TreatmentUpdate,
                                        TreatmentCreate, PatientCreate, PatientUpdate,
@@ -31,7 +26,6 @@ from validators.api_validators import (CharacteristicCreate, CharacteristicUpdat
 from utils.validate_request import validate_request
 from utils.auth_security import login_required
 
-# Importing validation utilities
 from utils.business_rules import find_node
 
 api_blueprint = Blueprint('api', __name__)
@@ -347,15 +341,12 @@ def create_treatment(validated_data: TreatmentCreate):
     Note: "treatment_hash" is auto-generated.
     """
     try:
-        # 1️⃣ Get validated data as dict with proper MongoDB _id fields
         payload = validated_data.model_dump(by_alias=True)
         
-        # 2️⃣ Extract and validate components based on treatment type
         treatment_type = payload["type"]
         raw_regimen = payload.get("regimen")
         raw_alts = payload.get("alternatives", [])
 
-        # 3️⃣ Build MongoEngine embedded documents
         from models.tables import Treatment as TreatmentDoc
         from models.tables import Regimen as RegimenDoc
         from models.tables import AlternativeTreatment as AltTreatDoc
@@ -383,7 +374,6 @@ def create_treatment(validated_data: TreatmentCreate):
                     )
                 )
 
-        # 4️⃣ Generate treatment hash and create document
         hash_input = payload["name"] + treatment_type + str(raw_regimen) + str(raw_alts)
         treatment_hash = hashlib.sha256(hash_input.encode()).hexdigest()
 
@@ -655,16 +645,12 @@ def add_node(validated_data, patient_id):
         #         child.model_dump(by_alias=True) for child in validated_data.children
         #     ]
         
-    
-        # Fetch the patient tree
         patient_tree = PatientDriver.find(id=patient_id).first()
         if not patient_tree:
             return jsonify({'error': 'Patient not found'}), 404
 
-        # Make sure embedded Node has its own ObjectId
         if '_id' not in new_node_data:
             new_node_data['_id'] = ObjectId()
-        # If we're attaching under a parent, record that too
         if parent_node_id:
             new_node_data['parent_id'] = ObjectId(str(parent_node_id))
 
@@ -686,7 +672,6 @@ def add_node(validated_data, patient_id):
                                 if parent_node_id else None)
         
         if parent_node_id:
-            # Find and validate parent node
             parent_node = find_node(patient_tree.tree, str(parent_node_id))
             if not parent_node:
                 return jsonify({'error': 'Parent node not found'}), 404
@@ -695,11 +680,9 @@ def add_node(validated_data, patient_id):
         else:
             patient_tree.tree.children.append(new_node)
 
-        # Recompute tree hash
         hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
         patient_tree.tree_hash = hashlib.sha256(hash_input).hexdigest()
-        
-        # Update the document
+
         PatientDriver.update(patient_tree)
         
         return jsonify({

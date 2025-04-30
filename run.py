@@ -1,13 +1,8 @@
-# Standard library imports
+# run.py
 import os
-
-# Third-party imports
 from dotenv import load_dotenv
-
-# Local application imports
 from app_factory import create_app
 
-# Load environment variables from .env file
 load_dotenv()
 
 # -----------------------------------------------------------------------------

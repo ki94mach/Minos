@@ -1,7 +1,5 @@
 # utils/business_rules.py
-
 from bson import ObjectId
-import logging
 from typing import Optional
 
 
@@ -65,8 +63,7 @@ def validate_and_transform_drug(drug_data: dict) -> dict:
         drug_data['name'] = to_title_format(drug_data['name'])
     if 'unit' in drug_data:
         drug_data['unit'] = drug_data['unit'].lower()
-    
-    # Validate that the transformed data matches the database record
+
     if drug_data.get('name') != drug.name:
         raise ValueError("Name does not match the database record")
     if drug_data.get('strength') != drug.strength:
@@ -94,8 +91,7 @@ def validate_and_transform_characteristic(characteristic_data: dict) -> dict:
         characteristic_data['name'] = to_title_format(characteristic_data['name'])
     if 'char_type' in characteristic_data:
         characteristic_data['char_type'] = to_title_format(characteristic_data['char_type'])
-    
-    # Validate that the transformed data matches the database record
+
     if characteristic_data.get('name') != characteristic.name:
         raise ValueError("Name does not match the database record")
     if characteristic_data.get('char_type') != characteristic.char_type:
@@ -120,18 +116,15 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
     if 'name' in treatment_data:
         treatment_data['name'] = to_title_format(treatment_data['name'])
     
-    # Validate type if provided
     if 'type' in treatment_data:
         if treatment_data['type'] not in ['Treatment', 'Regimen', 'Alternative']:
             raise ValueError("Treatment type must be one of: Treatment, Regimen, Alternative")
     
-    # Validate that the transformed data matches the database record
     if treatment_data.get('name') != treatment.name:
         raise ValueError("Name does not match the database record")
     if treatment_data.get('type') != treatment.type:
         raise ValueError("Type does not match the database record")
     
-    # Handle regimen validation if present
     if treatment_data.get('regimen'):
         if treatment.type != 'Regimen':
             raise ValueError("Regimen can only be present for treatment type 'Regimen'")
@@ -155,7 +148,6 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
                     f"{item['annual_patient_con']} (payload) ≠ {db_val} (DB)"
                 )
     
-    # Handle alternatives validation if present
     if treatment_data['alternatives']:
         if treatment.type != 'Alternative':
             raise ValueError("Alternatives can only be present for treatment type 'Alternative'")
@@ -167,7 +159,6 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
                 f"Alternatives mismatch: DB has {set(db_map)}, payload has {set(payload_map)}"
             )
 
-        # compare ratios
         for alt_id in db_map:
             if payload_map[alt_id] != db_map[alt_id]:
                 raise ValueError(
@@ -193,13 +184,11 @@ def validate_and_transform_followup_embedded(followup_data: dict) -> dict:
     if 'name' in followup_data:
         followup_data['name'] = followup_data['name'].strip()
     
-    # Validate overall_survival if provided
     if 'overall_survival' in followup_data:
         overall_survival = followup_data['overall_survival']
         if not isinstance(overall_survival, (int, float)) or not (0 <= overall_survival <= 1):
             raise ValueError("Overall survival must be a number between 0 and 1")
     
-    # Validate that the transformed data matches the database record
     if followup_data.get('name') != followup.name:
         raise ValueError("Name does not match the database record")
     if followup_data.get('overall_survival') != followup.overall_survival:
@@ -231,16 +220,13 @@ def validate_and_transform_alternative(alternative_data: dict) -> dict:
     if 'name' in alternative_data:
         alternative_data['name'] = to_title_format(alternative_data['name'])
     
-    # Validate that the transformed data matches the database record
     if alternative_data.get('name') != treatment.name:
         raise ValueError("Name does not match the database record")
     
-    # Validate regimen if present
     if 'regimen' in alternative_data:
         if not treatment.regimen:
             raise ValueError("Referenced treatment must have a regimen")
             
-        # Validate regimen structure matches
         regimen_data = alternative_data['regimen']
         db_map = {
             str(item.drug._id): item.annual_patient_con
@@ -294,7 +280,6 @@ def validate_regimen_consistency(
         if not treatment.regimen:
             raise ValueError("Referenced treatment does not contain a regimen")
 
-        # build a quick lookup: str(drug_id) → annual_patient_con
         db_map = {
             str(item.drug._id): item.annual_patient_con
             for item in treatment.regimen.drugs

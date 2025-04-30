@@ -27,7 +27,6 @@ from utils.business_rules import (
     validate_and_transform_alternative
 )
 
-# Constants for allowed values.
 ALLOWED_UNITS = ['mg', 'g', 'ng', 'mcg', 'IU']
 ALLOWED_TREATMENT_TYPES = ['Treatment', 'Regimen', 'Alternative']
 ALLOWED_NODE_TYPES = ["characteristic", "treatment", "followup"]
@@ -358,22 +357,19 @@ class TreatmentUpdate(BaseModel):
                 raise ValueError(
                     'Alternatives can only be present for Alternative type'
                     )
-            
-            # Validate each alternative and check ratios
+
             alt_ids = []
             ratios_sum = 0.0
             for alt in v:
                 alt.validate_against_database()
                 alt_ids.append(str(alt.id))
                 ratios_sum += alt.ratio
-            
-            # Check for duplicates
+
             if len(alt_ids) != len(set(alt_ids)):
                 raise ValueError(
                     "Duplicate alternative treatments are not allowed"
                     )
-            
-            # Validate ratio sum
+
             if not (0.99 <= ratios_sum <= 1.01):
                 raise ValueError(
                     "Alternative treatment ratios must sum to 1.0"
@@ -558,14 +554,12 @@ class FollowupData(BaseModel):
     @field_validator('overall_survival')
     @classmethod
     def validate_survival_rate(cls, v: float) -> float:
-        return validate_rate(v)  # Reuse rate validation since it's the same constraint
+        return validate_rate(v)
 
     @model_validator(mode="after")
     def validate_against_database(self) -> "FollowupData":
-        # First validate the overall survival rate
         self.validate_survival_rate(self.overall_survival)
-        
-        # Then validate against database record
+
         followup_data = {
             '_id': str(self.id),
             'overall_survival': self.overall_survival
