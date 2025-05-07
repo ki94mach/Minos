@@ -10,6 +10,13 @@ const CustomNode = ({ id, data }: { id: string; data: any  }) => {
         return typeof num === "number" || typeof num === "string" ? num.toString() : "1";
     });
 
+    const borderColor =
+    data?.type === "characteristic"
+      ? "#2196f3" // Blue for characteristic
+      : data?.type === "treatment"
+      ? "#4caf50" // Green for treatment
+      : "#ddd";   // Default    
+
     const labelInputRef = useRef<HTMLInputElement>(null);
     const numberInputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -52,7 +59,7 @@ const CustomNode = ({ id, data }: { id: string; data: any  }) => {
                 padding: "10px",
                 borderRadius: "5px",
                 background: "#fff",
-                border: "1px solid #ddd",
+                border: `2px solid ${borderColor}`,
                 textAlign: "center",
                 minWidth: "150px",
                 cursor: "pointer",
@@ -107,7 +114,7 @@ const CustomNode = ({ id, data }: { id: string; data: any  }) => {
             ) : (
                 <>
                     {data?.label && <strong>{data.label}</strong>}
-                    {data?.number && <div>{data.number}</div>}
+                    {data?.size !== undefined && <div>Size: {data.size}</div>}
                     {isTreatment && Array.isArray(data?.drugs) && (
                         <ul style={{ padding: 0, margin: 0, listStyle: "none" }}>
                             {data.drugs.map((d: any, i: number) => (

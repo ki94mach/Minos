@@ -25,6 +25,7 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+*__pycache__*
 
 # Virtual Environment
 venv/
@@ -81,3 +82,7 @@ flask_session/
 
 # Misc frontend docs
 docs
+
+# Test files
+tests/
+docs/

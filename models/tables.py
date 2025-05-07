@@ -1,3 +1,4 @@
+# models/tables.py
 from mongoengine import (
     Document,
     EmbeddedDocument,

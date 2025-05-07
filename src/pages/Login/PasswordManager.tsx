@@ -9,13 +9,13 @@ import {
   Link,
 } from "@mui/material";
 import axios from "axios";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams  } from "react-router-dom";
 
 const PasswordManager: React.FC = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
-
+  console.log("Token:", token);
   const isResetMode = !!token;
   const [mode, setMode] = useState<"forgot" | "reset" | "change">("forgot");
 
@@ -26,6 +26,8 @@ const PasswordManager: React.FC = () => {
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
 
+ 
+
   useEffect(() => {
     if (isResetMode) {
       setMode("reset");
@@ -35,10 +37,28 @@ const PasswordManager: React.FC = () => {
   }, [token]);
 
   const getCSRF = async () => {
-    const res = await axios.get("http://localhost:5000/auth/csrf-token", {
+    let url = "";
+  
+    if (mode === "reset" && token) {
+      url = `http://localhost:5000/auth/reset-password/${token}`;
+    } else if (mode === "forgot") {
+      url = "http://localhost:5000/auth/forgot-password";
+    } else if (mode === "change") {
+      url = "http://localhost:5000/auth/change-password";
+    }
+  
+    const res = await axios.get(url, {
       withCredentials: true,
+      responseType: "text",
     });
-    return res.data.csrfToken;
+  
+    const html = res.data;
+    const match = html.match(/<input[^>]*name="csrf_token"[^>]*value="([^"]+)"[^>]*>/);
+    if (match && match[1]) {
+      return match[1]; // CSRF token
+    } else {
+      throw new Error("CSRF token not found in HTML");
+    }
   };
 
   const handleForgot = async (e: React.FormEvent) => {

@@ -17,7 +17,12 @@ class UserDriver:
     @staticmethod
     def find(**query):
         return User.objects(**query)
-
+    
+    @staticmethod
+    def get_by_id(drug_id):
+        """Retrieve a Drug document by its id using MongoEngine’s objects call."""
+        return User.objects(id=drug_id).first()
+    
     @staticmethod
     def get_user_by_email(email: str):
         return User.objects(email=email).first()

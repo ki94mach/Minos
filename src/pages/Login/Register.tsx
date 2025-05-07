@@ -77,7 +77,11 @@ const Register: React.FC = () => {
       
       await axios.post(
         "http://localhost:5000/auth/register",
-        { email, password, csrf_token: token, },
+        { email,
+          password,
+          confirm_password: confirmPassword,
+          csrf_token: token
+        },
         {
           withCredentials: true,
           headers: {

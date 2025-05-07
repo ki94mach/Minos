@@ -16,7 +16,12 @@ class FollowupDriver:
     @staticmethod
     def find(**query):
         return Followup.objects(**query)
-
+    
+    @staticmethod
+    def get_by_id(drug_id):
+        """Retrieve a Drug document by its id using MongoEngine’s objects call."""
+        return Followup.objects(id=drug_id).first()
+    
     @staticmethod
     def update(followup: Followup):
         try:

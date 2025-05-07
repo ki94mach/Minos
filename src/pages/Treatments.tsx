@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
     Container, Typography, Card, CardContent, TextField, Button, Divider,
     FormControl, InputLabel, Select, MenuItem, Box, IconButton, List,
-    ListItem, ListItemText, FormHelperText, Grid, Paper
+    ListItem, ListItemText, FormHelperText, Grid, Paper, Autocomplete
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import axios from "axios";
@@ -53,7 +53,6 @@ const Treatments: React.FC = () => {
 
     const [alternativeRegimenDrugs, setAlternativeRegimenDrugs] = useState<DrugWithCon[]>([]);
     const [alternativeRatio, setAlternativeRatio] = useState<number>(0);
-    const [alternativeName, setAlternativeName] = useState<string>("");
     const [alternatives, setAlternatives] = useState<Alternative[]>([]);
     const [editingTreatmentId, setEditingTreatmentId] = useState<string | null>(null);
     const regimenOptions = treatments.filter(t => t.type === "Regimen");
@@ -130,20 +129,22 @@ const Treatments: React.FC = () => {
         }
       
         const newAlt: Alternative = {
-          _id: uuidv4(),
-          name: selectedRegimen.name,
+          _id: selectedRegimen._id,
+          // name: selectedRegimen.name,
+          name: treatments.find(t => t._id === selectedRegimen._id)?.name || selectedRegimen.name, 
           ratio: alternativeRatio,
-          regimen: {
-            drugs: selectedRegimen.regimen.drugs.map(item => ({
-              drug: {
-                ...item.drug,
-                _id: typeof item.drug._id === "object" && "$oid" in item.drug._id
-                  ? (item.drug._id as any)["$oid"]
-                  : item.drug._id,
-              },
-              annual_patient_con: item.annual_patient_con,
-            }))
-          }
+          regimen: selectedRegimen.regimen,
+          // regimen: {
+          //   drugs: selectedRegimen.regimen.drugs.map(item => ({
+          //     drug: {
+          //       ...item.drug,
+          //       _id: typeof item.drug._id === "object" && "$oid" in item.drug._id
+          //         ? (item.drug._id as any)["$oid"]
+          //         : item.drug._id,
+          //     },
+          //     annual_patient_con: item.annual_patient_con,
+          //   }))
+          // }
         };
       
         setAlternatives(prev => [...prev, newAlt]);
@@ -173,13 +174,17 @@ const Treatments: React.FC = () => {
         } else if (treatmentType === "Alternative") {
           if (alternatives.length === 0) return alert("Add at least one alternative.");
           payload.alternatives = alternatives.map((alt) => ({
-            _id: alt._id,
+            _id: typeof alt._id === "object" && "$oid" in alt._id
+            ? alt._id["$oid"]
+            : alt._id,
             name: alt.name,
             ratio: alt.ratio,
             regimen: {
                 drugs: alt.regimen.drugs.map((item) => ({
                     drug: {
-                        _id: item.drug._id,
+                        _id: typeof item.drug._id === "object" && "$oid" in item.drug._id
+                          ? item.drug._id["$oid"]
+                          : item.drug._id,
                         name: item.drug.name,
                         strength: item.drug.strength,
                         unit: item.drug.unit
@@ -331,14 +336,16 @@ const Treatments: React.FC = () => {
                                 <Typography variant="subtitle1">Regimen Drugs</Typography>
                                 <Grid container spacing={2}>
                                     <Grid item xs={6}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Select Drug</InputLabel>
-                                            <Select value={selectedDrugId} onChange={(e) => setSelectedDrugId(e.target.value)} label="Select Drug">
-                                                {drugs.map(drug => (
-                                                    <MenuItem key={drug._id} value={drug._id}>{drug.name} - {drug.strength} {drug.unit}</MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
+                                    <Autocomplete
+                                        fullWidth
+                                        options={drugs}
+                                        getOptionLabel={(option) => `${option.name} - ${option.strength} ${option.unit}`}
+                                        value={drugs.find(d => d._id === selectedDrugId) || null}
+                                        onChange={(event, newValue) => setSelectedDrugId(newValue ? newValue._id : "")}
+                                        renderInput={(params) => (
+                                          <TextField {...params} label="Search Drug" variant="outlined" />
+                                        )}
+                                      />
                                     </Grid>
                                     <Grid item xs={4}>
                                         <TextField type="number" fullWidth label="Annual Consumption" value={annualConsumption} onChange={(e) => setAnnualConsumption(Number(e.target.value))} />
@@ -361,23 +368,18 @@ const Treatments: React.FC = () => {
                         {treatmentType === "Alternative" && (
                             <Box mt={3}>
                                 <Typography variant="subtitle1">Add Alternative Regimen</Typography>
-                                <FormControl fullWidth sx={{ mb: 2 }}>
-                                    <InputLabel>Select Regimen</InputLabel>
-                                    <Select
-                                        value={selectedRegimenId}
-                                        label="Select Regimen"
-                                        onChange={(e) => setSelectedRegimenId(e.target.value)}
-                                    >
-                                        {regimenOptions.map((regimen) => (
-                                        <MenuItem key={regimen._id} value={regimen._id}>
-                                            {regimen.name}
-                                        </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                                <Grid container spacing={2}>
-                                    
-                                    
+                                <Autocomplete
+                                  fullWidth
+                                  options={regimenOptions}
+                                  getOptionLabel={(option) => option.name}
+                                  value={regimenOptions.find(r => r._id === selectedRegimenId) || null}
+                                  onChange={(event, newValue) => setSelectedRegimenId(newValue ? newValue._id : "")}
+                                  renderInput={(params) => (
+                                    <TextField {...params} label="Search Regimen" variant="outlined" />
+                                  )}
+                                  sx={{ mb: 2 }}
+                                />
+                                <Grid container spacing={2}>                                 
                                     
                                 </Grid>
                                 <List>

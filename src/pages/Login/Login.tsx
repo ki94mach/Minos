@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect , useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { TextField, Button, Typography, Box, Link } from "@mui/material";
@@ -8,23 +8,30 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
-  // const [csrfToken, setCsrfToken] = useState("");
-  const [csrfReady, setCsrfReady] = useState(false);  
-
-  // useEffect(() => {
-  //   axios.get("http://localhost:5000/auth/csrf-token", { withCredentials: true })
-  //     .then(res => setCsrfToken(res.data.csrfToken))
-  //     .catch(err => console.error("CSRF token fetch failed:", err));
-  // }, []);
+  const [message, setMessage] = useState(""); 
+  const [csrfToken, setCsrfToken] = useState("");
 
   useEffect(() => {
-    axios.get("http://localhost:5000/auth/login", { withCredentials: true })
-      .then(() => {
-        setCsrfReady(true);
+    axios
+      .get("http://localhost:5000/auth/login", {
+        withCredentials: true,
+        responseType: "text",
+      })
+      .then((res) => {
+        const html = res.data;
+        const match = html.match(
+          /<input[^>]*name="csrf_token"[^>]*value="([^"]+)"[^>]*>/
+        );
+        if (match && match[1]) {
+          const token = match[1];
+          setCsrfToken(token);
+          Cookies.set("csrf_token", token); 
+        } else {
+          console.error("CSRF token not found in response HTML.");
+        }
       })
       .catch((err) => {
-        console.error("Error refreshing CSRF token:", err);
+        console.error("Failed to fetch CSRF token:", err);
       });
   }, []);
 
@@ -32,17 +39,14 @@ const Login: React.FC = () => {
     e.preventDefault();
     setMessage("");
 
-    if (!csrfReady) {
-      setMessage("CSRF token not initialized. Please wait...");
-      return;
-    }
+    // const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
     const csrfToken = Cookies.get("csrf_token") || "";
 
     try {
       const response = await axios.post(
         "http://localhost:5000/auth/login",
-        { email, password },
+        { email, password, csrf_token: csrfToken },
         {
           withCredentials: true,
           headers: {

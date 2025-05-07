@@ -3,24 +3,25 @@ import bcrypt
 from flask import session, request, jsonify, redirect, url_for, current_app
 from functools import wraps
 import time
-import hashlib
 import secrets
-from datetime import datetime
 import logging
 from flask_mail import Message
-import json
 import redis
 from flask_wtf.csrf import generate_csrf
+from typing import Optional, Dict, Any
+import json
 
-# Dictionary to track login attempts
-login_attempts = {}
-# Maximum number of failed login attempts before temporary lockout
+from validators.auth_validators import RegisterUserSchema, validate_strong_password, validate_email
+
+# Constants for security settings
 MAX_FAILED_ATTEMPTS = 5
-# Lockout duration in seconds
 LOCKOUT_DURATION = 300  # 5 minutes
-
-# Password reset configuration
 PASSWORD_RESET_TIMEOUT_MINUTES = 30
+SESSION_TIMEOUT_MINUTES = 10000
+TOKEN_LENGTH = 64
+
+# Dictionary to track login attempts with type hints
+login_attempts: Dict[str, Dict[str, Any]] = {}
 
 
 def get_redis_connection():
@@ -39,119 +40,110 @@ def get_redis_connection():
         return redis_url
 
 
-def set_user_session(user_id, email, role, additional_data=None):
+def set_user_session(user_id: str, email: str, role: str, additional_data: Optional[Dict] = None) -> None:
     """
-    Create and store user session data in Redis
+    Create and store user session data with enhanced security.
     """
-    session['user_id'] = str(user_id)
+    session['user_id'] = user_id
     session['email'] = email
     session['role'] = role
+    session['created_at'] = time.time()
     
-    # Store additional user information if provided
-    if additional_data and isinstance(additional_data, dict):
+    # Store additional session data
+    if additional_data:
         for key, value in additional_data.items():
-            session[key] = value
+            if isinstance(value, (str, int, float, bool)):
+                session[key] = value
+            else:
+                # Safely serialize complex objects
+                try:
+                    session[key] = json.dumps(value)
+                except (TypeError, ValueError) as e:
+                    logging.warning(f"Could not serialize session data for key {key}: {e}")
+
+    # Set session expiry
+    session.permanent = True
     
-    # Generate new CSRF token on session creation using Flask-WTF
-    generate_csrf()
+    # Log session creation
+    logging.info(f"Session created for user {email} with role {role}")
 
 
-def clear_user_session():
+def clear_user_session() -> None:
     """
-    Clear the user session completely
+    Securely clear the user session.
     """
+    user_email = session.get('email')
+    
+    # Clear all session data
     session.clear()
+    
+    # Log session clearing
+    if user_email:
+        logging.info(f"Session cleared for user {user_email}")
 
 
-def is_strong_password(password):
-    """
-    Validates password strength.
-    Must meet at least 3 of these 4 criteria:
-    - At least 12 characters long
-    - Contains lowercase and uppercase letters
-    - Contains at least one digit
-    - Contains at least one special character
-    
-    Browser auto-generated passwords are typically very strong but might not
-    meet every specific requirement.
-    """
-    # Initialize criteria counter
-    criteria_met = 0
-    
-    # Check password length - browsers usually generate long passwords
-    if len(password) >= 12:
-        criteria_met += 1
-    
-    # Check for mix of upper and lowercase
-    if bool(re.search(r'[a-z]', password)) and bool(re.search(r'[A-Z]', password)):
-        criteria_met += 1
-    
-    # Check for digits
-    if bool(re.search(r'\d', password)):
-        criteria_met += 1
-    
-    # Check for special characters
-    if bool(re.search(r'[!@#$%^&*(),.?":{}|<>_\-+=[\]\\;\'/]', password)):
-        criteria_met += 1
-    
-    # Always require minimum length for security
-    if len(password) < 8:
-        return False
-        
-    # Password is strong if it meets at least 3 of the 4 criteria
-    return criteria_met >= 3
-
-
-def hash_password(password):
+def hash_password(password: str) -> str:
     """
     Creates a stronger password hash with bcrypt using higher work factor.
     """
-    # Use a higher work factor (12) for bcrypt for better security
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+    if not password:
+        raise ValueError("Password cannot be empty")
+    
+    # Use a higher work factor (12) for better security
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 
-def verify_password(password, hashed):
+def verify_password(password: str, hashed: str) -> bool:
     """
     Verifies a password against a hash in constant time to prevent timing attacks.
     """
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception as e:
+        logging.error(f"Error verifying password: {e}")
+        return False
 
 
-def track_login_attempt(email, success):
+def track_login_attempt(email: str, success: bool) -> bool:
     """
-    Tracks login attempts to prevent brute force attacks.
-    Returns True if the account is locked due to too many failed attempts.
+    Track login attempts and implement account lockout.
+    Returns True if account is locked, False otherwise.
     """
     now = time.time()
     
+    # Initialize tracking for new email
     if email not in login_attempts:
         login_attempts[email] = {
             'attempts': 0,
             'last_attempt': now,
-            'locked_until': 0
+            'locked_until': None
         }
     
-    # Check if account is currently locked
-    if login_attempts[email]['locked_until'] > now:
-        return True  # Account is locked
+    # Check if account is locked
+    if login_attempts[email].get('locked_until'):
+        if now < login_attempts[email]['locked_until']:
+            return True
+        # Reset counter after lockout period
+        login_attempts[email] = {
+            'attempts': 0,
+            'last_attempt': now,
+            'locked_until': None
+        }
     
-    # If lockout has expired, reset the counter
-    if login_attempts[email]['locked_until'] > 0 and login_attempts[email]['locked_until'] <= now:
-        login_attempts[email]['attempts'] = 0
-        login_attempts[email]['locked_until'] = 0
-    
-    # Reset counter after a successful login
     if success:
+        # Reset counter on successful login
         login_attempts[email]['attempts'] = 0
-        return False
-    
-    # Increment counter for failed attempt
-    login_attempts[email]['attempts'] += 1
+    else:
+        # Increment counter on failed attempt
+        login_attempts[email]['attempts'] += 1
+        
     login_attempts[email]['last_attempt'] = now
     
     # Lock account if too many failed attempts
     if login_attempts[email]['attempts'] >= MAX_FAILED_ATTEMPTS:
         login_attempts[email]['locked_until'] = now + LOCKOUT_DURATION
+        logging.warning(f"Account locked for {email} due to too many failed attempts")
         return True
     
     return False
@@ -160,8 +152,7 @@ def track_login_attempt(email, success):
 def login_required(f):
     """
     Decorator to protect routes that require authentication.
-    Checks if the user is logged in by verifying the session data in Redis.
-    Updates the session activity timestamp on each access.
+    Includes session timeout check and activity tracking.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -169,15 +160,18 @@ def login_required(f):
         if not user_id:
             return jsonify({'error': 'Authentication required'}), 401
         
-        # Record session activity
+        # Check session timeout
+        created_at = session.get('created_at', 0)
+        if time.time() - created_at > (SESSION_TIMEOUT_MINUTES * 60):
+            clear_user_session()
+            return jsonify({'error': 'Session expired'}), 401
+        
+        # Update session activity timestamp
         try:
-            from utils.redis_utils import update_session_activity
-            session_id = session.sid if hasattr(session, 'sid') else None
-            if session_id:
-                update_session_activity(session_id)
+            session['last_activity'] = time.time()
         except Exception as e:
             logging.warning(f"Could not update session activity: {e}")
-            
+        
         return f(*args, **kwargs)
     return decorated_function
 
@@ -190,71 +184,72 @@ def get_csrf_token():
     return generate_csrf()
 
 
-def generate_secure_token(length=64):
+def generate_secure_token(length: int = TOKEN_LENGTH) -> str:
     """
-    Generates a secure random token for password reset.
+    Generate a cryptographically secure token.
     """
+    if length < 32:
+        raise ValueError("Token length must be at least 32 characters")
     return secrets.token_urlsafe(length)
 
 
-def send_password_reset_email(email, reset_url):
+def send_password_reset_email(email: str, reset_url: str) -> bool:
     """
-    Sends a password reset email to the user using Flask-Mail.
-    Will work in both development and production environments.
+    Send password reset email with enhanced security measures.
+    Returns True if email was sent successfully.
     """
     try:
-        from flask import current_app
-        # Get mail instance from current app context
-        mail = current_app.extensions['mail']
+        # Validate email
+        validate_email(email)
         
-        app_name = "Minos"  # You can customize this or fetch from config
+        msg = Message('Password Reset Request',
+                     sender=current_app.config['MAIL_DEFAULT_SENDER'],
+                     recipients=[email])
         
-        # Create message
-        subject = f"{app_name} - Password Reset Request"
-        
-        body = f"""
-Hello,
-
-You have requested to reset your password. Please click the link below to reset your password:
-
+        msg.body = f"""To reset your password, visit the following link:
 {reset_url}
 
 This link will expire in {PASSWORD_RESET_TIMEOUT_MINUTES} minutes.
 
-If you did not request this reset, please ignore this email and your password will remain unchanged.
-
-Regards,
-The {app_name} Team
-        """
+If you did not make this request then simply ignore this email and no changes will be made.
+"""
         
-        # Create and send the email message
-        msg = Message(
-            subject=subject,
-            recipients=[email],
-            body=body,
-            sender=current_app.config.get('MAIL_DEFAULT_SENDER')
-        )
+        msg.html = f"""
+<p>To reset your password, click the link below:</p>
+<p><a href="{reset_url}">Reset Password</a></p>
+<p>This link will expire in {PASSWORD_RESET_TIMEOUT_MINUTES} minutes.</p>
+<p>If you did not make this request then simply ignore this email and no changes will be made.</p>
+"""
         
-        mail.send(msg)
+        current_app.mail.send(msg)
         logging.info(f"Password reset email sent to {email}")
         return True
+        
     except Exception as e:
-        logging.error(f"Failed to send password reset email: {e}")
-        
-        # Still log the reset URL so it can be manually retrieved during development
-        logging.info(f"Password reset URL for {email}: {reset_url}")
-        
+        logging.error(f"Error sending password reset email to {email}: {e}")
         return False
 
 
-def secure_headers():
+def secure_headers() -> Dict[str, str]:
     """
-    Returns a dictionary of secure headers that should be added to all responses.
+    Returns security headers with strict CSP and other protections.
     """
     return {
-        'Content-Security-Policy': "default-src 'self'; script-src 'self' https://code.jquery.com; style-src 'self' 'unsafe-inline'",
+        'Content-Security-Policy': (
+            "default-src 'self'; "
+            "script-src 'self' https://code.jquery.com; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "object-src 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'; "
+            "frame-ancestors 'none'"
+        ),
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
         'X-XSS-Protection': '1; mode=block',
-        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
-    } 
+        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
+        'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()'
+    }
