@@ -138,6 +138,7 @@ def configure_app(app: Flask, config: Optional[Dict[str, Any]] = None) -> None:
         WTF_CSRF_TIME_LIMIT=3600,  # 1 hour
         WTF_CSRF_SSL_STRICT=True,
         MAX_CONTENT_LENGTH=10 * 1024 * 1024,  # 10MB max file size
+         WTF_CSRF_HEADERS=["X-CSRFToken", "X-CSRF-Token"],
     )
 
     # Update with any provided config

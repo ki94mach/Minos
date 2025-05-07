@@ -3,6 +3,7 @@
 from flask import Blueprint, session, jsonify, redirect, url_for, render_template
 import logging
 from datetime import datetime
+from flask_wtf.csrf import generate_csrf
 
 from utils.auth_security import (
     track_login_attempt, hash_password, verify_password, 
@@ -28,6 +29,19 @@ auth_blueprint = Blueprint('auth', __name__)
 
 
 # ----------------- LOGIN -----------------
+
+@auth_blueprint.route("/csrf-token", methods=["GET"])
+def get_csrf_token():
+    token = generate_csrf()          # ➊ store in session + return value
+    resp  = jsonify({"csrf_token": token})
+    # ➋ make the browser store it; SameSite=None needed for localhost:3000 → 5000
+    resp.set_cookie(
+        "csrf_token", token,
+        secure=False,                # True in production behind HTTPS
+        samesite="None",
+        httponly=False               # React must be able to read it
+    )
+    return resp
 
 @auth_blueprint.route('/login', methods=['GET'])
 def login_get():
