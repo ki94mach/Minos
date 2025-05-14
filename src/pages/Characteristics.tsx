@@ -69,11 +69,15 @@ const Characteristics: React.FC = () => {
     
             setType("");
             setName("");
+            setErrors("");
             fetchCharacteristics();
             alert("Characteristic saved successfully!");
-        } catch (error) {
-            console.error(error);
-            alert("Error saving characteristic.");
+        } catch (error: any) {
+            console.error("Submit Error:", error);
+        
+            const message = error.response?.data?.error || "Error saving characteristic.";
+            setErrors(message);
+            alert(message);
         }
     };
     
@@ -95,11 +99,15 @@ const Characteristics: React.FC = () => {
             },
             withCredentials: true,
         });
+            setErrors("");
             fetchCharacteristics();
             alert("Characteristic deleted successfully!");
-        } catch (error) {
-            console.error("Error deleting characteristic:", error);
-            alert("Error deleting characteristic.");
+        } catch (error: any) {
+            console.error("Delete Error:", error);
+        
+            const message = error.response?.data?.error || "Error deleting characteristic.";
+            setErrors(message);
+            alert(message);
         }
     };
 

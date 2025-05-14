@@ -6,7 +6,7 @@ import api from "./api";
 
 (async function bootstrapCsrf() {
   try {
-    await api.get("/api/csrf-token");   // sets both cookie & header
+    await api.get("/auth/csrf-token");   // sets both cookie & header
   } catch (err) {
     console.error("CSRF bootstrap failed", err);
   }

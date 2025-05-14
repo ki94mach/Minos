@@ -58,6 +58,8 @@ const Treatments: React.FC = () => {
     const regimenOptions = treatments.filter(t => t.type === "Regimen");
     const [selectedRegimenId, setSelectedRegimenId] = useState<string>("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [errors, setErrors] = useState<string>("");
+
 
     useEffect(() => {
         fetchDrugs();
@@ -221,12 +223,14 @@ const Treatments: React.FC = () => {
             await axios.post("http://localhost:5000/api/treatments", payload, config);
             alert("Treatment added.");
           }
-      
+          setErrors("");
           fetchTreatments();
           resetForm();
           setEditingTreatmentId(null); 
         } catch (error: any) {
-          alert(error.response?.data?.error || "Error submitting treatment");
+          const errorMessage = error.response?.data?.error || "Error submitting treatment";
+          setErrors(errorMessage); 
+          alert(errorMessage); 
         }
       };
       
@@ -288,11 +292,13 @@ const Treatments: React.FC = () => {
               "X-CSRFToken": csrfToken || "",
             },
           });
-      
+          setErrors("");
           fetchTreatments();
           alert("Treatment deleted.");
         } catch (error: any) {
-          alert(error.response?.data?.error || "Error deleting treatment");
+          const errorMessage = error.response?.data?.error || "Error deleting treatment";
+          setErrors(errorMessage); 
+          alert(errorMessage);
         }
       };
       
@@ -395,7 +401,31 @@ const Treatments: React.FC = () => {
                                 <Typography variant="subtitle2">Current Alternatives:</Typography>
                                 {alternatives.map((alt, i) => (
                                     <Paper key={i} sx={{ p: 2, mb: 2 }}>
-                                        <Typography variant="body2"><strong>{alt.name}</strong> (Ratio: {alt.ratio})</Typography>
+                                        <Grid container spacing={1} alignItems="center">
+                                          <Grid item xs={8}>
+                                            <Typography variant="body2"><strong>{alt.name}</strong></Typography>
+                                          </Grid>
+                                          <Grid item xs={4}>
+                                            <TextField
+                                              fullWidth
+                                              type="number"
+                                              label="Ratio"
+                                              value={alt.ratio}
+                                              onChange={(e) => {
+                                                const updated = [...alternatives];
+                                                let val = parseFloat(e.target.value);
+                                                if (isNaN(val)) val = 0;
+                                                if (val > 1) val = 1;
+                                                if (val < 0) val = 0;
+                                                updated[i].ratio = val;
+                                                setAlternatives(updated);
+                                              }}
+                                              inputProps={{ min: 0, max: 1, step: 0.01 }}
+                                              size="small"
+                                            />
+                                          </Grid>
+                                        </Grid>
+
                                     
                                         <Button size="small" color="error" onClick={() => setAlternatives(alternatives.filter((_, idx) => idx !== i))}>Remove</Button>
                                     </Paper>
@@ -407,6 +437,11 @@ const Treatments: React.FC = () => {
                             <Button type="submit" variant="contained">Submit</Button>
                         </Box>
                     </form>
+                    {errors && (
+                      <Typography color="error" sx={{ mt: 2 }}>
+                        {errors}
+                      </Typography>
+                    )}
                 </CardContent>
             </Card>
             {treatments.length > 0 && (

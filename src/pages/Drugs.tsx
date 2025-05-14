@@ -21,6 +21,8 @@ const Drugs: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState<string>("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [errors, setErrors] = useState("");
+
 
     useEffect(() => {
         fetchDrugs();
@@ -81,11 +83,12 @@ const Drugs: React.FC = () => {
             setName("");
             setStrength("");
             setUnit("mg");
-
+            setErrors("");
             fetchDrugs();
         } catch (error: any) {
             console.error("Error adding drug:", error);
             const errorMessage = error.response?.data?.error || "Error adding drug.";
+            setErrors(errorMessage); 
             alert(errorMessage);
         }
     };
@@ -108,12 +111,15 @@ const Drugs: React.FC = () => {
               "X-CSRFToken": csrfToken || "",
             },
           });
-    
+          setErrors("");
           fetchDrugs();
           alert("Drug deleted successfully!");
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error deleting drug:", error);
-          alert("Error deleting drug.");
+          const errorMessage = error.response?.data?.error || "Error deleting drug.";
+          setErrors(errorMessage);
+          alert(errorMessage);
+          
         }
       };
 
@@ -210,8 +216,15 @@ const Drugs: React.FC = () => {
           )}
         </CardContent>
       </Card>
+      {/* {errors && (
+      <Typography color="error" sx={{ mt: 2 }}>
+          {errors}
+      </Typography>
+  )} */}
         </Container>
     );
+    
+  
 };
 
 export default Drugs;
