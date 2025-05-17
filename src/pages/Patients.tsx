@@ -28,10 +28,15 @@ import axios from "axios";
 import BackButton from "../components/BackButton";
 import CustomNode from "../components/CustomNode";
 import Cookies from "js-cookie";
+import { useNavigate, useParams } from "react-router-dom";
 
 /* -------------------------------------------------------------------------- */
 /*                                helpers                                     */
 /* -------------------------------------------------------------------------- */
+// interface PatientsProps {
+//   rootId?: string | null;
+// }
+
 interface CustomNodeProps extends NodeProps {
   setNodes?: React.Dispatch<React.SetStateAction<any[]>>;
 }
@@ -40,9 +45,21 @@ const nodeTypes: NodeTypes = {
   custom: (props: NodeProps) => <CustomNode {...props} />,
 };
 
+function findNodeById(node: any, id: string): any | null {
+  const nodeId = node.characteristic_data?.name || node._id?.$oid || node._id;
+  if (nodeId === id) return node;
+  if (!node.children) return null;
+  for (const child of node.children) {
+    const found = findNodeById(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
 /* -------------------------------------------------------------------------- */
 /*                               component                                    */
 /* -------------------------------------------------------------------------- */
+// const Patients: React.FC<PatientsProps> = ({ rootId = null }) => {
 const Patients: React.FC = () => {
   /* ------------------------------ state ----------------------------------- */
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -62,8 +79,19 @@ const Patients: React.FC = () => {
     | { _id: string; type: string; name: string }
     | null
   >(null);
+  // const [selectedRootId, setSelectedRootId] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { rootId } = useParams<{ rootId?: string }>();
+  const selectedRootId = rootId ?? null;
+  const isOverview = selectedRootId === null;
 
   /* ----------------------------- effects ---------------------------------- */
+
+  useEffect(() => {
+      // each time the URL’s :rootId changes we re-draw
+       drawPatientNodes();
+    }, [selectedRootId]);
+  
   // fetch patients list for the list‑view (grid at top of page)
   useEffect(() => {
     const fetchPatients = async () => {
@@ -149,6 +177,13 @@ const Patients: React.FC = () => {
     [setEdges]
   );
 
+  const onNodeClick = (_: any, node: any) => {
+    if (!rootId) {
+      navigate(`/patients/${node.id}`);
+    }
+  };
+  
+
   /* -------------------------- form submit -------------------------------- */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,85 +239,147 @@ const Patients: React.FC = () => {
   /* ---------------------------------------------------------------------- */
   /*   Build the merged graph of *all* patient trees without duplicates     */
   /* ---------------------------------------------------------------------- */
-  const drawPatientNodes = async () => {
+  // const drawPatientNodes = async (rootId: string | null = null, depthLimit: number = Infinity) => {
+  const drawPatientNodes = async (depthLimit: number = (selectedRootId ? Infinity : 1)) => {
     try {
       const { data } = await axios.get("http://localhost:5000/api/patients");
       const parsedPatients = data.map((item: string) => JSON.parse(item));
 
+      const roots = selectedRootId
+      ? parsedPatients
+          .map((p:any) => findNodeById(p.tree, selectedRootId))
+          .filter((n: any) => n != null)
+      : parsedPatients.map((p:any) => p.tree);
+
+
+
       /* -------------------------------------------------------------
        * Global registries for this draw call – one per _run_.
        * ----------------------------------------------------------- */
-      const nodesById = new Map<string, any>(); // deduplication map
+      const isOverview = selectedRootId === null;
+      const CENTER_X = 400;
+      const CENTER_Y = 250;
+      const OVERVIEW_RADIUS = 400;
+      const H_SPACING = 200;
+      const V_SPACING = 150;
+  
+      // dedupe & accumulate
+      const nodesById = new Map<string, any>();
       const edges: Edge[] = [];
-      const rootPositions = new Map<string, { x: number; y: number }>();
-
-      let nextRootX = 0; // running horizontal offset for new root nodes
-
+      let nextRootX = 0;
       /* -------------------------------------------------------------
        * recursive DFS that respects the global registries
        * ----------------------------------------------------------- */
+      
       const buildFlowNodes = (
         node: any,
         depth: number,
         index: number,
         parentId: string | null = null,
-        parentX = 0
-      ) => {
-        const nodeId = node._id?.$oid || node._id;
+        parentSize: number,
+        siblingsCount: number 
+      ) => {        
+        
+        if (depth > depthLimit) return;
+        
+        const nodeId = node.characteristic_data?.name || node._id?.$oid || node._id;
+        const nodeRate = node.rate ?? 1;
+        const nodeSize = depth === 0 ? node.size ?? 0 : parentSize * nodeRate;
 
-        /* 1️⃣  Add a node only the first time we meet its _id */
-        if (!nodesById.has(nodeId)) {
-          // decide position
-          let position: { x: number; y: number };
-          if (depth === 0) {
-            if (rootPositions.has(nodeId)) {
-              position = rootPositions.get(nodeId)!;
-            } else {
-              position = { x: nextRootX, y: 0 };
-              rootPositions.set(nodeId, position);
-              nextRootX += 300; // space between root trees
-            }
-          } else {
-            position = { x: parentX + index * 200, y: depth * 180 };
-          }
+          // Skip if we’re showing a subtree and this node isn't under the selected root
+      if (rootId && depth === 0 && nodeId !== rootId) return;
+      /* 1️⃣  Add a node only the first time we meet its _id */
+      if (!nodesById.has(nodeId)) {
+        nodesById.set(nodeId, {
+          id: nodeId,
+          position: { x: 0, y: 0 },
+          type: "custom",
+          data: {
+            label:
+              node.characteristic_data?.name ||
+              node.treatment_data?.name ||
+              "Node",
+            type: node.node_type,
+            size: nodeSize,
+            rate: nodeRate,
+            drugs:
+              node.treatment_data?.regimen?.drugs?.map((d: any) => d.drug) || [],
+            onClick: () => navigate(`/patients/${nodeId}`),
+          },
+        });
+      }
 
-          nodesById.set(nodeId, {
-            id: nodeId,
-            position,
-            type: "custom",
-            data: {
-              label:
-                node.characteristic_data?.name ||
-                node.treatment_data?.name ||
-                "Node",
-              type: node.node_type,
-              size: node.size,
-              rate: node.rate,
-              drugs:
-                node.treatment_data?.regimen?.drugs?.map((d: any) => d.drug) || [],
-            },
-          });
+      /* 2️⃣  Edge creation – many edges can point to the same node */
+      if (parentId) {
+        edges.push({
+          id: `${parentId}->${nodeId}`,
+          source: parentId,
+          target: nodeId,
+        });
+      }
+
+       // 3️⃣ figure out position
+       const record = nodesById.get(nodeId)!;
+       let { x, y } = record.position;      
+ 
+      if (depth === 0) {
+        // ── ROOT LAYOUT ───────────────────────────────
+        if (isOverview) {
+          // place each root on a circle
+          const step = (2 * Math.PI) / roots.length;
+          const angle = Math.PI + (step * index)/4 ; // start at 180° (left)
+          x = CENTER_X + OVERVIEW_RADIUS * Math.cos(angle);
+          y = CENTER_Y + OVERVIEW_RADIUS * Math.sin(angle);
+        } else {
+          // drilled‐in: simple row
+          x = nextRootX;
+          y = 100;
+          nextRootX += H_SPACING;
         }
+      } else {
+        // ── CHILD LAYOUT ──────────────────────────────
+      if (!parentId) return; 
+      if (isOverview) {
+        const parent = nodesById.get(parentId!)!;
+        const step = (2 * Math.PI) / siblingsCount;
+        const angle = step * index;
+        x = parent.position.x + OVERVIEW_RADIUS * Math.cos(angle);
+        y = parent.position.y + OVERVIEW_RADIUS * Math.sin(angle);
+      } else {
+        // drilled‐in: top-down tree
+        const parent = nodesById.get(parentId!)!;
+        y = parent.position.y + V_SPACING;
+        x =
+          parent.position.x +
+          (index - (siblingsCount - 1) / 2) * H_SPACING;
+      }
+    }
+    record.position = { x, y };
 
-        /* 2️⃣  Edge creation – many edges can point to the same node */
-        if (parentId) {
-          edges.push({
-            id: `${parentId}->${nodeId}`,
-            source: parentId,
-            target: nodeId,
-          });
-        }
+        /* 3️⃣ Recurse over children */
+    const kids = node.children || [];
+    kids.forEach((child: any, i: number) =>
+      buildFlowNodes(
+          child,
+          depth + 1,
+          i,
+          nodeId,
+          nodeSize,
+          kids.length  // Pass the actual number of children
+      )
+  );
+};
 
-        /* 3️⃣  Recurse over children */
-        (node.children || []).forEach((child: any, i: number) =>
-          buildFlowNodes(child, depth + 1, i, nodeId, nodesById.get(nodeId)!.position.x)
-        );
-      };
-
-      /* walk every patient's tree */
-      parsedPatients.forEach((p: any) => {
-        if (p.tree) buildFlowNodes(p.tree, 0, 0);
-      });
+  roots.forEach((rootNode: any, idx: number) =>
+    buildFlowNodes(
+      rootNode,
+      0,                // depth
+      idx,              // index among roots
+      null,             // no parent
+      rootNode.size ?? 0,
+      (rootNode.children || []).length
+    )
+  );
 
       setNodes(Array.from(nodesById.values()));
       setEdges(edges);
@@ -303,90 +400,16 @@ const Patients: React.FC = () => {
       </Typography>
 
       {/* ---------------------- new patient form ----------------------- */}
-      <Card className="mb-8">
-        <CardContent>
-          <Typography variant="h5" gutterBottom>
-            New Patient Tree
-          </Typography>
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Characteristic Type</InputLabel>
-                  <Select
-                    value={selectedCharType}
-                    label="Characteristic Type"
-                    onChange={(e) => setSelectedCharType(e.target.value)}
-                  >
-                    {charTypes.map((t) => (
-                      <MenuItem key={t} value={t}>
-                        {t}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
 
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth disabled={!selectedCharType}>
-                  <InputLabel>Characteristic Name</InputLabel>
-                  <Select
-                    value={selectedCharName}
-                    label="Characteristic Name"
-                    onChange={(e) => {
-                      const name = e.target.value;
-                      setSelectedCharName(name);
-                      const found = allCharacteristics.find(
-                        (c) => c.name === name && c.type === selectedCharType
-                      );
-                      setSelectedCharObj(found || null);
-                    }}
-                  >
-                    {charNames.map((n) => (
-                      <MenuItem key={n} value={n}>
-                        {n}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Population</InputLabel>
-                  <Select
-                    value={selectedPopulation}
-                    label="Population"
-                    onChange={(e) => setSelectedPopulation(e.target.value)}
-                  >
-                    <MenuItem value="Custom Population">Custom Population</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              {selectedPopulation === "Custom Population" && (
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    required
-                    type="number"
-                    label="Enter Population Number"
-                    inputProps={{ min: 1 }}
-                    value={customPopulationNumber}
-                    onChange={(e) => setCustomPopulationNumber(e.target.value)}
-                  />
-                </Grid>
-              )}
-
-              <Grid item xs={12}>
-                <Button type="submit" variant="contained" fullWidth>
-                  Create Patient Tree
-                </Button>
-              </Grid>
-            </Grid>
-          </form>
-        </CardContent>
-      </Card>
+      {rootId && (
+        <Button
+          variant="contained"
+          onClick={() => navigate("/patients")}
+          sx={{ mb: 2 }}
+        >
+          Back to All Roots
+        </Button>
+      )}
 
       {/* -------------------- draw/refresh button ---------------------- */}
       <Button
@@ -394,7 +417,7 @@ const Patients: React.FC = () => {
         color="secondary"
         fullWidth
         className="my-4"
-        onClick={drawPatientNodes}
+        onClick={() => navigate("/patients")}
       >
         Draw Patients Map
       </Button>
@@ -419,6 +442,7 @@ const Patients: React.FC = () => {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeClick={onNodeClick}
           fitView
           nodeTypes={nodeTypes}
         >

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Handle, Position, useReactFlow } from "reactflow";
+import { useNavigate } from "react-router-dom";
 
 const CustomNode = ({ id, data }: { id: string; data: any  }) => {
+    const navigate = useNavigate();
     const { setNodes, getNodes } = useReactFlow();
     const [isEditing, setIsEditing] = useState(false);
     const [label, setLabel] = useState(data.label);
@@ -67,10 +69,13 @@ const CustomNode = ({ id, data }: { id: string; data: any  }) => {
                 flexDirection: "column",
                 alignItems: "center"
             }}
-            onDoubleClick={(e) => {
+            onClick={() => {
+                if (!isEditing) data.onClick?.();
+              }}
+              onDoubleClick={(e) => {
                 e.preventDefault();
-                setIsEditing(true);
-            }}
+                if (data?.depth > 0) setIsEditing(true);
+              }}
             onBlur={handleBlur}
             tabIndex={-1}
         >
