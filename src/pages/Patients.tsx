@@ -29,6 +29,7 @@ import BackButton from "../components/BackButton";
 import CustomNode from "../components/CustomNode";
 import Cookies from "js-cookie";
 import { useNavigate, useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 /* -------------------------------------------------------------------------- */
 /*                                helpers                                     */
@@ -84,6 +85,9 @@ const Patients: React.FC = () => {
   const { rootId } = useParams<{ rootId?: string }>();
   const selectedRootId = rootId ?? null;
   const isOverview = selectedRootId === null;
+  const COLORS = ["#FFD700", "#87CEEB", "#90EE90", "#FFB6C1", "#D3D3D3"];
+  const location = useLocation();
+  const mapColor = location.state?.color || "#ffffff"; // default to white
 
   /* ----------------------------- effects ---------------------------------- */
 
@@ -179,10 +183,11 @@ const Patients: React.FC = () => {
 
   const onNodeClick = (_: any, node: any) => {
     if (!rootId) {
-      navigate(`/patients/${node.id}`);
+      navigate(`/patients/${node.id}`, {
+        state: { color: node.data.color },
+      });
     }
   };
-  
 
   /* -------------------------- form submit -------------------------------- */
   const handleSubmit = async (e: React.FormEvent) => {
@@ -277,14 +282,18 @@ const Patients: React.FC = () => {
         index: number,
         parentId: string | null = null,
         parentSize: number,
-        siblingsCount: number 
+        siblingsCount: number,
+        inheritedColor: string
       ) => {        
         
         if (depth > depthLimit) return;
         
         const nodeId = node.characteristic_data?.name || node._id?.$oid || node._id;
         const nodeRate = node.rate ?? 1;
-        const nodeSize = depth === 0 ? node.size ?? 0 : parentSize * nodeRate;
+        const nodeSize =
+          typeof node.size === "number"
+            ? node.size
+            : parentSize * nodeRate;
 
           // Skip if we’re showing a subtree and this node isn't under the selected root
       if (rootId && depth === 0 && nodeId !== rootId) return;
@@ -304,6 +313,9 @@ const Patients: React.FC = () => {
             rate: nodeRate,
             drugs:
               node.treatment_data?.regimen?.drugs?.map((d: any) => d.drug) || [],
+            alternatives:
+              node.treatment_data?.alternatives || [],
+            color: inheritedColor,
             onClick: () => navigate(`/patients/${nodeId}`),
           },
         });
@@ -365,7 +377,8 @@ const Patients: React.FC = () => {
           i,
           nodeId,
           nodeSize,
-          kids.length  // Pass the actual number of children
+          kids.length,
+          inheritedColor   
       )
   );
 };
@@ -376,8 +389,9 @@ const Patients: React.FC = () => {
       0,                // depth
       idx,              // index among roots
       null,             // no parent
-      rootNode.size ?? 0,
-      (rootNode.children || []).length
+      (typeof rootNode.size === "number" && rootNode.size > 0 ? rootNode.size : 100),
+      (rootNode.children || []).length,
+      COLORS[idx % COLORS.length]
     )
   );
 
@@ -412,7 +426,7 @@ const Patients: React.FC = () => {
       )}
 
       {/* -------------------- draw/refresh button ---------------------- */}
-      <Button
+      {/* <Button
         variant="contained"
         color="secondary"
         fullWidth
@@ -420,7 +434,7 @@ const Patients: React.FC = () => {
         onClick={() => navigate("/patients")}
       >
         Draw Patients Map
-      </Button>
+      </Button> */}
 
       {/* ------------------------- legend ----------------------------- */}
       <Box display="flex" gap={2} alignItems="center" mb={1}>
@@ -435,7 +449,7 @@ const Patients: React.FC = () => {
       </Box>
 
       {/* ----------------------- react‑flow --------------------------- */}
-      <div style={{ height: 500, width: "100%", border: "1px solid #ddd" }}>
+      <div style={{ height: 500, width: "100%", border: "1px solid #ddd", backgroundColor: mapColor, transition: "background-color 0.5s ease", }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}

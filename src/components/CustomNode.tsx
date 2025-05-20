@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Handle, Position, useReactFlow } from "reactflow";
 import { useNavigate } from "react-router-dom";
+import { Tooltip } from "@mui/material";
 
 const CustomNode = ({ id, data }: { id: string; data: any  }) => {
     const navigate = useNavigate();
@@ -55,87 +56,103 @@ const CustomNode = ({ id, data }: { id: string; data: any  }) => {
     // }, [getNodes]);
 
     return (
-        <div
-            ref={containerRef}
-            style={{
-                padding: "10px",
-                borderRadius: "5px",
-                background: "#fff",
-                border: `2px solid ${borderColor}`,
-                textAlign: "center",
-                minWidth: "150px",
-                cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center"
-            }}
-            onClick={() => {
-                if (!isEditing) data.onClick?.();
-              }}
-              onDoubleClick={(e) => {
-                e.preventDefault();
-                if (data?.depth > 0) setIsEditing(true);
-              }}
-            onBlur={handleBlur}
-            tabIndex={-1}
-        >
-            {isEditing ? (
-                <>
+            <Tooltip
+            title={
+                isTreatment ? (
+                  data.alternatives && data.alternatives.length > 0 ? (
+                    <div>
+                      {data.alternatives.map((alt: any, i: number) => (
+                        <div key={i} style={{ marginBottom: "8px" }}>
+                          <strong>{alt.name}</strong>
+                          {alt.regimen?.drugs && Array.isArray(alt.regimen.drugs) && (
+                            <ul style={{ paddingLeft: "16px", marginTop: "4px" }}>
+                              {alt.regimen.drugs.map((d: any, j: number) => (
+                                <li key={j}>
+                                  {d.drug.name} – {d.drug.strength} {d.drug.unit}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    // fallback if no alternatives
+                    Array.isArray(data?.drugs) && data.drugs.length > 0 ? (
+                      <div>
+                        {data.drugs.map((d: any, i: number) => (
+                          <div key={i}>
+                            {d.name} – {d.strength} {d.unit}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      "No drug info available"
+                    )
+                  )
+                ) : ""
+              }
+              arrow
+              placement="bottom"
+            >
+              <div
+                ref={containerRef}
+                style={{
+                  padding: "10px",
+                  borderRadius: "5px",
+                  background: "#fff",
+                  border: `2px solid ${borderColor}`,
+                  textAlign: "center",
+                  minWidth: "150px",
+                  cursor: "pointer",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center"
+                }}
+                onClick={() => {
+                  if (!isEditing) data.onClick?.();
+                }}
+                onDoubleClick={(e) => {
+                  e.preventDefault();
+                  if (data?.depth > 0) setIsEditing(true);
+                }}
+                onBlur={handleBlur}
+                tabIndex={-1}
+              >
+                {isEditing ? (
+                  <>
                     <input
-                        type="text"
-                        value={label}
-                        onChange={(e) => setLabel(e.target.value)}
-                        style={{ width: "80%", marginBottom: "5px", textAlign: "center" }}
-                        ref={labelInputRef}
+                      type="text"
+                      value={label}
+                      onChange={(e) => setLabel(e.target.value)}
+                      style={{ width: "80%", marginBottom: "5px", textAlign: "center" }}
+                      ref={labelInputRef}
                     />
-                    
                     <input
-                        type="number"
-                        value={number}
-                        onChange={(e) => setNumber(e.target.value)}
-                        style={{ 
-                            width: "80%", 
-                            textAlign: "center", 
-                            WebkitAppearance: "none", 
-                            appearance: "none", 
-                            MozAppearance: "textfield" 
-                        }}
-                        ref={numberInputRef} 
+                      type="number"
+                      value={number}
+                      onChange={(e) => setNumber(e.target.value)}
+                      style={{
+                        width: "80%",
+                        textAlign: "center",
+                        WebkitAppearance: "none",
+                        appearance: "none",
+                        MozAppearance: "textfield"
+                      }}
+                      ref={numberInputRef}
                     />
-                    <style>{`
-                        /* Remove spinner elements for Webkit browsers */
-                        input[type="number"]::-webkit-outer-spin-button,
-                        input[type="number"]::-webkit-inner-spin-button {
-                            -webkit-appearance: none;
-                            margin: 0;
-                        }
-
-                        /* Remove spinner elements for Firefox */
-                        input[type="number"] {
-                            -moz-appearance: textfield;
-                        }
-                    `}</style>
-                </>
-            ) : (
-                <>
+                  </>
+                ) : (
+                  <>
                     {data?.label && <strong>{data.label}</strong>}
                     {data?.size !== undefined && <div>Size: {data.size}</div>}
-                    {isTreatment && Array.isArray(data?.drugs) && (
-                        <ul style={{ padding: 0, margin: 0, listStyle: "none" }}>
-                            {data.drugs.map((d: any, i: number) => (
-                                <li key={i} style={{ marginTop: "4px" }}>
-                                    {d.name} - {d.strength} {d.unit}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </>
-            )}
-
-            <Handle type="target" position={Position.Top} />
-            <Handle type="source" position={Position.Bottom} />
-        </div>
-    );
+                  </>
+                )}
+                <Handle type="target" position={Position.Top} />
+                <Handle type="source" position={Position.Bottom} />
+              </div>
+            </Tooltip>
+          );
 };
 
 export default CustomNode;
