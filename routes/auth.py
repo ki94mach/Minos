@@ -47,7 +47,7 @@ def get_csrf_token():
 def login_get():
     # if session.get('user_id'):
     #     return redirect(url_for('api.get_characteristics'))
-    return render_template('login.html')
+    return render_template('index.html')
 
 
 @auth_blueprint.route('/login', methods=['POST'])

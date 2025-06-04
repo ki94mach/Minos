@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import api from "./api";
 
+
 (async function bootstrapCsrf() {
   try {
     await api.get("/auth/csrf-token");   // sets both cookie & header

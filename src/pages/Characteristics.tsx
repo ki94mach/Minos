@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { TextField, Button, Typography, Container, Card, CardContent, List, ListItem, ListItemText, IconButton } from "@mui/material";
+import { TextField, Button, Typography, Container, Card, CardContent, List, ListItem, ListItemText, IconButton, DialogTitle, Dialog, DialogContent } from "@mui/material";
 import { Edit, Delete } from "@mui/icons-material";
 import axios from "axios";
 import BackButton from "../components/BackButton";
 import Cookies from "js-cookie";
+import CharacteristicForm from "../components/CharacteristicForm";
+import {
+  listCharacteristics,
+  deleteCharacteristic,
+  CharacteristicItem,
+} from "../api/characteristics";
 
 interface Characteristic {
     _id: string;
@@ -18,6 +24,7 @@ const Characteristics: React.FC = () => {
     const [editingId, setEditingId] = useState("");
     const [errors, setErrors] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [editChar, setEditChar] = useState<Characteristic | null>(null);
 
     useEffect(() => {
         fetchCharacteristics();
@@ -86,6 +93,7 @@ const Characteristics: React.FC = () => {
         setType(char.type);
         setName(char.name);
         setEditingId(char._id);
+        setEditChar(char);
     };
 
     const handleDelete = async (char_id: string) => {
@@ -172,8 +180,23 @@ const Characteristics: React.FC = () => {
                     </List>
                 </CardContent>
             </Card>
+
+            {editChar && (
+        <Dialog open onClose={() => setEditChar(null)}>
+          <DialogTitle>Edit characteristic</DialogTitle>
+          <DialogContent>
+            <CharacteristicForm
+              initial={editChar}
+              onSaved={() => { setEditChar(null); fetchCharacteristics(); }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
         </Container>
+
+        
     );
+   
 };
 
 export default Characteristics;
