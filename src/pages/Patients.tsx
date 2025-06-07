@@ -30,12 +30,15 @@ import { useLocation } from "react-router-dom";
 import { mul, format } from "../components/math";
 import Decimal from "decimal.js";
 import CharacteristicForm from "../components/CharacteristicForm";
+import EditCharacteristicForm from "../components/EditCharacteristicForm";
 import TreatmentForm      from "../components/TreatmentForm";
 import { CharacteristicItem } from "../api/characteristics";
 import { Treatment } from "../components/TreatmentForm";
 import FollowupForm from "../components/FollowupForm";
 import { FollowupItem as Followup } from "../components/FollowupForm";
 import { log } from "console";
+import { logDOM } from "@testing-library/dom";
+import EditTreatmentForm from "../components/EditTreatmentForm";
 
 
 /* -------------------------------------------------------------------------- */
@@ -57,6 +60,23 @@ function getUniqueCharId(node: any): string {
     node._id?.$oid ||
     node._id
   );
+}
+
+interface EditCharModalData {
+  nodeId: string;             
+  currentCharId: string;      
+  currentType: string;       
+  currentName: string;        
+  currentRate: number;
+  patientId: string;
+  parentId: string;
+}
+
+interface EditTreatModalData {
+  nodeId: string;           
+  currentTreatId: string;
+  currentRate: number;
+  patientId: string;
 }
 
 
@@ -132,6 +152,10 @@ const Patients: React.FC = () => {
   const [debouncedNodes, setDebouncedNodes] = useState<any[]>([]);
   const [debouncedEdges, setDebouncedEdges] = useState<any[]>([]);
 
+  const [editCharModalData, setEditCharModalData] = useState<EditCharModalData | null>(null);
+  const [allTreatments, setAllTreatments] = useState<Treatment[]>([]);
+  const [editTreatModalData, setEditTreatModalData] = useState<EditTreatModalData|null>(null);
+
   
   
 
@@ -175,29 +199,125 @@ const [editTrt,  setEditTrt ]   = useState<Treatment | null>(null);
 const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
 
   const location = useLocation();
+  const patientId = location.state?.treeId || "";
+  const patientTreeId = location.state?.treeId as string; 
   const mapColor = location.state?.color || "#ffffff"; // default to white
 
-  function editNode(nodeId: string) {
-    const n = nodes.find((x: any) => x.id === nodeId);
+  function editNode(uniqueCharOrTreatId: string) {
+    // Find the clicked node in React‐Flow state (nodes[])
+    const n = nodes.find((x: any) => x.id === uniqueCharOrTreatId);
     if (!n) return;
+  
+    // common: we still need to know the patientTreeId for any update
+    // if (!patientTreeId) {
+    //   alert("Error: missing patientTreeId.");
+    //   return;
+    // }
+  
+    // (A) First, fetch the whole PatientTree document from the server
+    axios
+    .get("http://localhost:5000/api/patients")
+    .then((res) => {
+      // 'res.data' is an array of strings (each string is JSON of one patient).
+      const parsedList = res.data.map((item: string) => JSON.parse(item));
+      // Find the one whose _id (or _id.$oid) matches patientTreeId:
+      let patientDoc = parsedList.find((p: any) => {
+        const pid = p._id?.$oid || p._id;
+        return pid === patientTreeId;
+      });
+      if (!patientDoc) {
+        for (const p of parsedList) {
+          // p.tree is the root of this patient’s embedded‐tree
+          const maybeMatch = findNodeById(p.tree, uniqueCharOrTreatId);
+          if (maybeMatch) {
+            patientDoc = p;
+            break;
+          }
+        }
+      }
+  
+      if (!patientDoc) {
+        alert("Could not find that patient in the list.");
+        return;
+      }
 
-    if (n.data.type === "treatment") {
-      setEditTrt({
-        _id: nodeId,
-        name: n.data.label,
-        type: n.data.treatmentKind ?? "Treatment",
-        regimen: n.data.regimen,
-        alternatives: n.data.alternatives,
+      const realPatientId: string = patientDoc._id?.$oid || patientDoc._id;
+  
+      // Now you have the full tree object:
+      const treeObj = patientDoc.tree;
+      const foundNode = findNodeById(treeObj, uniqueCharOrTreatId);
+      if (!foundNode) {
+        alert("Node not found inside this patient’s tree.");
+        return;
+      }
+  
+        // (C) Extract the actual Mongo‐stored node._id (string) for the update URL
+        const realNodeId: string = foundNode._id?.$oid || foundNode._id;
+
+        const existingParentId: string = 
+        foundNode.parent_id?._id?.$oid || foundNode.parent_id;
+        
+        // (D) Now check if this is a characteristic‐node or a treatment‐node,
+        // and open the appropriate modal with its data.
+  
+        if (n.data.type === "characteristic") {
+          // Pull out the existing characteristic_data + rate
+          const existingType = foundNode.characteristic_data?.type || "";
+          const existingName = foundNode.characteristic_data?.name || "";
+          const existingRate = foundNode.rate ?? 0;
+          // const existingParentId: string = foundNode.parent_id?._id?.$oid || foundNode.parent_id;
+  
+          // Pass those values into the Characteristic‐edit dialog
+          setEditCharModalData({
+            nodeId: realNodeId,
+            currentCharId: uniqueCharOrTreatId,  // this was characteristic_data._id
+            currentType: existingType,
+            currentName: existingName,
+            currentRate: existingRate,
+            patientId: realPatientId,
+            parentId: existingParentId
+          });
+        }
+        else if (n.data.type === "treatment") {
+          // Pull out the treatment_data payload from foundNode
+          // const treatData = foundNode.treatment_data || {};
+          // const existingName = treatData.name || "";
+          // const existingRegimen = treatData.regimen || {};
+          // const existingAlternatives = treatData.alternatives || [];
+          // const existingRate = foundNode.rate ?? 0;
+  
+          // Now set up your treatment‐edit modal state (you’ll need
+          // a corresponding `editTreatmentModalData` state variable, similar
+          // to editCharModalData). For example:
+          // setEditTreatmentModalData({
+          //   nodeId: realNodeId,
+          //   currentName: existingName,
+          //   currentRegimen: existingRegimen,
+          //   currentAlternatives: existingAlternatives,
+          //   currentRate: existingRate,
+          //   patientId: patientTreeId,
+          // });
+
+          const treatData = foundNode.treatment_data || {};
+          const existingRate = foundNode.rate ?? 0;
+          const realNodeId    = foundNode._id?.$oid || foundNode._id;
+          const realPatientId = patientDoc._id?.$oid || patientDoc._id;
+
+          setEditTreatModalData({
+            nodeId: realNodeId,
+            currentTreatId: uniqueCharOrTreatId, 
+            currentRate: existingRate,
+            patientId: realPatientId,
+          });
+        }
+  
+      })
+      .catch((err) => {
+        console.error("Failed to fetch patientTree for editing:", err);
+        alert("Could not load the patient’s tree for editing.");
       });
-    } else if (n.data.type === "characteristic") {
-      setEditChar({
-        _id: nodeId,
-        type: n.data.charType,
-        name: n.data.label,
-      });
-    }
-    //add followup edit
   }
+  
 
   function hashColor(str: string): string {
     let h = 0, s = 0, l = 0;
@@ -335,6 +455,19 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
       // each time the URL’s :rootId changes we re-draw
        drawPatientNodes();
     }, [selectedRootId]);
+
+  useEffect(() => {
+      // ...inside your existing fetch block...
+      axios.get("http://localhost:5000/api/treatments")
+        .then((r) => {
+          const list = r.data.map((x: string) => {
+            const o = JSON.parse(x);
+            return { ...o, _id: o._id.$oid };
+          });
+          setAllTreatments(list);
+        });
+  }, [selectedRootId]);
+    
   
   // fetch patients list for the list‑view (grid at top of page)
   useEffect(() => {
@@ -827,25 +960,25 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
 
     
         // Now loop over each parentId & its array of children:
-        // childrenByParent.forEach((childArray, parentId) => {
-        //   const parentNode = nodesById.get(parentId);
-        //   if (!parentNode) return; // safety
+        childrenByParent.forEach((childArray, parentId) => {
+          const parentNode = nodesById.get(parentId);
+          if (!parentNode) return; // safety
     
-        //   const px = parentNode.position.x;
-        //   const py = parentNode.position.y;
-        //   const totalKids = childArray.length;  
+          const px = parentNode.position.x;
+          const py = parentNode.position.y;
+          const totalKids = childArray.length;  
     
-        //   childArray.forEach((childId, idx) => {
-        //     const childNode = nodesById.get(childId);
-        //     if (!childNode) return;
+          childArray.forEach((childId, idx) => {
+            const childNode = nodesById.get(childId);
+            if (!childNode) return;
     
-        //     // Spread them evenly in a small circle of radius R around (px, py)
-        //     const angle = (2 * Math.PI * idx) / totalKids;
-        //     const cx = px + R * Math.cos(angle);
-        //     const cy = py + R * Math.sin(angle);
-        //     childNode.position = { x: cx, y: cy };
-        //   });
-        // });
+            // Spread them evenly in a small circle of radius R around (px, py)
+            const angle = (2 * Math.PI * idx) / totalKids;
+            const cx = px + R * Math.cos(angle);
+            const cy = py + R * Math.sin(angle);
+            childNode.position = { x: cx, y: cy };
+          });
+        });
 
         
     
@@ -967,7 +1100,7 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
           </Menu>
 
           {/* ===== “Edit Characteristic” dialog ===== */}
-          {editChar && (
+          {/* {editChar && (
             <Dialog open onClose={() => setEditChar(null)} maxWidth="md" fullWidth>
               <DialogTitle>Edit characteristic</DialogTitle>
               <DialogContent dividers>
@@ -980,24 +1113,54 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
                 />
               </DialogContent>
             </Dialog>
-          )}
+          )} */}
+          {editCharModalData && (
+              <Dialog
+                open={true}
+                onClose={() => setEditCharModalData(null)}
+                maxWidth="sm"
+                fullWidth
+              >
+                <DialogTitle>Edit Characteristic Node</DialogTitle>
+                <DialogContent dividers>
+                  <EditCharacteristicForm
+                    allChars={allCharacteristics}
+                    editData={editCharModalData}
+                    // patientId={editCharModalData.patientId} 
+                    onCancel={() => setEditCharModalData(null)}
+                    onSave={() => {
+                      setEditCharModalData(null);
+                      drawPatientNodes(); 
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
           {/* ─── end “Edit Characteristic” ─── */}
     
           {/* ===== “Edit Treatment” dialog ===== */}
-          {editTrt && (
-            <Dialog open onClose={() => setEditTrt(null)} maxWidth="md" fullWidth>
-              <DialogTitle>Edit treatment</DialogTitle>
+          {editTreatModalData && (
+            <Dialog
+              open={true}
+              onClose={() => setEditTreatModalData(null)}
+              maxWidth="sm"
+              fullWidth
+            >
+              <DialogTitle>Edit Treatment Node</DialogTitle>
               <DialogContent dividers>
-                <TreatmentForm
-                  initial={editTrt ?? undefined}
-                  onSaved={async () => {
-                    setEditTrt(null);
-                    await drawPatientNodes(); // refresh the map
+                <EditTreatmentForm
+                  allTreatments={allTreatments}
+                  editData={editTreatModalData}
+                  onCancel={() => setEditTreatModalData(null)}
+                  onSave={() => {
+                    setEditTreatModalData(null);
+                    drawPatientNodes();
                   }}
                 />
               </DialogContent>
             </Dialog>
           )}
+
           {/* ─── end “Edit Treatment” ─── */}
     
         </div>
