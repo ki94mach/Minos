@@ -101,47 +101,63 @@ const CustomNode = (
     }
   };
 
+
+const tooltipContent = (() => {
+  if (nodeData.type === "treatment") {
+    if (nodeData.alternatives?.length) {
+      return (
+        <div>
+          {nodeData.alternatives.map((alt: any, i: number) => (
+            <div key={i} style={{ marginBottom: 8 }}>
+              <strong>
+                {alt.name} (Ratio: {alt.ratio})
+              </strong>
+              {!!alt.regimen?.drugs?.length && (
+                <ul style={{ paddingLeft: 16, marginTop: 4 }}>
+                  {alt.regimen.drugs.map((d: any, j: number) => (
+                    <li key={j}>
+                      {d.drug.name} – {d.drug.strength} {d.drug.unit} 
+                      (Consumption: {d.annual_patient_con})
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (nodeData.regimen?.drugs?.length) {
+      return (
+        <div>
+          {nodeData.regimen.drugs.map((d: any, i: number) => (
+            <div key={i}>
+              {d.drug.name} – {d.drug.strength} {d.drug.unit} 
+              (Consumption: {d.annual_patient_con})
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return "No drug info available";
+  }
+
+
+  if (nodeData.type === "characteristic") {
+    return nodeData.charType?? "Characteristic";
+  }
+  return "";
+})();
+
+const formattedSize =
+  nodeData.size !== undefined
+    ? Number(nodeData.size).toLocaleString()
+    : "";
+
   return (
     <Tooltip
-      title={
-        nodeData.type === "treatment" ? (
-          nodeData.alternatives && nodeData.alternatives.length > 0 ? (
-            <div>
-              {nodeData.alternatives.map((alt: any, i: number) => (
-                <div key={i} style={{ marginBottom: "8px" }}>
-                  <strong>
-                    {alt.name} (Ratio: {alt.ratio})
-                  </strong>
-                  {alt.regimen?.drugs && Array.isArray(alt.regimen.drugs) && (
-                    <ul style={{ paddingLeft: "16px", marginTop: "4px" }}>
-                      {alt.regimen.drugs.map((d: any, j: number) => (
-                        <li key={j}>
-                          {d.drug.name} – {d.drug.strength} {d.drug.unit} (Consumption:{" "}
-                          {d.annual_patient_con})
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : Array.isArray(nodeData.regimen?.drugs) &&
-            nodeData.regimen.drugs.length > 0 ? (
-            <div>
-              {nodeData.regimen.drugs.map((d: any, i: number) => (
-                <div key={i}>
-                  {d.drug.name} – {d.drug.strength} {d.drug.unit} (Consumption:{" "}
-                  {d.annual_patient_con})
-                </div>
-              ))}
-            </div>
-          ) : (
-            "No drug info available"
-          )
-        ) : (
-          ""
-        )
-      }
+      title={tooltipContent}
       arrow
       placement="bottom"
     >
@@ -189,7 +205,7 @@ const CustomNode = (
         ) : (
           <>
             {nodeData?.label && <strong>{nodeData.label}</strong>}
-            {nodeData?.size !== undefined && <div>Size: {nodeData.size}</div>}
+            {nodeData?.size !== undefined && <div>Size: {formattedSize}</div>}
           </>
         )}
         <Handle type="target" position={Position.Top} />

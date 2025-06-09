@@ -39,6 +39,7 @@ import { FollowupItem as Followup } from "../components/FollowupForm";
 import { log } from "console";
 import { logDOM } from "@testing-library/dom";
 import EditTreatmentForm from "../components/EditTreatmentForm";
+import dagre from 'dagre';
 
 
 /* -------------------------------------------------------------------------- */
@@ -157,7 +158,35 @@ const Patients: React.FC = () => {
   const [editTreatModalData, setEditTreatModalData] = useState<EditTreatModalData|null>(null);
 
   
-  
+  const NODE_WIDTH = 180
+const NODE_HEIGHT = 60
+
+function applyDagreLayout(nodes: any[], edges: any[]) {
+  const g = new dagre.graphlib.Graph()
+  g.setDefaultEdgeLabel(() => ({}))
+  g.setGraph({ rankdir: 'TB', ranksep: 50, nodesep: 20 })
+
+  // 1) register nodes & edges
+  nodes.forEach((n) =>
+    g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
+  )
+  edges.forEach((e) => g.setEdge(e.source, e.target))
+
+  // 2) run layout
+  dagre.layout(g)
+
+  // 3) read back positions
+  return nodes.map((n) => {
+    const { x, y } = g.node(n.id)
+    return {
+      ...n,
+      position: {
+        x: x - NODE_WIDTH / 2,
+        y: y - NODE_HEIGHT / 2,
+      },
+    }
+  })
+}
 
   const handleNodeContext = useCallback((e: React.MouseEvent, nodeId: string) => {
     e.preventDefault();
@@ -202,6 +231,9 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
   const patientId = location.state?.treeId || "";
   const patientTreeId = location.state?.treeId as string; 
   const mapColor = location.state?.color || "#ffffff"; // default to white
+
+  const parentNode = nodes.find(n => n.id === addingParentId);
+  const parentType = parentNode?.data.type; // e.g. "characteristic" | "treatment" | "followup"
 
   function editNode(uniqueCharOrTreatId: string) {
     // Find the clicked node in React‐Flow state (nodes[])
@@ -879,11 +911,6 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
             rootSizeDecimal = new Decimal(
               typeof rootNode.size === "number" ? rootNode.size : 1
             );
-            console.log(
-              "[drawPatientNodes] overview root (#" + idx + ") ID=" + getUniqueCharId(rootNode),
-              "→ sizeDecimal =",
-              rootSizeDecimal.toString()
-            );
           }
     
           buildFlowNodes(
@@ -902,9 +929,8 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
         // 4) AFTER DFS completes, do a “re‐layout” pass so that no two children of the same parent overlap:
         const R = 120; // radius (in px) for drawing children around parent
         const childrenByParent = new Map<string, string[]>();
-    
-        // Build a mapping: parentId → [ childId, childId, … ]
-        edges.forEach((edge) => {
+         // Build a mapping: parentId → [ childId, childId, … ]
+         edges.forEach((edge) => {
           const p = edge.source;
           const c = edge.target;
           if (!childrenByParent.has(p)) {
@@ -912,6 +938,48 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
           }
           childrenByParent.get(p)!.push(c);
         });
+
+        const allFlowNodes = Array.from(nodesById.values())
+        let finalNodes: typeof allFlowNodes
+
+        if (selectedRootId) {
+          // • DRILL MODE → top‐to‐bottom dagre layout
+          finalNodes = applyDagreLayout(allFlowNodes, edges)
+        } else {
+          // • OVERVIEW MODE → radial around the ‘Iran’ root
+          const center = { x: 400, y: 250 }
+          const R = 400
+        
+          // (a) figure out which node is the root
+          //     assume your first element in `roots` is the “Iran” node
+          const rootUniqueId = getUniqueCharId(roots[0])
+
+          // (b) position the root in the center
+          const rootNode = nodesById.get(rootUniqueId)!
+          rootNode.position = center
+
+          // (c) grab its immediate children
+          const firstRing = childrenByParent.get(rootUniqueId) || []
+
+          // (d) place them evenly around the circle
+          firstRing.forEach((childId, i) => {
+            const angle = (2 * Math.PI * i) / firstRing.length
+            const n = nodesById.get(childId)!
+            n.position = {
+              x: center.x + R * Math.cos(angle),
+              y: center.y + R * Math.sin(angle),
+            }
+          })
+
+          // (e) collect all
+          finalNodes = allFlowNodes
+        }
+        
+          // everyone else stays where dagre/grid put them (or you can default them)
+          setNodes(finalNodes)
+          setEdges(edges)
+          
+       
 
         const depthMap = new Map<string, number>();
         const assignDepth = (nodeId: string, depth: number) => {
@@ -960,34 +1028,42 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
 
     
         // Now loop over each parentId & its array of children:
-        childrenByParent.forEach((childArray, parentId) => {
-          const parentNode = nodesById.get(parentId);
-          if (!parentNode) return; // safety
+        // childrenByParent.forEach((childArray, parentId) => {
+        //   const parentNode = nodesById.get(parentId);
+        //   if (!parentNode) return; // safety
     
-          const px = parentNode.position.x;
-          const py = parentNode.position.y;
-          const totalKids = childArray.length;  
+        //   const px = parentNode.position.x;
+        //   const py = parentNode.position.y;
+        //   const totalKids = childArray.length;  
     
-          childArray.forEach((childId, idx) => {
-            const childNode = nodesById.get(childId);
-            if (!childNode) return;
+        //   childArray.forEach((childId, idx) => {
+        //     const childNode = nodesById.get(childId);
+        //     if (!childNode) return;
     
-            // Spread them evenly in a small circle of radius R around (px, py)
-            const angle = (2 * Math.PI * idx) / totalKids;
-            const cx = px + R * Math.cos(angle);
-            const cy = py + R * Math.sin(angle);
-            childNode.position = { x: cx, y: cy };
-          });
-        });
+        //     // Spread them evenly in a small circle of radius R around (px, py)
+        //     const angle = (2 * Math.PI * idx) / totalKids;
+        //     const cx = px + R * Math.cos(angle);
+        //     const cy = py + R * Math.sin(angle);
+        //     childNode.position = { x: cx, y: cy };
+        //   });
+        // });
 
+        // const rawNodes = Array.from(nodesById.values())
+        // const finalNodes = selectedRootId
+        //   ? applyDagreLayout(rawNodes, edges)
+        //   : rawNodes  // or radialLayout(rawNodes, childrenByParent)
+        //   requestAnimationFrame(() => {
+        //     setNodes(finalNodes)
+        //     setEdges(edges)
+        //   })
         
     
         // ──────────────────────────────────────────────────
         // 5) Finally, send everything to React-Flow in one go:
-        requestAnimationFrame(() => {
-          setNodes(Array.from(nodesById.values()));
-          setEdges(edges);
-        });
+        // requestAnimationFrame(() => {
+        //   setNodes(Array.from(nodesById.values()));
+        //   setEdges(edges);
+        // });
       } catch (err) {
         console.error("Error drawing patients:", err);
         alert("Failed to draw patients.");
@@ -1017,6 +1093,7 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
         )}
     
         {/* Legend */}
+        {!isOverview && (
         <Box display="flex" gap={2} alignItems="center" mb={1}>
           <Box display="flex" alignItems="center">
             <Box width={16} height={16} bgcolor="#2196f3" borderRadius={1} mr={1} />
@@ -1027,6 +1104,7 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
             <Typography variant="body2">Treatment</Typography>
           </Box>
         </Box>
+        )}
     
         {/* ===== React Flow Canvas ===== */}
         <div
@@ -1197,6 +1275,7 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
               </Button>
               <Button
                 variant="outlined"
+                disabled={parentType === "characteristic"}
                 onClick={() => {
                   setNewNodeType("followup");
                   setIsChoosingType(false);
@@ -1220,7 +1299,7 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
             maxWidth="sm"
             fullWidth
           >
-            <DialogTitle>Add Characteristic under {addingParentId}</DialogTitle>
+            {/* <DialogTitle>Add Characteristic under {addingParentId}</DialogTitle> */}
             <DialogContent dividers>
               <CharacteristicForm
                 initial={undefined}
@@ -1247,7 +1326,7 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
             maxWidth="md"
             fullWidth
           >
-            <DialogTitle>Add Treatment under {addingParentId}</DialogTitle>
+            {/* <DialogTitle>Add Treatment under {addingParentId}</DialogTitle> */}
             <DialogContent dividers>
               <TreatmentForm
                 initial={undefined}
@@ -1274,7 +1353,7 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
             maxWidth="sm"
             fullWidth
           >
-            <DialogTitle>Add Follow‐up under {addingParentId}</DialogTitle>
+            {/* <DialogTitle>Add Follow‐up under {addingParentId}</DialogTitle> */}
             <DialogContent dividers>
               <FollowupForm
                 initial={undefined}
