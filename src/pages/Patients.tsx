@@ -105,7 +105,9 @@ function findNodeById(node: any, id: string): any | null {
    return null;
 }
 
+function addNodeApi() {
 
+}
 /* -------------------------------------------------------------------------- */
 /*                               component                                    */
 /* -------------------------------------------------------------------------- */
@@ -156,6 +158,7 @@ const Patients: React.FC = () => {
   const [editCharModalData, setEditCharModalData] = useState<EditCharModalData | null>(null);
   const [allTreatments, setAllTreatments] = useState<Treatment[]>([]);
   const [editTreatModalData, setEditTreatModalData] = useState<EditTreatModalData|null>(null);
+  const [rawPatients, setRawPatients] = useState<any[]>([]);
 
   
   const NODE_WIDTH = 180
@@ -230,6 +233,8 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
   const location = useLocation();
   const patientId = location.state?.treeId || "";
   const patientTreeId = location.state?.treeId as string; 
+  // console.log("patientTreeId", patientTreeId);
+  
   const mapColor = location.state?.color || "#ffffff"; // default to white
 
   const parentNode = nodes.find(n => n.id === addingParentId);
@@ -499,6 +504,16 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
           setAllTreatments(list);
         });
   }, [selectedRootId]);
+
+  // useEffect(() => {
+  //   axios.get("http://localhost:5000/api/patients")
+  //     .then((r) => {
+  //       const parsed = r.data.map((s: string) => JSON.parse(s));
+  //       setRawPatients(parsed);
+  //       drawPatientNodes();      // refresh your graph using the same routine
+  //     })
+  //     .catch(console.error);
+  // }, [selectedRootId]);  // re‐run whenever you drill in/out
     
   
   // fetch patients list for the list‑view (grid at top of page)
@@ -832,6 +847,8 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
                   node.treatment_data?.name ||
                   "Node",
                 type: node.node_type,
+                docId: node._id.$oid || node._id, 
+                parentDocId: node.parent_id?._id?.$oid || node.parent_id || null,
                 charType: node.characteristic_data?.type,
                 size: nodeSize,
                 rate: node.rate ?? 1,
@@ -1301,15 +1318,56 @@ const [editFollowup, setEditFollowup] = useState<Followup | null>(null);
           >
             {/* <DialogTitle>Add Characteristic under {addingParentId}</DialogTitle> */}
             <DialogContent dividers>
-              <CharacteristicForm
-                initial={undefined}
-                parentId={addingParentId}
-                onSaved={async () => {
-                  setAddingParentId(null);
-                  setNewNodeType(null);
-                  await drawPatientNodes();
-                }}
-              />
+              {/* find the parent node’s treeId */}
+            {(() => {
+              const patientDoc = rawPatients.find(
+                (p) => (p._id?.$oid || p._id) === patientTreeId
+              );
+              if (!patientDoc) return null;
+
+              const parentTreeNode = findNodeById(patientDoc.tree, addingParentId);
+
+              const parent = nodes.find((n) => n.id === addingParentId)!;
+              const rawParent = parent.data.parentDocId;
+              const trueParentId =
+                typeof rawParent === 'object' && rawParent.$oid
+                  ? rawParent.$oid
+                  : rawParent;
+              const parentSize = parent?.data.size;
+              const pid = parent?.data.treeId;
+
+              const childrenPayload = (parentTreeNode?.children || []).map((c: any) => ({
+                node_type: c.node_type,
+                rate:      c.rate,
+                size:      c.size,
+                // pick whichever data‐block it has:
+                characteristic_data: c.characteristic_data,
+                treatment_data:      c.treatment_data,
+                // and even forward any grandchildren
+                children:            c.children || []
+              }));
+
+              console.log("pid: ", pid);
+              console.log("trueParentId: ", trueParentId);
+              
+              if (!pid) {
+                console.error("No treeId on parent node!", parent);
+                return null; // or show an error
+              }
+              return (
+                <CharacteristicForm
+                  parentId={trueParentId}
+                  parentSize={parentSize}
+                  patientId={pid}
+                  onSaved={({ characteristicId, rate }) => {
+                    setAddingParentId(null);
+                    setNewNodeType(null);
+                    drawPatientNodes();
+                  }}
+                  childrenToAdd={childrenPayload}
+                />
+              );
+            })()}
             </DialogContent>
           </Dialog>
         )}

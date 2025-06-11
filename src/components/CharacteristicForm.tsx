@@ -1,74 +1,181 @@
-// src/components/CharacteristicForm.tsx
+import React, { useState, useEffect, useMemo } from "react";
+import axios from "axios";
+import Cookies from "js-cookie";
+import { TextField, Button, Stack, FormControl, InputLabel, Select, MenuItem, Typography } from "@mui/material";
 
-import React, { useState } from "react";
-import { TextField, Button, Stack } from "@mui/material";
-import { CharacteristicItem, saveCharacteristic } from "../api/characteristics";
+interface CharacteristicOption {
+  _id: string;
+  type: string;
+  name: string;
+}
 
-export default function CharacteristicForm({
-  initial,
-  parentId,
-  onSaved,
-}: {
-  initial?: CharacteristicItem;
-  parentId?: string;
-  onSaved: () => void;
-}) {
-  const [type, setType] = useState(initial?.type ?? "");
-  const [name, setName] = useState(initial?.name ?? "");
+interface CharacteristicFormProps {
+  initial?: {
+    _id: string;
+    type: string;
+    name: string;
+    rate?: number;
+  };
+  parentId: string;
+  parentSize: number; // size of parent node
+  patientId: string;
+  childrenToAdd?: ChildNode[];
+  onSaved: (data: { characteristicId: string; rate: number }) => void;
+}
+
+interface ChildNode {
+  node_type: "treatment" | "characteristic" | "followup";
+  rate:      number;
+  size?:     number;
+  treatment_data?: {
+    _id: string;
+    name: string;
+    type: string;
+    regimen: {
+      drugs: Array<{
+        drug: {
+          _id: string;
+          name: string;
+          strength: number;
+          unit: string;
+        };
+        annual_patient_con: number;
+      }>;
+    };
+  };
+  characteristic_data?: {
+    _id: string;
+    char_type: string;
+    name: string;
+  };
+  children?: ChildNode[]; // for further nesting if you need it
+}
+
+export default function CharacteristicForm({ initial, parentId, parentSize, patientId, onSaved, childrenToAdd = [], }: CharacteristicFormProps) {
+  const [options, setOptions] = useState<CharacteristicOption[]>([]);
+  const [selectedId, setSelectedId] = useState(initial?._id || "");
+  const [rate, setRate] = useState<number>(initial?.rate ?? 1);
   const [busy, setBusy] = useState(false);
 
-  return (
-    <Stack
-      spacing={2}
-      component="form"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setBusy(true);
+  // Fetch available characteristics for dropdown
+  useEffect(() => {
+    axios.get("http://localhost:5000/api/characteristics")
+      .then((response) => {
+        const parsed: CharacteristicOption[] = response.data.map((item: string) => {
+          const obj = JSON.parse(item);
+          return { _id: obj._id.$oid, type: obj.type, name: obj.name };
+        });
+        setOptions(parsed);
+      })
+      .catch((err) => console.error("Failed to load characteristics:", err));
+  }, []);
 
-        try {
-          if (initial?._id) {
-            // ─────────────── Editing an existing characteristic ───────────────
-            await saveCharacteristic({
-              _id: initial._id,
-              type,
-              name,
-            });
-          } else {
-            // ─────────────── Creating a new characteristic ───────────────
-            // parentId is optional, but if provided we include it here
-            if (parentId) {
-              await saveCharacteristic({
-                type,
-                name,
-                parent_id: parentId,
-              } as any);
-            } else {
-              await saveCharacteristic({ type, name });
-            }
-          }
-          onSaved();
-        } catch (err) {
-          // Handle error if needed (e.g. show a Snackbar)
-          console.error(err);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
+  // Compute size = parentSize * rate
+  const size = useMemo(() => {
+    return Math.round(parentSize * rate);
+  }, [parentSize, rate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!parentId || !selectedId) return;
+    setBusy(true);
+
+    const selectedOpt = options.find((opt) => opt._id === selectedId);
+    if (!selectedOpt) {
+      console.error("Selected characteristic not found in options");
+      setBusy(false);
+      return;
+    }
+
+    // const childrenPayload = myChildForms.map(child => ({
+    //   node_type:   child.node_type,      // e.g. "treatment"
+    //   rate:        child.rate,
+    //   size:        child.size,
+    //   treatment_data: {                   // or characteristic_data / followup_data
+    //     _id:   child._id,
+    //     name:  child.name,
+    //     /* …etc… */
+    //   },
+    //   // and if _those_ children have further children, you’d nest
+    //   children: [ …more… ]
+    // }));
+
+
+    const payload = {
+      parent_node_id: parentId,
+      node: {
+        node_type: "characteristic",
+        rate,
+        size,
+        characteristic_data: {
+          _id: selectedId,
+          char_type: selectedOpt.type,
+          name: selectedOpt.name,
+        },
+      },
+      children: childrenToAdd,
+    };
+
+    try {
+      const csrfToken = Cookies.get("csrf_token");
+
+      const config = {
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken || "", 
+        },
+        withCredentials: true, 
+    };
+
+      await axios.post(
+        `http://localhost:5000/api/patients/${patientId}/add_node`,
+        payload,
+        config
+      );
+      onSaved({ characteristicId: selectedId, rate });
+    } catch (err) {
+      console.error("Failed to add node:", err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Stack spacing={2} component="form" onSubmit={handleSubmit}>
+      <FormControl fullWidth required>
+        <InputLabel id="char-select-label">Characteristic</InputLabel>
+        <Select
+          labelId="char-select-label"
+          label="Characteristic"
+          value={selectedId}
+          onChange={(e) => setSelectedId(e.target.value as string)}
+        >
+          {options.map((opt) => (
+            <MenuItem key={opt._id} value={opt._id}>
+              {opt.type} – {opt.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
       <TextField
-        label="Type"
-        value={type}
-        onChange={(e) => setType(e.target.value)}
+        label="Rate"
+        type="number"
+        inputProps={{ step: "0.01", min: 0, max: 1 }}
+        value={rate}
+        onChange={(e) => setRate(parseFloat(e.target.value))}
         required
       />
+
       <TextField
-        label="Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
+        label="Computed Size"
+        type="number"
+        value={size}
+        InputProps={{ readOnly: true }}
       />
+
       <Button type="submit" variant="contained" disabled={busy}>
-        {initial ? "Update" : "Add"}
+        Add Node
       </Button>
     </Stack>
   );

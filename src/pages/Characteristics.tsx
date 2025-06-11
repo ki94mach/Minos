@@ -184,12 +184,12 @@ const Characteristics: React.FC = () => {
             {editChar && (
         <Dialog open onClose={() => setEditChar(null)}>
           <DialogTitle>Edit characteristic</DialogTitle>
-          <DialogContent>
+          {/* <DialogContent>
             <CharacteristicForm
               initial={editChar}
               onSaved={() => { setEditChar(null); fetchCharacteristics(); }}
             />
-          </DialogContent>
+          </DialogContent> */}
         </Dialog>
       )}
         </Container>

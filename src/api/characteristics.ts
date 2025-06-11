@@ -5,6 +5,7 @@ export interface CharacteristicItem {
   _id: string;
   type: string;
   name: string;
+  rate: number;
 }
 
 function authHeaders() {
@@ -19,7 +20,7 @@ export async function listCharacteristics() {
   const { data } = await axios.get("http://localhost:5000/api/characteristics");
   return data.map((s: string) => {
     const obj = JSON.parse(s);
-    return { ...obj, _id: obj._id.$oid } as CharacteristicItem;
+    return { ...obj, _id: obj._id.$oid, rate: Number(obj.rate) } as CharacteristicItem;
   });
 }
 
