@@ -79,29 +79,17 @@ const EditCharacteristicForm: React.FC<EditCharacteristicFormProps> = ({
       );
     }
 
-    
-      // const body: any = {
-      //   characteristic_data: {
-      //     _id: selectedCharId,
-      //     char_type: selectedType,
-      //     name: selectedName,
-      //   },
-      //   rate: rateValue,
-      // };
-
-      // if (selectedType !== currentType || selectedName !== currentName) {
-        await axios.put(
+        const response = await axios.put(
           `http://localhost:5000/api/patients/${patientId}/node/${nodeId}`, 
           { rate: rateValue },
           config
         );
-      // }
 
-      // await axios.put(
-      //   `/api/characteristics/${nodeId}/rate`,
-      //   { rate: rateValue },
-      //   { withCredentials: true }
-      // );
+      if (response.data?.message) {
+        alert(response.data.message);
+      } else {
+        alert("Node updated successfully.");
+      }
 
       onSave();
     } catch (error: any) {

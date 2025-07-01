@@ -48,7 +48,7 @@ interface ChildNode {
     char_type: string;
     name: string;
   };
-  children?: ChildNode[]; // for further nesting if you need it
+  children?: ChildNode[]; 
 }
 
 export default function CharacteristicForm({ initial, parentId, parentSize, patientId, onSaved, childrenToAdd = [], }: CharacteristicFormProps) {
@@ -87,6 +87,17 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
       return;
     }
 
+    const nodePart = {
+      node_type: "characteristic",
+      rate,
+      size,
+      characteristic_data: {
+        _id: selectedOpt._id,
+        char_type: selectedOpt.type,
+        name: selectedOpt.name,
+      },
+    };
+
     // const childrenPayload = myChildForms.map(child => ({
     //   node_type:   child.node_type,      // e.g. "treatment"
     //   rate:        child.rate,
@@ -101,20 +112,29 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
     // }));
 
 
-    const payload = {
+    // const payload: any = {
+    //   parent_node_id: parentId,
+    //   node: {
+    //     node_type: "characteristic",
+    //     rate,
+    //     size,
+    //     characteristic_data: {
+    //       _id: selectedId,
+    //       char_type: selectedOpt.type,
+    //       name: selectedOpt.name,
+    //     },
+    //   },
+    //   // children: []
+    // };
+
+    const payload: Record<string, any> = {
       parent_node_id: parentId,
-      node: {
-        node_type: "characteristic",
-        rate,
-        size,
-        characteristic_data: {
-          _id: selectedId,
-          char_type: selectedOpt.type,
-          name: selectedOpt.name,
-        },
-      },
-      children: childrenToAdd,
+      node: nodePart,
     };
+
+    if (childrenToAdd && childrenToAdd.length > 0) {
+    payload.children = childrenToAdd;
+  }
 
     try {
       const csrfToken = Cookies.get("csrf_token");
@@ -127,6 +147,8 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
         withCredentials: true, 
     };
 
+    console.log("Parent Node id:", parentId);
+    
       await axios.post(
         `http://localhost:5000/api/patients/${patientId}/add_node`,
         payload,

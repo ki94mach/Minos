@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import axios from "axios";
 import Cookies from "js-cookie";
-import { Treatment } from "./TreatmentForm";
+import { TreatmentOption } from "./TreatmentForm";
 
 interface EditTreatModalData {
   nodeId: string;            // the node’s Mongo _id
@@ -24,7 +24,7 @@ interface EditTreatModalData {
 }
 
 interface EditTreatmentFormProps {
-  allTreatments: Treatment[];       // fetched from /api/treatments
+  allTreatments: TreatmentOption[];       // fetched from /api/treatments
   editData: EditTreatModalData;
   onCancel: () => void;
   onSave: () => void;

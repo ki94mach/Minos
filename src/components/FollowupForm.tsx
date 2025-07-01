@@ -1,39 +1,28 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Stack, TextField, Button } from "@mui/material";
 import axios from "axios";
 import Cookies from "js-cookie";
-
-/**
- * Interface describing a single Follow‐up item.
- * - _id: (optional) when editing, this is the existing follow‐up’s ID.
- * - description: text for this follow‐up.
- * - parent_id: when creating a brand‐new follow‐up under some parent node.
- */
-export interface FollowupItem {
-  _id?: string;
-  description: string;
-  parent_id?: string;
-}
+import { nodeModuleNameResolver } from "typescript";
 
 export default function FollowupForm({
-  initial,
   parentId,
+  patientId,
+  parentSize = 1,
   onSaved,
+  nodeName,
 }: {
-  /** If present, we are “editing” the existing follow‐up. */
-  initial?: FollowupItem;
-  /** When creating a new follow‐up, attach it under this parent node. */
-  parentId?: string;
-  /** Called after successful save (POST or PUT). */
+  parentId: string;
+  patientId: string;
+  parentSize?: number;
   onSaved: () => void;
+  nodeName: string;
 }) {
-  // Initialize description from initial?.description (edit mode), or empty string (create).
-  const [description, setDescription] = useState(initial?.description ?? "");
+  const [name, setName] = useState(`Follow Up: ${nodeName}`);
+  const [overallSurvival, setOverallSurvival] = useState(0.5);
   const [busy, setBusy] = useState(false);
 
-  /**
-   * Build CSRF headers so that Flask/Django/etc. accept our request.
-   */
+  const size = useMemo(() => Math.round(parentSize * overallSurvival), [parentSize, overallSurvival]);
+
   function authHeaders() {
     const csrf = Cookies.get("csrf_token") ?? "";
     return {
@@ -42,55 +31,72 @@ export default function FollowupForm({
     };
   }
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+
+    try {
+      // Step 1: Create the follow-up and get its ID
+      const createResp = await axios.post(
+        "http://localhost:5000/api/followups",
+        {
+          name: name,
+          overall_survival: overallSurvival,
+          patient_id: patientId,
+          parent_id: parentId,
+        },
+        authHeaders()
+      );
+
+      const followupId = createResp.data.id;
+      const size = Math.round(parentSize * overallSurvival);
+
+      // Step 2: Add the follow-up node to the patient tree
+      await axios.post(
+        `http://localhost:5000/api/patients/${patientId}/add_node`,
+        {
+          parent_node_id: parentId,
+          node: {
+            node_type: "followup",
+            rate: overallSurvival,
+            size,
+            followup_data: {
+              _id: followupId,
+              name,
+              overall_survival: overallSurvival,
+            },
+          },
+        },
+        authHeaders()
+      );
+
+      onSaved();
+    } catch (err) {
+      console.error("Error creating follow-up node:", err);
+      alert("Follow-up creation failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <Stack
-      spacing={2}
-      component="form"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setBusy(true);
-
-        try {
-          if (initial?._id) {
-            // ─────────────── Editing an existing follow‐up ───────────────
-            await axios.put(
-              `http://localhost:5000/api/followups/${initial._id}`,
-              { description },
-              authHeaders()
-            );
-          } else {
-            // ─────────────── Creating a brand‐new follow‐up ───────────────
-            // Always send description; if parentId is defined, include parent_id
-            const payload: Partial<FollowupItem> = { description };
-            if (parentId) {
-              payload.parent_id = parentId;
-            }
-            await axios.post(
-              "http://localhost:5000/api/followups",
-              payload,
-              authHeaders()
-            );
-          }
-
-          // After successful save, invoke onSaved() to close Dialog + refresh graph
-          onSaved();
-        } catch (err) {
-          console.error("Error saving follow‐up:", err);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
+    <Stack component="form" spacing={2} onSubmit={handleSubmit}>
       <TextField
-        label="Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
+        label="Name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
         required
-        multiline
-        minRows={2}
+      />
+      <TextField
+        label="Overall Survival"
+        type="number"
+        inputProps={{ step: 0.01, min: 0, max: 1 }}
+        value={overallSurvival}
+        onChange={(e) => setOverallSurvival(parseFloat(e.target.value))}
+        required
       />
       <Button type="submit" variant="contained" disabled={busy}>
-        {initial ? "Update" : "Add"}
+        Add Follow-up
       </Button>
     </Stack>
   );
