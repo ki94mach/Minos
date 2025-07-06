@@ -83,17 +83,20 @@ export default function TreatmentForm({
       return;
     }
 
-    const fixedRegimen = {
-      drugs: selected.regimen?.drugs.map((d) => ({
-        ...d,
-        drug: {
-          ...d.drug,
-          _id: typeof d.drug._id === "object" && "$oid" in d.drug._id
-            ? d.drug._id["$oid"]
-            : d.drug._id,
-        },
-      })),
-    };
+    const fixedRegimen = selected.regimen?.drugs
+      ? {
+          drugs: selected.regimen.drugs.map((d) => ({
+            ...d,
+            drug: {
+              ...d.drug,
+              _id:
+                typeof d.drug._id === "object" && "$oid" in d.drug._id
+                  ? d.drug._id["$oid"]
+                  : d.drug._id,
+            },
+          })),
+        }
+      : undefined; 
 
     const node = {
       node_type: "treatment",
@@ -103,7 +106,10 @@ export default function TreatmentForm({
         _id: selected._id,
         name: selected.name,
         type: selected.type,
-        regimen: fixedRegimen,
+        // regimen: fixedRegimen,
+        ...(selected.type === "Regimen" && fixedRegimen
+          ? { regimen: fixedRegimen }
+          : {}),
       },
     };
 
@@ -121,6 +127,8 @@ export default function TreatmentForm({
         },
         withCredentials: true,
       };
+
+      console.log("Payload:", payload);
 
       await axios.post(
         `http://localhost:5000/api/patients/${patientId}/add_node`,

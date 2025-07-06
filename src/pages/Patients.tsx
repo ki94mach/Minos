@@ -1,13 +1,11 @@
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import ReactFlow, {
   addEdge,
-  Background,
   useEdgesState,
   useNodesState,
   Connection,
   Edge,
   NodeProps,
-  NodeTypes,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import {
@@ -36,11 +34,8 @@ import { CharacteristicItem } from "../api/characteristics";
 import { TreatmentOption } from "../components/TreatmentForm";
 import FollowupForm from "../components/FollowupForm";
 // import { FollowupItem as Followup } from "../components/FollowupForm";
-import { log } from "console";
-import { logDOM } from "@testing-library/dom";
 import EditTreatmentForm from "../components/EditTreatmentForm";
 import dagre from 'dagre';
-
 
 /* -------------------------------------------------------------------------- */
 /*                                helpers                                     */
@@ -159,6 +154,7 @@ const Patients: React.FC = () => {
   const [allTreatments, setAllTreatments] = useState<TreatmentOption[]>([]);
   const [editTreatModalData, setEditTreatModalData] = useState<EditTreatModalData|null>(null);
   const [rawPatients, setRawPatients] = useState<any[]>([]);
+  const [isIranRightClick, setIsIranRightClick] = useState(false);
 
   
   const NODE_WIDTH = 180
@@ -233,7 +229,6 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
   const location = useLocation();
   const patientId = location.state?.treeId || "";
   const patientTreeId = location.state?.treeId as string; 
-  // console.log("patientTreeId", patientTreeId);
   
   const mapColor = location.state?.color || "#ffffff"; // default to white
 
@@ -398,7 +393,43 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
   
     return dfs(tree, rootSizeDecimal);
   }
-  
+
+  function generateReactFlowNodesFromTree(tree: any, patientId: string): any[] {
+  const traverse = (node: any, depth = 0, position = { x: 0, y: 0 }): any[] => {
+    const nodes: any[] = [];
+
+    const nodeId = node._id?.$oid || node._id;
+
+    nodes.push({
+      id: nodeId,
+      type: "custom",
+      position: {
+        x: position.x,
+        y: position.y + depth * 150,
+      },
+      data: {
+        ...node,
+        docId: node._id?.$oid || node._id,
+        treeId: patientId, // ✅ ensure all nodes have their patient tree ID
+      },
+    });
+
+    if (node.children && Array.isArray(node.children)) {
+      node.children.forEach((child: any, index: number) => {
+        const childPosition = {
+          x: position.x + index * 200,
+          y: position.y + 150,
+        };
+        nodes.push(...traverse(child, depth + 1, childPosition));
+      });
+    }
+
+    return nodes;
+  };
+
+  return traverse(tree);
+}
+ 
 
   /* ───────────── remove one node + its edges ───────────── */
   function deleteNode(nodeId: string) {
@@ -409,8 +440,6 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
 
     const nodeDocId = node.data.docId;
     const patientTreeId = node.data.treeId;
-    console.log(node.data);
-    
 
     if (!patientTreeId) {
       alert("Missing patient tree ID.");
@@ -435,6 +464,16 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
         drawPatientNodes();
         alert("Node deleted.");
       })
+      // .then(async () => {
+      //   alert("Node deleted.");
+
+      //   setNodes((prev) => prev.filter((n) => n.id !== nodeId));
+      //   setEdges((prev) => prev.filter((e) => e.source !== nodeId && e.target !== nodeId));
+
+      //   await new Promise((res) => setTimeout(res, 300));
+      //   await drawPatientNodes();  // now it's safe
+      // })
+
       .catch((err) => {
         const msg = err.response?.data?.error ?? "Error deleting node.";
         alert(msg);
@@ -443,6 +482,11 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
   }  
   
   function addNode(parentId: string) {
+    const parent = nodes.find((n) => n.id === parentId);
+    if (!parent) return;
+
+    const isIran = parent.data?.label === "Iran";
+    setIsIranRightClick(isIran);
     setAddingParentId(parentId);
     setIsChoosingType(true);
   }
@@ -675,14 +719,21 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
   /* ---------------------------------------------------------------------- */
   /*   Build the merged graph of *all* patient trees without duplicates     */
   /* ---------------------------------------------------------------------- */
-  // const drawPatientNodes = async (rootId: string | null = null, depthLimit: number = Infinity) => {
     const drawPatientNodes = async (
       depthLimit: number = Infinity
     ) => {
       try {
-        const { data } = await axios.get("http://localhost:5000/api/patients");
-        const parsedPatients = data.map((item: string) => JSON.parse(item));
-    
+        const res = await axios.get("http://localhost:5000/api/patients");
+
+        const parsedPatients = res.data.map((p: string) => {
+          const obj = JSON.parse(p);
+          return {
+            ...obj,
+            _id: obj._id.$oid,
+          };
+        });
+        // const parsedPatients = data.map((item: string) => JSON.parse(item));
+
         // Choose either all roots (overview) or the single drilled‐in root:
         // const roots = selectedRootId
         //   ? parsedPatients
@@ -693,6 +744,16 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
         const drillTreeId = location.state?.treeId as string | undefined;
 
         let roots: any[] = [];
+        let truePatientId: string | undefined;
+
+        if (selectedRootId && !truePatientId) {
+          const fallbackPatient = parsedPatients.find((p: any) =>
+            findNodeById(p.tree, selectedRootId)
+          );
+          truePatientId =
+            fallbackPatient?._id?.$oid || fallbackPatient?._id || "";
+        }
+
         if (selectedRootId && drillTreeId) {
           // 1) Find the single patient document whose _id === drillTreeId
           const patientDoc = parsedPatients.find((p: any) => {
@@ -702,6 +763,12 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
           if (patientDoc) {
             // 2) Inside that one patient, locate the clicked node (selectedRootId)
             const subTree = findNodeById(patientDoc.tree, selectedRootId);
+            const correctPatient = parsedPatients.find((p: any) =>
+              findNodeById(p.tree, selectedRootId)
+            );
+
+            truePatientId = correctPatient?._id?.$oid || correctPatient?._id;
+            
             if (subTree) {
               roots = [subTree];
             } else {
@@ -842,23 +909,28 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
                   node.treatment_data?.name ||
                   "Node",
                 type: node.node_type,
-                docId: node._id.$oid || node._id, 
-                parentDocId: node.parent_id?._id?.$oid || node.parent_id || null,
+                docId: node._id.$oid || node._id,
+                parentDocId:
+                  node.parent_id?._id?.$oid || node.parent_id || null,
                 charType: node.characteristic_data?.type,
                 size: nodeSize,
                 rate: node.rate ?? 1,
                 drugs:
-                  node.treatment_data?.regimen?.drugs?.map((d: any) => d.drug) ||
-                  [],
+                  node.treatment_data?.regimen?.drugs?.map(
+                    (d: any) => d.drug
+                  ) || [],
+                regimen: node.treatment_data?.regimen || null,
                 alternatives: node.treatment_data?.alternatives || [],
                 color: hashColor(uniqueCharId),
                 isOverview: isOverviewMode,
-                treeId: treeId,
-                onClick: () => navigate(`/patients/${nodeId}`, {
-                          state: { color: hashColor(uniqueCharId), treeId: treeId },
-                       }),
+                treeId: treeIdMap.get(nodeId),
+                onClick: () =>
+                  navigate(`/patients/${nodeId}`, {
+                    state: { color: hashColor(uniqueCharId), treeId: treeId },
+                  }),
               },
             });
+
           }
     
           // ──────────────────────────────────────────────────
@@ -873,43 +945,95 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
     
           
           function containsPrimaryIndication(node: any): boolean {
-            if (node.characteristic_data?.type === "Primary Indication") return true;
-          
-            const kids = node.children || [];
-            return kids.some(containsPrimaryIndication);
-          }
-          
-          if (isOverviewMode && !containsPrimaryIndication(node)) {
-            return;
+            if (node.characteristic_data?.type === "Primary Indication")
+              return true;
+            return (node.children || []).some(containsPrimaryIndication);
           }
 
-          if (node.characteristic_data?.type === "Primary Indication") {
-            return;
+          function shouldRenderNode(
+            node: any,
+            isOverviewMode: boolean
+          ): boolean {
+            if (!isOverviewMode) return true;
+            const isPrimary =
+              node.characteristic_data?.type === "Primary Indication";
+            const hasPrimaryDescendant = containsPrimaryIndication(node);
+
+            return isPrimary || hasPrimaryDescendant;
           }
-          
-            const kids = node.children || [];
-            kids.forEach((child: any, i: number) =>
-              buildFlowNodes(
-                child,
-                depth + 1,
-                i,
-                nodeId,
-                rawSize,
-                kids.length,
-                inheritedColor,
-                treeId
-              )
-            );
-          
+        
+          if (!shouldRenderNode(node, isOverviewMode)) return;
+          const isPrimary = node.characteristic_data?.type === "Primary Indication";
+            if (!(isOverviewMode && isPrimary)) {
+             const kids = (node.children || []).filter((child: any) =>
+               shouldRenderNode(child, isOverviewMode)
+             );
+              kids.forEach((child: any, i: number) =>
+                buildFlowNodes(
+                  child,
+                  depth + 1,
+                  i,
+                  nodeId,
+                  rawSize,
+                  kids.length,
+                  inheritedColor,
+                  treeId
+                )
+              );
+            }
           
           
         };
     
+        // const treeIdMap = new Map<string, string>(
+        //   parsedPatients.map((p: any) => [
+        //     getUniqueCharId(p.tree),
+        //     p._id?.$oid || p._id,
+        //   ])
+        // );
+
+        const treeIdMap = new Map<string, string>();
+        parsedPatients.forEach((p: any) => {
+          const collectIds = (node: any) => {
+            const id = getUniqueCharId(node);
+            treeIdMap.set(id, p._id?.$oid || p._id);
+            (node.children || []).forEach(collectIds);
+          };
+          collectIds(p.tree);
+        });
+
+
+        const allNodes: any[] = [];
+
         // ──────────────────────────────────────────────────
         // 3) Kick off DFS for each root
-        roots.forEach((rootNode: any, idx: number) => {
+        roots.forEach((rootNode: any, idx: number) => {     
+          const patientId =
+            parsedPatients[idx]._id.$oid || parsedPatients[idx]._id;     
+          if (!rootNode) {
+            console.warn(`⚠️ rootNode at index ${idx} is undefined`);
+            return;
+          }
+
           let rootSizeDecimal: Decimal;
-          const patientId = parsedPatients[idx]._id.$oid || parsedPatients[idx]._id;
+          // const patientId = treeIdMap.get(getUniqueCharId(rootNode)) as string;
+          if (selectedRootId && !truePatientId) {
+            const fallbackPatient = parsedPatients.find((p: any) =>
+              findNodeById(p.tree, selectedRootId)
+            );
+            truePatientId =
+              fallbackPatient?._id?.$oid || fallbackPatient?._id || "";
+          }
+          
+          
+          // const patientId = selectedRootId
+          //   ? truePatientId ?? ""
+          //   : treeIdMap.get(getUniqueCharId(rootNode)) ?? "";
+
+          if (!patientId) {
+            console.warn("⚠️ No patientId found for rootNode", rootNode);
+          }
+
           if (selectedRootId) {
             // (A) Find the patient doc whose `tree` contains the clicked node
             const patientObj = parsedPatients.find((p: any) =>
@@ -944,6 +1068,24 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
             patientId
           );
         });
+
+        let finalNodes = Array.from(nodesById.values()).map((node) => {
+          // Get real patient ID from map
+          const fallbackTreeId = treeIdMap.get(node.id) || truePatientId;
+
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              treeId: node.data.treeId || fallbackTreeId,
+              docId: node.data.docId || node.data.id,
+            },
+          };
+        });
+
+        setNodes(finalNodes);
+        
+
     
         // ──────────────────────────────────────────────────
         // 4) AFTER DFS completes, do a “re‐layout” pass so that no two children of the same parent overlap:
@@ -960,7 +1102,7 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
         });
 
         const allFlowNodes = Array.from(nodesById.values())
-        let finalNodes: typeof allFlowNodes
+        // finalNodes: typeof allFlowNodes
 
         if (selectedRootId) {
           // • DRILL MODE → top‐to‐bottom dagre layout
@@ -994,12 +1136,9 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
           // (e) collect all
           finalNodes = allFlowNodes
         }
-        
-          // everyone else stays where dagre/grid put them (or you can default them)
           setNodes(finalNodes)
+          console.log("✅ Final Nodes:", finalNodes);
           setEdges(edges)
-          
-       
 
         const depthMap = new Map<string, number>();
         const assignDepth = (nodeId: string, depth: number) => {
@@ -1045,45 +1184,6 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
               };
             });
           });
-
-    
-        // Now loop over each parentId & its array of children:
-        // childrenByParent.forEach((childArray, parentId) => {
-        //   const parentNode = nodesById.get(parentId);
-        //   if (!parentNode) return; // safety
-    
-        //   const px = parentNode.position.x;
-        //   const py = parentNode.position.y;
-        //   const totalKids = childArray.length;  
-    
-        //   childArray.forEach((childId, idx) => {
-        //     const childNode = nodesById.get(childId);
-        //     if (!childNode) return;
-    
-        //     // Spread them evenly in a small circle of radius R around (px, py)
-        //     const angle = (2 * Math.PI * idx) / totalKids;
-        //     const cx = px + R * Math.cos(angle);
-        //     const cy = py + R * Math.sin(angle);
-        //     childNode.position = { x: cx, y: cy };
-        //   });
-        // });
-
-        // const rawNodes = Array.from(nodesById.values())
-        // const finalNodes = selectedRootId
-        //   ? applyDagreLayout(rawNodes, edges)
-        //   : rawNodes  // or radialLayout(rawNodes, childrenByParent)
-        //   requestAnimationFrame(() => {
-        //     setNodes(finalNodes)
-        //     setEdges(edges)
-        //   })
-        
-    
-        // ──────────────────────────────────────────────────
-        // 5) Finally, send everything to React-Flow in one go:
-        // requestAnimationFrame(() => {
-        //   setNodes(Array.from(nodesById.values()));
-        //   setEdges(edges);
-        // });
       } catch (err) {
         console.error("Error drawing patients:", err);
         alert("Failed to draw patients.");
@@ -1095,110 +1195,113 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
   /*                                  UI                                    */
   /* ---------------------------------------------------------------------- */
   return (
-      <Container maxWidth="md" className="py-8">
-        <BackButton />
-        <Typography variant="h3" align="center" className="mb-8">
-          Patient Map Management
-        </Typography>
-    
-        {/* If we drilled into a specific root, show “Back to All Roots” */}
-        {rootId && (
-          <Button
-            variant="contained"
-            onClick={() => navigate("/patients")}
-            sx={{ mb: 2 }}
-          >
-            Back to All Roots
-          </Button>
-        )}
-    
-        {/* Legend */}
-        {!isOverview && (
+    <Container maxWidth="md" className="py-8">
+      <BackButton />
+      <Typography variant="h3" align="center" className="mb-8">
+        Patient Map
+      </Typography>
+      {rootId && (
+        <Button
+          variant="contained"
+          onClick={() => navigate("/patients")}
+          sx={{ mb: 2 }}>
+          Back to All Roots
+        </Button>
+      )}
+
+      {/* Legend */}
+      {!isOverview && (
         <Box display="flex" gap={2} alignItems="center" mb={1}>
           <Box display="flex" alignItems="center">
-            <Box width={16} height={16} bgcolor="#2196f3" borderRadius={1} mr={1} />
+            <Box
+              width={16}
+              height={16}
+              bgcolor="#2196f3"
+              borderRadius={1}
+              mr={1}
+            />
             <Typography variant="body2">Characteristic</Typography>
           </Box>
           <Box display="flex" alignItems="center">
-            <Box width={16} height={16} bgcolor="#4caf50" borderRadius={1} mr={1} />
+            <Box
+              width={16}
+              height={16}
+              bgcolor="#4caf50"
+              borderRadius={1}
+              mr={1}
+            />
             <Typography variant="body2">Treatment</Typography>
           </Box>
         </Box>
-        )}
-    
-        {/* ===== React Flow Canvas ===== */}
-        <div
-          style={{
-            width: "100%",
-            height: 500,
-            border: "1px solid #ddd",
-            backgroundColor: mapColor,
-            transition: "background-color 0.5s ease",
-          }}
-        >
-          <ReactFlow
-            nodes={debouncedNodes} // Use debounced nodes
-            edges={debouncedEdges} // Use debounced edges
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            fitView
-            nodeTypes={nodeTypes}
-            // Add these props to help with ResizeObserver issues
-            fitViewOptions={{
-              padding: 0.1,
-              includeHiddenNodes: false,
-            }}
-            minZoom={0.1}
-            maxZoom={2}
-            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-          >
-            {/* <Background  variant="none" gap={12} size={1}  /> */}
-          </ReactFlow>
-    
-          {/* Context menu (right‐click) */}
-          <Menu
-            open={!!ctx}
-            onClose={() => setCtx(null)}
-            anchorReference="anchorPosition"
-            anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined}
-          >
-            <MenuItem
-              onClick={() => {
-                if (!ctx) return;
-                editNode(ctx.nodeId);
-                setCtx(null);
-              }}
-            >
-              Edit
-            </MenuItem>
-    
-            <MenuItem
-              onClick={() => {
-                if (!ctx) return;
-                deleteNode(ctx.nodeId);
-                setCtx(null);
-              }}
-            >
-              Delete
-            </MenuItem>
-    
-            <MenuItem
-              onClick={() => {
-                if (!ctx) return;
-                addNode(ctx.nodeId);
-                setAddingParentId(ctx.nodeId);
-                setIsChoosingType(true);
-                setCtx(null);
-              }}
-            >
-              Add Node
-            </MenuItem>
-          </Menu>
+      )}
 
-          {/* ===== “Edit Characteristic” dialog ===== */}
-          {/* {editChar && (
+      {/* ===== React Flow Canvas ===== */}
+      <div
+        style={{
+          width: "100%",
+          height: 600,
+          border: "1px solid #ddd",
+          backgroundColor: mapColor,
+          transition: "background-color 0.5s ease",
+        }}>
+        <ReactFlow
+          nodes={debouncedNodes}
+          edges={debouncedEdges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeClick={onNodeClick}
+          fitView
+          nodeTypes={nodeTypes}
+          proOptions={{ hideAttribution: true }}
+          fitViewOptions={{
+            padding: 0.1,
+            includeHiddenNodes: false,
+          }}
+          minZoom={0.1}
+          maxZoom={2}
+          defaultViewport={{ x: 0, y: 0, zoom: 1 }}>
+          {/* <Background  variant="none" gap={12} size={1}  /> */}
+        </ReactFlow>
+
+        {/* Context menu (right‐click) */}
+        <Menu
+          open={!!ctx}
+          onClose={() => setCtx(null)}
+          anchorReference="anchorPosition"
+          anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined}>
+          <MenuItem
+            onClick={() => {
+              if (!ctx) return;
+              editNode(ctx.nodeId);
+              setCtx(null);
+            }}>
+            Edit
+          </MenuItem>
+
+          <MenuItem
+            onClick={() => {
+              if (!ctx) return;
+              deleteNode(ctx.nodeId);
+              setCtx(null);
+            }}>
+            Delete
+          </MenuItem>
+
+          <MenuItem
+            onClick={() => {
+              if (!ctx) return;
+              addNode(ctx.nodeId);
+              setAddingParentId(ctx.nodeId);
+              setIsChoosingType(true);
+              setCtx(null);
+            }}>
+            Add Node
+          </MenuItem>
+        </Menu>
+
+        {/* ===== “Edit Characteristic” dialog ===== */}
+        {/* {editChar && (
             <Dialog open onClose={() => setEditChar(null)} maxWidth="md" fullWidth>
               <DialogTitle>Edit characteristic</DialogTitle>
               <DialogContent dividers>
@@ -1212,231 +1315,306 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
               </DialogContent>
             </Dialog>
           )} */}
-          {editCharModalData && (
-              <Dialog
-                open={true}
-                onClose={() => setEditCharModalData(null)}
-                maxWidth="sm"
-                fullWidth
-              >
-                <DialogTitle>Edit Characteristic Node</DialogTitle>
-                <DialogContent dividers>
-                  <EditCharacteristicForm
-                    allChars={allCharacteristics}
-                    editData={editCharModalData}
-                    // patientId={editCharModalData.patientId} 
-                    onCancel={() => setEditCharModalData(null)}
-                    onSave={() => {
-                      setEditCharModalData(null);
-                      drawPatientNodes(); 
-                    }}
-                  />
-                </DialogContent>
-              </Dialog>
-            )}
-          {/* ─── end “Edit Characteristic” ─── */}
-    
-          {/* ===== “Edit Treatment” dialog ===== */}
-          {editTreatModalData && (
-            <Dialog
-              open={true}
-              onClose={() => setEditTreatModalData(null)}
-              maxWidth="sm"
-              fullWidth
-            >
-              <DialogTitle>Edit Treatment Node</DialogTitle>
-              <DialogContent dividers>
-                <EditTreatmentForm
-                  allTreatments={allTreatments}
-                  editData={editTreatModalData}
-                  onCancel={() => setEditTreatModalData(null)}
-                  onSave={() => {
-                    setEditTreatModalData(null);
-                    drawPatientNodes();
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-          )}
-
-          {/* ─── end “Edit Treatment” ─── */}
-    
-        </div>
-        {/* ─── end ReactFlow container ─── */}
-    
-        {/* ===== “Pick Node Type” dialog ===== */}
-        {isChoosingType && (
+        {editCharModalData && (
           <Dialog
-            open
-            onClose={() => {
-              setIsChoosingType(false);
-              setAddingParentId(null);
-            }}
-          >
-            <DialogTitle>Pick node type</DialogTitle>
-            <DialogContent sx={{ display: "flex", gap: 1, pb: 2 }}>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setNewNodeType("characteristic");
-                  setIsChoosingType(false);
-                }}
-              >
-                Characteristic
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setNewNodeType("treatment");
-                  setIsChoosingType(false);
-                }}
-              >
-                Treatment
-              </Button>
-              <Button
-                variant="outlined"
-                disabled={parentType === "characteristic"}
-                onClick={() => {
-                  setNewNodeType("followup");
-                  setIsChoosingType(false);
-                }}
-              >
-                Follow‐up
-              </Button>
-            </DialogContent>
-          </Dialog>
-        )}
-        {/* ─── end “Pick Node Type” ─── */}
-    
-        {/* ===== “Add Characteristic Under Parent” ===== */}
-        {addingParentId && newNodeType === "characteristic" && (
-          <Dialog
-            open
-            onClose={() => {
-              setAddingParentId(null);
-              setNewNodeType(null);
-            }}
+            open={true}
+            onClose={() => setEditCharModalData(null)}
             maxWidth="sm"
-            fullWidth
-          >
+            fullWidth>
+            <DialogTitle>Edit Characteristic Node</DialogTitle>
             <DialogContent dividers>
-              {/* find the parent node’s treeId */}
-            {(() => {
-
-
-              const parent = nodes.find((n) => n.id === addingParentId)!;
-              const rawParent = parent.data.parentDocId;
-              const trueParentId = rawParent && typeof rawParent === 'object' && '$oid' in rawParent
-                    ? rawParent.$oid
-                    : rawParent;
-              const parentSize = parent?.data.size;
-              const pid = (parent?.data.treeId).toString();
-
-
-              console.log("pid: ", pid);
-              console.log("trueParentId: ", trueParentId);
-              
-              if (!pid) {
-                console.error("No treeId on parent node!", parent);
-                return null; // or show an error
-              }
-              return (
-                <CharacteristicForm
-                  parentId="67d01fbe9e8a82122fb03320"
-                  parentSize={parentSize}
-                  patientId={pid}
-                  onSaved={({ characteristicId, rate }) => {
-                    setAddingParentId(null);
-                    setNewNodeType(null);
-                    drawPatientNodes();
-                  }}
-                  childrenToAdd={[]} 
-                />
-              );
-            })()}
-            </DialogContent>
-          </Dialog>
-        )}
-        {/* ─── end “Add Characteristic” ─── */}
-    
-        {/* ===== “Add Treatment Under Parent” ===== */}
-        {addingParentId && newNodeType === "treatment" && (
-          <Dialog
-            open
-            onClose={() => {
-              setAddingParentId(null);
-              setNewNodeType(null);
-            }}
-            maxWidth="md"
-            fullWidth
-          >
-            {/* <DialogTitle>Add Treatment under {addingParentId}</DialogTitle> */}
-            <DialogContent dividers>
-              <TreatmentForm
-                parentId={(() => {
-                  const parent = nodes.find((n) => n.id === addingParentId)!;
-                  const rawParent = parent.data.parentDocId;
-                  return typeof rawParent === "object" && rawParent?.$oid
-                    ? rawParent.$oid
-                    : rawParent;
-                })()}
-                parentSize={parentNode?.data.size ?? 1}
-                patientId={parentNode?.data.treeId}
-                onSaved={async () => {
-                  setAddingParentId(null);
-                  setNewNodeType(null);
-                  await drawPatientNodes();
+              <EditCharacteristicForm
+                allChars={allCharacteristics}
+                editData={editCharModalData}
+                // patientId={editCharModalData.patientId}
+                onCancel={() => setEditCharModalData(null)}
+                onSave={() => {
+                  setEditCharModalData(null);
+                  drawPatientNodes();
                 }}
               />
             </DialogContent>
           </Dialog>
         )}
-        {/* ─── end “Add Treatment” ─── */}
-    
-        {/* ===== “Add Follow‐up Under Parent” ===== */}
-        {addingParentId && newNodeType === "followup" && (
+        {/* ─── end “Edit Characteristic” ─── */}
+
+        {/* ===== “Edit Treatment” dialog ===== */}
+        {editTreatModalData && (
           <Dialog
-            open
-            onClose={() => {
-              setAddingParentId(null);
-              setNewNodeType(null);
-            }}
+            open={true}
+            onClose={() => setEditTreatModalData(null)}
             maxWidth="sm"
-            fullWidth
-          >
-            {/* <DialogTitle>Add Follow‐up under {addingParentId}</DialogTitle> */}
+            fullWidth>
+            <DialogTitle>Edit Treatment Node</DialogTitle>
             <DialogContent dividers>
-              {(() => {
-                const parentNode = nodes.find((n) => n.id === addingParentId)!;
-                const rawParent = parentNode.data.parentDocId;
-                const trueParentId =
-                  typeof rawParent === "object" && rawParent.$oid
-                    ? rawParent.$oid
-                    : rawParent;
-
-                const patientTreeId = parentNode.data.treeId;
-
-                return (
-                  <FollowupForm
-                    parentId={trueParentId} 
-                    patientId={patientTreeId}
-                    parentSize={parentNode.data.size}
-                    nodeName={parentNode.data.label}
-                    onSaved={async () => {
-                      setAddingParentId(null);
-                      setNewNodeType(null);
-                      await drawPatientNodes();
-                    }}
-                  />
-                );
-              })()}
+              <EditTreatmentForm
+                allTreatments={allTreatments}
+                editData={editTreatModalData}
+                onCancel={() => setEditTreatModalData(null)}
+                onSave={() => {
+                  setEditTreatModalData(null);
+                  drawPatientNodes();
+                }}
+              />
             </DialogContent>
           </Dialog>
         )}
-        {/* ─── end “Add Follow‐up” ─── */}
-    
-      </Container>
-    );
+
+        {/* ─── end “Edit Treatment” ─── */}
+      </div>
+      {/* ─── end ReactFlow container ─── */}
+
+      {/* ===== “Pick Node Type” dialog ===== */}
+      {isChoosingType && (
+        <Dialog
+          open
+          onClose={() => {
+            setIsChoosingType(false);
+            setAddingParentId(null);
+          }}>
+          <DialogTitle>Pick node type</DialogTitle>
+          <DialogContent sx={{ display: "flex", gap: 1, pb: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setNewNodeType("characteristic");
+                setIsChoosingType(false);
+              }}>
+              Characteristic
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setNewNodeType("treatment");
+                setIsChoosingType(false);
+              }}>
+              Treatment
+            </Button>
+            <Button
+              variant="outlined"
+              disabled={parentType === "characteristic"}
+              onClick={() => {
+                setNewNodeType("followup");
+                setIsChoosingType(false);
+              }}>
+              Follow‐up
+            </Button>
+          </DialogContent>
+        </Dialog>
+      )}
+      {/* ─── end “Pick Node Type” ─── */}
+
+      {/* ===== “Add Characteristic Under Parent” ===== */}
+      {addingParentId && newNodeType === "characteristic" && (
+        <Dialog
+          open
+          onClose={() => {
+            setAddingParentId(null);
+            setNewNodeType(null);
+          }}
+          maxWidth="sm"
+          fullWidth>
+          <DialogContent dividers>
+            {/* find the parent node’s treeId */}
+            {(() => {
+              const parent = nodes.find((n) => n.id === addingParentId)!;
+              const rawParent = parent.data.parentDocId;
+              const trueParentId =
+                rawParent &&
+                typeof rawParent === "object" &&
+                "$oid" in rawParent
+                  ? rawParent.$oid
+                  : rawParent;
+              const parentSize = parent?.data.size;
+              const treeId = parent?.data?.treeId;
+              if (!treeId) {
+                console.error("Missing treeId for parent node:", parent);
+                return null;
+              }
+              // const pid = treeId;
+              const addingParent = parent.data.docId;
+
+              return (
+                <CharacteristicForm
+                  parentId={
+                    parent?.data?.docId ||
+                    parent?.data?._id?.$oid ||
+                    parent?.data?._id ||
+                    parent?.id
+                  }
+                  parentSize={parentSize}
+                  patientId={treeId}
+                  onSaved={async ({ characteristicId, rate }) => {
+                    setAddingParentId(null);
+                    setNewNodeType(null);
+                    setIsIranRightClick(false);
+
+                    if (isIranRightClick) {
+                      // Special case: create patient with child
+                      const csrf = Cookies.get("csrf_token") ?? "";
+
+                      const charObj = allCharacteristics.find(
+                        (c) => c._id === characteristicId
+                      );
+                      if (!charObj) {
+                        alert("Characteristic not found");
+                        return;
+                      }
+
+                      const size = Math.round(parentSize * rate);
+
+                      const payload = {
+                        node: {
+                          node_type: "characteristic",
+                          rate: 1.0,
+                          size: parentSize,
+                          parent_id: null,
+                          characteristic_data: {
+                            _id: "67d01f7b9e8a82122fb0331b",
+                            char_type: "Population",
+                            name: "Iran",
+                          },
+                          children: [
+                            {
+                              node_type: "characteristic",
+                              rate,
+                              size,
+                              parent_id: null,
+                              characteristic_data: {
+                                _id: characteristicId,
+                                char_type: charObj.type,
+                                name: charObj.name,
+                              },
+                            },
+                          ],
+                        },
+                      };
+
+                      try {
+                        await axios.post(
+                          "http://localhost:5000/api/patients",
+                          payload,
+                          {
+                            headers: {
+                              "Content-Type": "application/json",
+                              "X-CSRFToken": csrf,
+                            },
+                            withCredentials: true,
+                          }
+                        );
+
+                        alert("Patient created.");
+                        // await drawPatientNodes();
+                        window.location.reload();
+                      } catch (err) {
+                        console.error(
+                          "Failed to create patient with child:",
+                          err
+                        );
+                        alert("❌ Failed to create patient");
+                      }
+                    } else {
+                      // Normal case: refresh only
+                      await drawPatientNodes();
+                    }
+                  }}
+                  // childrenToAdd={[]}
+                />
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+      )}
+      {/* ─── end “Add Characteristic” ─── */}
+
+      {/* ===== “Add Treatment Under Parent” ===== */}
+      {addingParentId && newNodeType === "treatment" && (
+        <Dialog
+          open
+          onClose={() => {
+            setAddingParentId(null);
+            setNewNodeType(null);
+          }}
+          maxWidth="md"
+          fullWidth>
+          <DialogContent dividers>
+            <TreatmentForm
+              parentId={(() => {
+                const parent = nodes.find((n) => n.id === addingParentId)!;
+                const rawParent = parent.data.docId;
+                return typeof rawParent === "object" && rawParent?.$oid
+                  ? rawParent.$oid
+                  : rawParent;
+              })()}
+              parentSize={parentNode?.data.size ?? 1}
+              // patientId={(() => {
+              //   const parent = nodes.find((n) => n.id === addingParentId);
+              //   return parent?.data?.treeId;
+              // })()}
+              patientId={
+                nodes.find((n) => n.id === addingParentId)?.data?.treeId
+              }
+              onSaved={async () => {
+                setAddingParentId(null);
+                setNewNodeType(null);
+                await drawPatientNodes();
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+      {/* ─── end “Add Treatment” ─── */}
+
+      {/* ===== “Add Follow‐up Under Parent” ===== */}
+      {addingParentId && newNodeType === "followup" && (
+        <Dialog
+          open
+          onClose={() => {
+            setAddingParentId(null);
+            setNewNodeType(null);
+          }}
+          maxWidth="sm"
+          fullWidth>
+          {/* <DialogTitle>Add Follow‐up under {addingParentId}</DialogTitle> */}
+          <DialogContent dividers>
+            {(() => {
+              const parentNode = nodes.find((n) => n.id === addingParentId)!;
+              const rawParent = parentNode.data.docId;
+              const trueParentId =
+                typeof rawParent === "object" && rawParent.$oid
+                  ? rawParent.$oid
+                  : rawParent;
+
+              const patientTreeId = parentNode.data.treeId;
+
+              return (
+                <FollowupForm
+                  parentId={(() => {
+                    const parent = nodes.find((n) => n.id === addingParentId)!;
+                    const rawParent = parent.data.docId;
+                    return typeof rawParent === "object" && rawParent?.$oid
+                      ? rawParent.$oid
+                      : rawParent;
+                  })()}
+                  patientId={
+                    nodes.find((n) => n.id === addingParentId)?.data?.treeId
+                  }
+                  parentSize={parentNode.data.size}
+                  nodeName={parentNode.data.label}
+                  onSaved={async () => {
+                    setAddingParentId(null);
+                    setNewNodeType(null);
+                    await drawPatientNodes();
+                  }}
+                />
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+      )}
+      {/* ─── end “Add Follow‐up” ─── */}
+    </Container>
+  );
   }
 
 export default Patients;
