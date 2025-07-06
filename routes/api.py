@@ -508,6 +508,40 @@ def create_patient(validated_data):
             node_data['_id'] = ObjectId()
 
         # Create the Node instance with processed data
+        import pprint
+        pprint.pprint(node_data)
+        for child in node_data.get("children", []):
+            if '_id' not in child:
+                print("❌ Missing _id in child:", child)
+            else:
+                print("✅ Child has _id:", child['_id'])
+
+        def convert_ids_recursively(node):
+             if isinstance(node, dict):
+                # Assign _id if missing
+                if '_id' not in node:
+                    node['_id'] = ObjectId()
+                elif isinstance(node['_id'], str):
+                    try:
+                        node['_id'] = ObjectId(node['_id'])
+                    except Exception:
+                        pass  # Let MongoEngine raise a validation error if invalid
+
+                # Convert parent_id if needed
+                if 'parent_id' in node and isinstance(node['parent_id'], str):
+                    try:
+                        node['parent_id'] = ObjectId(node['parent_id'])
+                    except Exception:
+                        pass
+
+                # Recurse for children
+                if 'children' in node and isinstance(node['children'], list):
+                    for child in node['children']:
+                        convert_ids_recursively(child)
+
+        # use this just before instantiating the Node
+        convert_ids_recursively(node_data)
+
         new_node = Node(**node_data)
         
         # Generate tree hash
@@ -682,7 +716,20 @@ def add_node(validated_data, patient_id):
 
         hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
         patient_tree.tree_hash = hashlib.sha256(hash_input).hexdigest()
+        def fix_tree_node(node):
+            # Fix characteristic_data.char_type
+            if getattr(node, 'node_type', None) == 'characteristic':
+                char_data = getattr(node, 'characteristic_data', None)
+                if char_data:
+                    if not char_data or not getattr(char_data, 'char_type', None):
+                        raise ValueError(f"Missing required 'char_type' for characteristic node {getattr(node, '_id', 'unknown')}")
 
+
+            # Recursively fix children
+            for child in getattr(node, 'children', []):
+                fix_tree_node(child)
+
+        fix_tree_node(patient_tree.tree)
         PatientDriver.update(patient_tree)
         
         return jsonify({
