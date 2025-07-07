@@ -33,18 +33,12 @@ import TreatmentForm      from "../components/TreatmentForm";
 import { CharacteristicItem } from "../api/characteristics";
 import { TreatmentOption } from "../components/TreatmentForm";
 import FollowupForm from "../components/FollowupForm";
-// import { FollowupItem as Followup } from "../components/FollowupForm";
 import EditTreatmentForm from "../components/EditTreatmentForm";
 import dagre from 'dagre';
 
 /* -------------------------------------------------------------------------- */
 /*                                helpers                                     */
 /* -------------------------------------------------------------------------- */
-// interface PatientsProps {
-//   rootId?: string | null;
-// }
-
-
 interface CustomNodeProps extends NodeProps {
   setNodes?: React.Dispatch<React.SetStateAction<any[]>>;
 }
@@ -201,16 +195,6 @@ function applyDagreLayout(nodes: any[], edges: any[]) {
   const { rootId } = useParams<{ rootId?: string }>();
   const selectedRootId = rootId ?? null;
   const isOverview = selectedRootId === null;
-  // const COLORS = [
-  //   "#f8d9de", 
-  //   "#E3FFE8", 
-  //   "#d1f0f6", 
-  //   "#fff2cc", // pastel pink
-  //   "#D1C4E9", // pastel purple
-  //   "#FFE0B2", // pastel orange
-  //   "#FFCDD2", // pastel red
-  //   "#C8E6C9", // pastel green
-  // ];
 
   const [ctx, setCtx] = useState<              // null = closed
   | { x: number; y: number; nodeId: string }
@@ -240,17 +224,9 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
     const n = nodes.find((x: any) => x.id === uniqueCharOrTreatId);
     if (!n) return;
   
-    // common: we still need to know the patientTreeId for any update
-    // if (!patientTreeId) {
-    //   alert("Error: missing patientTreeId.");
-    //   return;
-    // }
-  
-    // (A) First, fetch the whole PatientTree document from the server
     axios
     .get("http://localhost:5000/api/patients")
     .then((res) => {
-      // 'res.data' is an array of strings (each string is JSON of one patient).
       const parsedList = res.data.map((item: string) => JSON.parse(item));
       // Find the one whose _id (or _id.$oid) matches patientTreeId:
       let patientDoc = parsedList.find((p: any) => {
@@ -275,7 +251,6 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
 
       const realPatientId: string = patientDoc._id?.$oid || patientDoc._id;
   
-      // Now you have the full tree object:
       const treeObj = patientDoc.tree;
       const foundNode = findNodeById(treeObj, uniqueCharOrTreatId);
       if (!foundNode) {
@@ -283,26 +258,19 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
         return;
       }
   
-        // (C) Extract the actual Mongo‐stored node._id (string) for the update URL
         const realNodeId: string = foundNode._id?.$oid || foundNode._id;
 
         const existingParentId: string = 
         foundNode.parent_id?._id?.$oid || foundNode.parent_id;
-        
-        // (D) Now check if this is a characteristic‐node or a treatment‐node,
-        // and open the appropriate modal with its data.
   
         if (n.data.type === "characteristic") {
-          // Pull out the existing characteristic_data + rate
           const existingType = foundNode.characteristic_data?.type || "";
           const existingName = foundNode.characteristic_data?.name || "";
           const existingRate = foundNode.rate ?? 0;
           // const existingParentId: string = foundNode.parent_id?._id?.$oid || foundNode.parent_id;
-  
-          // Pass those values into the Characteristic‐edit dialog
           setEditCharModalData({
             nodeId: realNodeId,
-            currentCharId: uniqueCharOrTreatId,  // this was characteristic_data._id
+            currentCharId: uniqueCharOrTreatId,
             currentType: existingType,
             currentName: existingName,
             currentRate: existingRate,
@@ -311,25 +279,6 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
           });
         }
         else if (n.data.type === "treatment") {
-          // Pull out the treatment_data payload from foundNode
-          // const treatData = foundNode.treatment_data || {};
-          // const existingName = treatData.name || "";
-          // const existingRegimen = treatData.regimen || {};
-          // const existingAlternatives = treatData.alternatives || [];
-          // const existingRate = foundNode.rate ?? 0;
-  
-          // Now set up your treatment‐edit modal state (you’ll need
-          // a corresponding `editTreatmentModalData` state variable, similar
-          // to editCharModalData). For example:
-          // setEditTreatmentModalData({
-          //   nodeId: realNodeId,
-          //   currentName: existingName,
-          //   currentRegimen: existingRegimen,
-          //   currentAlternatives: existingAlternatives,
-          //   currentRate: existingRate,
-          //   patientId: patientTreeId,
-          // });
-
           const treatData = foundNode.treatment_data || {};
           const existingRate = foundNode.rate ?? 0;
           const realNodeId    = foundNode._id?.$oid || foundNode._id;
@@ -460,7 +409,6 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
         // remove from React-Flow state
         // setNodes((ns) => ns.filter((n) => n.id !== nodeId));
         // setEdges((es) => es.filter((e) => e.source !== nodeId && e.target !== nodeId));
-        // optional full refresh:
         drawPatientNodes();
         alert("Node deleted.");
       })
@@ -522,18 +470,16 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
     const timer = setTimeout(() => {
       setDebouncedNodes(nodes);
       setDebouncedEdges(edges);
-    }, 50); // 50ms debounce
+    }, 50);
   
     return () => clearTimeout(timer);
   }, [nodes, edges]);
 
   useEffect(() => {
-      // each time the URL’s :rootId changes we re-draw
        drawPatientNodes();
     }, [selectedRootId]);
 
   useEffect(() => {
-      // ...inside your existing fetch block...
       axios.get("http://localhost:5000/api/treatments")
         .then((r) => {
           const list = r.data.map((x: string) => {
@@ -549,10 +495,10 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
       .then((r) => {
         const parsed = r.data.map((s: string) => JSON.parse(s));
         setRawPatients(parsed);
-        drawPatientNodes();      // refresh your graph using the same routine
+        drawPatientNodes();
       })
       .catch(console.error);
-  }, [selectedRootId]);  // re‐run whenever you drill in/out
+  }, [selectedRootId]);
     
   
   // fetch patients list for the list‑view (grid at top of page)
@@ -981,16 +927,7 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
                 )
               );
             }
-          
-          
         };
-    
-        // const treeIdMap = new Map<string, string>(
-        //   parsedPatients.map((p: any) => [
-        //     getUniqueCharId(p.tree),
-        //     p._id?.$oid || p._id,
-        //   ])
-        // );
 
         const treeIdMap = new Map<string, string>();
         parsedPatients.forEach((p: any) => {
@@ -1301,20 +1238,6 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
         </Menu>
 
         {/* ===== “Edit Characteristic” dialog ===== */}
-        {/* {editChar && (
-            <Dialog open onClose={() => setEditChar(null)} maxWidth="md" fullWidth>
-              <DialogTitle>Edit characteristic</DialogTitle>
-              <DialogContent dividers>
-                <CharacteristicForm
-                  initial={editChar ?? undefined}
-                  onSaved={async () => {
-                    setEditChar(null);
-                    await drawPatientNodes(); // refresh the map
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-          )} */}
         {editCharModalData && (
           <Dialog
             open={true}
@@ -1415,7 +1338,6 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
           maxWidth="sm"
           fullWidth>
           <DialogContent dividers>
-            {/* find the parent node’s treeId */}
             {(() => {
               const parent = nodes.find((n) => n.id === addingParentId)!;
               const rawParent = parent.data.parentDocId;
@@ -1450,7 +1372,6 @@ const [editTrt,  setEditTrt ]   = useState<TreatmentOption | null>(null);
                     setIsIranRightClick(false);
 
                     if (isIranRightClick) {
-                      // Special case: create patient with child
                       const csrf = Cookies.get("csrf_token") ?? "";
 
                       const charObj = allCharacteristics.find(
