@@ -21,7 +21,7 @@ interface OneChar {
 }
 
 interface EditCharModalData {
-  nodeId: string;       // the characteristic node’s ID in React-Flow
+  nodeId: string;     
   currentCharId: string;
   currentType: string;
   currentName: string;
@@ -31,13 +31,12 @@ interface EditCharModalData {
 }
 
 interface EditCharacteristicFormProps {
-  allChars: OneChar[];         // list of all characteristics
-  editData: EditCharModalData; // the data for the node being edited 
-  onCancel: () => void;        // close modal w/o saving
-  onSave: () => void;          // called after successful save
+  allChars: OneChar[];         
+  editData: EditCharModalData;
+  onCancel: () => void;       
+  onSave: () => void;          
 }
 
-// 👇 Correct syntax for a React.FC with typed props:
 const EditCharacteristicForm: React.FC<EditCharacteristicFormProps> = ({
   allChars,
   editData,
@@ -157,3 +156,4 @@ const EditCharacteristicForm: React.FC<EditCharacteristicFormProps> = ({
 };
 
 export default EditCharacteristicForm;
+export type { EditCharModalData, OneChar };

@@ -74,11 +74,17 @@ const EditTreatmentForm: React.FC<EditTreatmentFormProps> = ({
         };
       }
 
-      await axios.put(
+      const response = await axios.put(
         `http://localhost:5000/api/patients/${patientId}/node/${nodeId}`,
         body,
         cfg
       );
+      if (response.data?.message) {
+        alert(response.data.message);
+      } else {
+        alert("Node updated successfully.");
+      }
+
       onSave();
     } catch (e: any) {
       console.error("Failed to update treatment node:", e);
@@ -129,3 +135,4 @@ const EditTreatmentForm: React.FC<EditTreatmentFormProps> = ({
 };
 
 export default EditTreatmentForm;
+export type { EditTreatModalData, EditTreatmentFormProps };

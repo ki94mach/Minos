@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Handle, Position, useReactFlow } from "reactflow";
+import { Handle, Position, useReactFlow, NodeProps } from "reactflow";
 import { useNavigate } from "react-router-dom";
 import { Tooltip } from "@mui/material";
-import { NodeProps } from "reactflow";
-
 
 const CustomNode = (
   props: NodeProps & {
@@ -33,10 +31,9 @@ const CustomNode = (
 
   // For overview nodes: fixed square dimensions so 50% borderRadius = circle
   // For drilled‐in nodes: keep them as rounded rectangles (8px radius)
-  const isOverview = nodeData.isOverview === true;
-  const containerStyle: React.CSSProperties = isOverview
+  const isOverviewMode = nodeData.isOverviewMode === true;
+  const containerStyle: React.CSSProperties = isOverviewMode
     ? {
-        // FORCE a square:
         width: "120px",
         height: "120px",
         borderRadius: "50%",
@@ -48,7 +45,12 @@ const CustomNode = (
         justifyContent: "center",
         cursor: "pointer",
         textAlign: "center",
-        padding: "0", // no extra top/bottom padding
+        padding: "4px",
+        boxSizing: "border-box",
+        overflow: "hidden",
+        whiteSpace: "normal", 
+        wordWrap: "break-word",
+        fontSize: "14px",
       }
     : {
         // Drilled‐in style: keep your existing rounded‐rectangle look
@@ -73,7 +75,7 @@ const CustomNode = (
     setTimeout(() => {
       fitView();
     }, 300);
-  }, [isOverview]);
+  }, [isOverviewMode]);
   
 
   useEffect(() => {
@@ -156,11 +158,7 @@ const formattedSize =
     : "";
 
   return (
-    <Tooltip
-      title={tooltipContent}
-      arrow
-      placement="bottom"
-    >
+    <Tooltip title={tooltipContent} arrow placement="bottom">
       <div
         ref={containerRef}
         onContextMenu={(e) => onContextMenu(e, id)}
@@ -173,8 +171,7 @@ const formattedSize =
           if (nodeData?.depth > 0) setIsEditing(true);
         }}
         onBlur={handleBlur}
-        tabIndex={-1}
-      >
+        tabIndex={-1}>
         {isEditing ? (
           <>
             <input
@@ -204,7 +201,11 @@ const formattedSize =
           </>
         ) : (
           <>
-            {nodeData?.label && <strong>{nodeData.label}</strong>}
+            {nodeData?.label && (
+              <strong>
+                {nodeData.label}
+              </strong>
+            )}
             {nodeData?.size !== undefined && <div>Size: {formattedSize}</div>}
           </>
         )}
