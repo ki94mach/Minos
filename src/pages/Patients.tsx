@@ -5,7 +5,6 @@ import ReactFlow, {
   useNodesState,
   Connection,
   Edge,
-  NodeProps,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import {
@@ -33,7 +32,6 @@ import AddCharacteristicDialog from "../components/patientDialogs/AddCharacteris
 import AddTreatmentDialog from "../components/patientDialogs/AddTreatmentDialog";
 import AddFollowupDialog from "../components/patientDialogs/AddFollowupDialog";
 import { buildFlowNodes } from "../utils/buildFlowNodes";
-
 import {
   getUniqueCharId,
   findNodeById,
@@ -45,11 +43,6 @@ import {
 /* -------------------------------------------------------------------------- */
 /*                                helpers                                     */
 /* -------------------------------------------------------------------------- */
-interface CustomNodeProps extends NodeProps {
-  setNodes?: React.Dispatch<React.SetStateAction<any[]>>;
-}
-
-
 interface EditCharModalData {
   nodeId: string;             
   currentCharId: string;      
@@ -65,10 +58,6 @@ interface EditTreatModalData {
   currentTreatId: string;
   currentRate: number;
   patientId: string;
-}
-
-function addNodeApi() {
-
 }
 /* -------------------------------------------------------------------------- */
 /*                               component                                    */
@@ -92,15 +81,10 @@ const Patients: React.FC = () => {
     //     window.removeEventListener("error", observerErrorHandler);
     //   };
     // }, []);
-    
-
-    
+  
   /* ------------------------------ state ----------------------------------- */
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-
-  const [selectedPopulation, setSelectedPopulation] = useState("");
-  const [customPopulationNumber, setCustomPopulationNumber] = useState("");
 
   const [charTypes, setCharTypes] = useState<string[]>([]);
   const [charNames, setCharNames] = useState<string[]>([]);
@@ -109,10 +93,6 @@ const Patients: React.FC = () => {
   >([]);
   const [selectedCharType, setSelectedCharType] = useState<string>("");
   const [selectedCharName, setSelectedCharName] = useState<string>("");
-  const [selectedCharObj, setSelectedCharObj] = useState<
-    | { _id: string; type: string; name: string }
-    | null
-  >(null);
 
   const [debouncedNodes, setDebouncedNodes] = useState<any[]>([]);
   const [debouncedEdges, setDebouncedEdges] = useState<any[]>([]);
@@ -236,42 +216,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         alert("Could not load the patient’s tree for editing.");
       });
   }
-
-  function generateReactFlowNodesFromTree(tree: any, patientId: string): any[] {
-  const traverse = (node: any, depth = 0, position = { x: 0, y: 0 }): any[] => {
-    const nodes: any[] = [];
-
-    const nodeId = node._id?.$oid || node._id;
-
-    nodes.push({
-      id: nodeId,
-      type: "custom",
-      position: {
-        x: position.x,
-        y: position.y + depth * 150,
-      },
-      data: {
-        ...node,
-        docId: node._id?.$oid || node._id,
-        treeId: patientId, // ✅ ensure all nodes have their patient tree ID
-      },
-    });
-
-    if (node.children && Array.isArray(node.children)) {
-      node.children.forEach((child: any, index: number) => {
-        const childPosition = {
-          x: position.x + index * 200,
-          y: position.y + 150,
-        };
-        nodes.push(...traverse(child, depth + 1, childPosition));
-      });
-    }
-
-    return nodes;
-  };
-
-  return traverse(tree);
-}
  
 
   /* ───────────── remove one node + its edges ───────────── */
@@ -504,58 +448,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   };
   
 
-  /* -------------------------- form submit -------------------------------- */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (
-      selectedPopulation === "Custom Population" &&
-      customPopulationNumber.trim() === ""
-    ) {
-      alert("Please enter a valid population number.");
-      return;
-    }
-
-    const populationNumber =
-      selectedPopulation === "Custom Population"
-        ? Number(customPopulationNumber)
-        : null;
-
-    try {
-      const csrfToken = Cookies.get("csrf_token");
-      const config = {
-        withCredentials: true,
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrfToken || "",
-        },
-      };
-
-      const { data } = await axios.post(
-        "http://localhost:5000/api/patients",
-        {
-          node: {
-            node_type: "characteristic",
-            rate: 1.0,
-            size: populationNumber,
-            characteristic_data: {
-              _id: selectedCharObj?._id,
-              char_type: selectedCharType,
-              name: selectedCharName,
-            },
-          },
-        },
-        config
-      );
-
-      /* After creating a patient, re‑draw the entire map */
-      await drawPatientNodes();
-      alert("Patient tree created and displayed!");
-    } catch (err) {
-      console.error("Error during patient creation:", err);
-      alert("Failed to create patient tree.");
-    }
-  };
-
   /* ---------------------------------------------------------------------- */
   /*   Build the merged graph of *all* patient trees without duplicates     */
   /* ---------------------------------------------------------------------- */
@@ -627,16 +519,11 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
          * ────────────────────────────────────────────────── */
         const isOverviewMode = selectedRootId === null;
         const visited = new Set<string>();
-        const CENTER_X = 400;
-        const CENTER_Y = 250;
-        const OVERVIEW_RADIUS = 400;
         const H_SPACING = 200;
         const V_SPACING = 150;
-    
         const nodesById = new Map<string, any>();
         const edges: Edge[] = [];
         const edgeSet = new Set<string>();
-        let nextRootX = 0;
     
         /* ──────────────────────────────────────────────────
          * 2) DFS function: MERGE duplicate “Iran” by using
@@ -653,9 +540,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           };
           collectIds(p.tree);
         });
-
-
-        const allNodes: any[] = [];
 
         // ──────────────────────────────────────────────────
         // 3) Kick off DFS for each root
@@ -855,7 +739,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         alert("Failed to draw patients.");
       }
     };
-    
 
   /* ---------------------------------------------------------------------- */
   /*                                  UI                                    */
