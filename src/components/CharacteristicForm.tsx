@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import api from "../api";
 import Cookies from "js-cookie";
-import { TextField, Button, Stack, FormControl, InputLabel, Select, MenuItem, Typography } from "@mui/material";
+import { TextField, Button, Stack, FormControl, Autocomplete } from "@mui/material";
 import { API_ENDPOINTS } from "../api/endpoints";
 
 interface CharacteristicOption {
@@ -57,6 +57,7 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
   const [selectedId, setSelectedId] = useState(initial?._id || "");
   const [rate, setRate] = useState<number>(initial?.rate ?? 1);
   const [busy, setBusy] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Fetch available characteristics for dropdown
   useEffect(() => {
@@ -162,25 +163,24 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
   return (
     <Stack spacing={2} component="form" onSubmit={handleSubmit}>
       <FormControl fullWidth required>
-        <InputLabel id="char-select-label">Characteristic</InputLabel>
-        <Select
-          labelId="char-select-label"
-          label="Characteristic"
-          value={selectedId}
-          onChange={(e) => setSelectedId(e.target.value as string)}
-        >
-          {options.map((opt) => (
-            <MenuItem key={opt._id} value={opt._id}>
-              {opt.type} – {opt.name}
-            </MenuItem>
-          ))}
-        </Select>
+        <Autocomplete
+          options={options}
+          getOptionLabel={(option) => `${option.type} – ${option.name}`}
+          value={options.find((opt) => opt._id === selectedId) || null}
+          onChange={(event, newValue) => {
+            if (newValue) setSelectedId(newValue._id);
+          }}
+          renderInput={(params) => (
+            <TextField {...params} label="Select Characteristic" required />
+          )}
+          isOptionEqualToValue={(option, value) => option._id === value._id}
+        />
       </FormControl>
 
       <TextField
         label="Rate"
         type="number"
-        inputProps={{ step: "0.01", min: 0, max: 1 }}
+        inputProps={{ step: "any", min: 0, max: 1 }}
         value={rate}
         onChange={(e) => setRate(parseFloat(e.target.value))}
         required

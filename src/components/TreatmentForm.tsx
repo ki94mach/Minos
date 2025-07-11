@@ -151,8 +151,7 @@ export default function TreatmentForm({
           labelId="treatment-select-label"
           value={selectedId}
           label="Treatment"
-          onChange={(e) => setSelectedId(e.target.value)}
-        >
+          onChange={(e) => setSelectedId(e.target.value)}>
           {treatments.map((t) => (
             <MenuItem key={t._id} value={t._id}>
               {t.name} ({t.type})
@@ -164,7 +163,7 @@ export default function TreatmentForm({
       <TextField
         label="Rate"
         type="number"
-        inputProps={{ step: "0.01", min: 0, max: 1 }}
+        inputProps={{ step: "any", min: 0, max: 1 }}
         value={rate}
         onChange={(e) => setRate(parseFloat(e.target.value))}
         required

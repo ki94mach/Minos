@@ -90,7 +90,7 @@ export default function FollowupForm({
       <TextField
         label="Overall Survival"
         type="number"
-        inputProps={{ step: 0.01, min: 0, max: 1 }}
+        inputProps={{ step: "any", min: 0, max: 1 }}
         value={overallSurvival}
         onChange={(e) => setOverallSurvival(parseFloat(e.target.value))}
         required
