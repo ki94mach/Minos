@@ -8,8 +8,9 @@ import {
   Alert,
   Link,
 } from "@mui/material";
-import axios from "axios";
+import api from "../../api";
 import { useNavigate, useSearchParams  } from "react-router-dom";
+import { API_ENDPOINTS } from "../../api/endpoints";
 
 const PasswordManager: React.FC = () => {
   const navigate = useNavigate();
@@ -40,14 +41,14 @@ const PasswordManager: React.FC = () => {
     let url = "";
   
     if (mode === "reset" && token) {
-      url = `http://localhost:5000/auth/reset-password/${token}`;
+      url = API_ENDPOINTS.RESET_PASSWORD;
     } else if (mode === "forgot") {
-      url = "http://localhost:5000/auth/forgot-password";
+      url = API_ENDPOINTS.FORGOT_PASSWORD;
     } else if (mode === "change") {
-      url = "http://localhost:5000/auth/change-password";
+      url = API_ENDPOINTS.CHANGE_PASSWORD;
     }
   
-    const res = await axios.get(url, {
+    const res = await api.get(url, {
       withCredentials: true,
       responseType: "text",
     });
@@ -67,8 +68,8 @@ const PasswordManager: React.FC = () => {
     try {
       const csrfToken = await getCSRF();
 
-      const response = await axios.post(
-        "http://localhost:5000/auth/forgot-password",
+      const response = await api.post(
+        API_ENDPOINTS.FORGOT_PASSWORD,
         { email },
         {
           withCredentials: true,
@@ -98,8 +99,8 @@ const PasswordManager: React.FC = () => {
     try {
       const csrfToken = await getCSRF();
 
-      const response = await axios.post(
-        "http://localhost:5000/auth/reset-password",
+      const response = await api.post(
+        API_ENDPOINTS.RESET_PASSWORD,
         { token, password: newPassword },
         {
           withCredentials: true,
@@ -130,8 +131,8 @@ const PasswordManager: React.FC = () => {
     try {
       const csrfToken = await getCSRF();
 
-      const response = await axios.post(
-        "http://localhost:5000/auth/change-password",
+      const response = await api.post(
+        API_ENDPOINTS.CHANGE_PASSWORD,
         {
           current_password: currentPassword,
           new_password: newPassword,

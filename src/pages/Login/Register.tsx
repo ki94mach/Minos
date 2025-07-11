@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../api";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -9,6 +9,7 @@ import {
   Typography,
 } from "@mui/material";
 import Cookies from "js-cookie";
+import { API_ENDPOINTS } from "../../api/endpoints";
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -23,19 +24,9 @@ const Register: React.FC = () => {
     const expires = new Date(Date.now() + days * 864e5).toUTCString();
     document.cookie = `${name}=${value}; expires=${expires}; path=/`;
   }
-
-  // useEffect(() => {
-  //   // This triggers Flask to set CSRF cookie automatically
-  //   axios.get("http://localhost:5000/auth/register", {
-  //     withCredentials: true,
-  //   }).catch(err => {
-  //     console.error("Failed to initiate CSRF flow:", err);
-  //   });
-  // }, []);
-
-  
+ 
     useEffect(() => {
-      axios.get("http://localhost:5000/auth/register", {
+      api.get(API_ENDPOINTS.REGISTER, {
         withCredentials: true,
         responseType: "text",
       })
@@ -75,8 +66,8 @@ const Register: React.FC = () => {
     try {
       const token = Cookies.get("csrf_token") || csrfToken;
       
-      await axios.post(
-        "http://localhost:5000/auth/register",
+      await api.post(
+        API_ENDPOINTS.REGISTER,
         { email,
           password,
           confirm_password: confirmPassword,

@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { Stack, TextField, Button } from "@mui/material";
-import axios from "axios";
+import api from "../api";
 import Cookies from "js-cookie";
-import { nodeModuleNameResolver } from "typescript";
+import { API_ENDPOINTS } from "../api/endpoints";
 
 export default function FollowupForm({
   parentId,
@@ -37,8 +37,8 @@ export default function FollowupForm({
 
     try {
       // Step 1: Create the follow-up and get its ID
-      const createResp = await axios.post(
-        "http://localhost:5000/api/followups",
+      const createResp = await api.post(
+        API_ENDPOINTS.FOLLOWUPS,
         {
           name: name,
           overall_survival: overallSurvival,
@@ -52,8 +52,8 @@ export default function FollowupForm({
       const size = Math.round(parentSize * overallSurvival);
 
       // Step 2: Add the follow-up node to the patient tree
-      await axios.post(
-        `http://localhost:5000/api/patients/${patientId}/add_node`,
+      await api.post(
+        API_ENDPOINTS.ADD_NODE(patientId),
         {
           parent_node_id: parentId,
           node: {

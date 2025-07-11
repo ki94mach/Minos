@@ -1,15 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { TextField, Button, Typography, Container, Card, CardContent, List, ListItem, ListItemText, IconButton, DialogTitle, Dialog, DialogContent } from "@mui/material";
+import { TextField, Button, Typography, Container, Card, CardContent, List, ListItem, ListItemText, IconButton, DialogTitle, Dialog } from "@mui/material";
 import { Edit, Delete } from "@mui/icons-material";
-import axios from "axios";
+import api from "../api";
 import BackButton from "../components/BackButton";
 import Cookies from "js-cookie";
-import CharacteristicForm from "../components/CharacteristicForm";
-import {
-  listCharacteristics,
-  deleteCharacteristic,
-  CharacteristicItem,
-} from "../api/characteristics";
+import { API_ENDPOINTS } from "../api/endpoints";
 
 interface Characteristic {
     _id: string;
@@ -32,7 +27,7 @@ const Characteristics: React.FC = () => {
 
     const fetchCharacteristics = async () => {
         try {
-            const response = await axios.get("http://localhost:5000/api/characteristics");
+            const response = await api.get(API_ENDPOINTS.CHARACTERISTICS);
             const parsed = response.data.map((item: string) => {
                 const obj = JSON.parse(item);
                 return { ...obj, _id: obj._id.$oid };
@@ -60,17 +55,17 @@ const Characteristics: React.FC = () => {
             };
     
             if (editingId) {
-                await axios.put(
-                    `http://localhost:5000/api/characteristics/${editingId}`,
-                    { type, name },
-                    config
+                await api.put(
+                  API_ENDPOINTS.CHARACTERISTIC_DETAIL(editingId),
+                  { type, name },
+                  config
                 );
                 setEditingId("");
             } else {
-                await axios.post(
-                    "http://localhost:5000/api/characteristics",
-                    { type, name },
-                    config
+                await api.post(
+                  API_ENDPOINTS.CHARACTERISTICS,
+                  { type, name },
+                  config
                 );
             }
     
@@ -100,7 +95,7 @@ const Characteristics: React.FC = () => {
         try {
             const csrfToken = Cookies.get("csrf_token");
 
-            await axios.delete(`http://localhost:5000/api/characteristics/${char_id}`, {
+            await api.delete(API_ENDPOINTS.CHARACTERISTIC_DETAIL(char_id), {
             headers: {
                 "Content-Type": "application/json",
                 "X-CSRFToken": csrfToken || "",

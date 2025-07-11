@@ -2,6 +2,7 @@ import { Dialog, DialogContent } from "@mui/material";
 import CharacteristicForm from "../CharacteristicForm";
 import type { OneChar } from "../EditCharacteristicForm";
 import type { Node } from "reactflow";
+import { API_ENDPOINTS } from "../../api/endpoints";
 
 type Props = {
   open: boolean;
@@ -73,7 +74,7 @@ export default function AddCharacteristicDialog({
                 },
               };
 
-              await fetch("http://localhost:5000/api/patients", {
+              await fetch(API_ENDPOINTS.PATIENTS, {
                 method: "POST",
                 credentials: "include",
                 headers: {

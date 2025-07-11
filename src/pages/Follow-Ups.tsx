@@ -1,7 +1,8 @@
 import React, {useEffect, useState} from "react";
 import { TextField, Button, Typography, Container, Card, CardContent, Select, MenuItem, FormControl, InputLabel, Box, Grid, TableContainer, TableCell, Table, TableHead, TableRow, TableBody, Paper } from "@mui/material";
-import axios from "axios";
+import api from "../api";
 import BackButton from "../components/BackButton";
+import { API_ENDPOINTS } from "../api/endpoints";
 
 const FollowUps: React.FC = () => {
     const [followups, setFollowups] = useState<any[]>([]);
@@ -16,7 +17,7 @@ const FollowUps: React.FC = () => {
 
     const fetchFollowups = async () => {
         try {
-            const response = await axios.get("http://localhost:5000/api/followups");
+            const response = await api.get(API_ENDPOINTS.FOLLOWUPS);
             setFollowups(response.data);
         } catch (error) {
             console.error("Error fetching followups:", error);
@@ -26,11 +27,11 @@ const FollowUps: React.FC = () => {
     const handleCreateFollowup = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const response = await axios.post("http://localhost:5000/api/followups", {
-                name,
-                overall_survival: parseFloat(overallSurvival),
-                patient_id: patientId,
-                parent_id: parentId
+            const response = await api.post(API_ENDPOINTS.FOLLOWUPS, {
+              name,
+              overall_survival: parseFloat(overallSurvival),
+              patient_id: patientId,
+              parent_id: parentId,
             });
             alert("Follow-up created successfully!");
             fetchFollowups();
@@ -42,7 +43,7 @@ const FollowUps: React.FC = () => {
 
     const handleDeleteFollowup = async (id: string) => {
         try {
-            await axios.delete(`http://localhost:5000/api/followups/${id}`);
+            await api.delete(API_ENDPOINTS.FOLLOWUP_DETAIL(id));
             alert("Follow-up deleted successfully!");
             fetchFollowups();
         } catch (error) {

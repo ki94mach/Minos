@@ -5,11 +5,11 @@ import {
     ListItem, ListItemText, FormHelperText, Grid, Paper, Autocomplete
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import axios from "axios";
-import { v4 as uuidv4 } from "uuid"; // ✅ Used for temporary _id for alternatives
+import api from "../api";
 import BackButton from "../components/BackButton";
 import { Edit, Delete } from "@mui/icons-material";
 import Cookies from "js-cookie";
+import { API_ENDPOINTS } from "../api/endpoints";
 
 interface Drug {
     _id: string;
@@ -68,7 +68,7 @@ const Treatments: React.FC = () => {
 
     const fetchDrugs = async () => {
         try {
-            const response = await axios.get("http://localhost:5000/api/drugs");
+            const response = await api.get(API_ENDPOINTS.DRUGS);
             const parsedDrugs = response.data.map((item: string) => {
                 const obj = JSON.parse(item);
                 return {
@@ -84,7 +84,7 @@ const Treatments: React.FC = () => {
 
     const fetchTreatments = async () => {
         try {
-            const response = await axios.get("http://localhost:5000/api/treatments");
+            const response = await api.get(API_ENDPOINTS.TREATMENTS);
             const parsedTreatments = response.data.map((item: string) => {
                 const obj = JSON.parse(item);
                 return { ...obj, _id: obj._id.$oid };
@@ -213,14 +213,14 @@ const Treatments: React.FC = () => {
           console.log("Submitting payload:", JSON.stringify(payload, null, 2));
 
           if (editingTreatmentId) {
-            await axios.put(
-              `http://localhost:5000/api/treatments/${editingTreatmentId}`,
+            await api.put(
+              API_ENDPOINTS.TREATMENT_DETAIL(editingTreatmentId),
               payload,
               config
             );
             alert("Treatment updated.");
           } else {
-            await axios.post("http://localhost:5000/api/treatments", payload, config);
+            await api.post(API_ENDPOINTS.TREATMENTS, payload, config);
             alert("Treatment added.");
           }
           setErrors("");
@@ -285,7 +285,7 @@ const Treatments: React.FC = () => {
         try{
             const csrfToken = Cookies.get("csrf_token");
 
-          await axios.delete(`http://localhost:5000/api/treatments/${treatmentId}`, {
+          await api.delete(API_ENDPOINTS.TREATMENT_DETAIL(treatmentId), {
             withCredentials: true,
             headers: {
               "Content-Type": "application/json",

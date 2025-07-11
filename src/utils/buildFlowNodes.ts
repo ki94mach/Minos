@@ -59,7 +59,12 @@ export function buildFlowNodes(
     if (parentId) {
       const edgeId = `${parentId}->${nodeId}`;
       if (!edgeSet.has(edgeId)) {
-        edges.push({ id: edgeId, source: parentId, target: nodeId });
+        edges.push({ id: edgeId,
+                     source: parentId,
+                     target: nodeId,
+                     type: "default",
+                     style: { stroke: "#000000", strokeWidth: 0.75 },
+                   });
         edgeSet.add(edgeId);
       }
     }
@@ -157,7 +162,13 @@ export function buildFlowNodes(
   if (parentId) {
     const edgeId = `${parentId}->${nodeId}`;
     if (!edgeSet.has(edgeId)) {
-      edges.push({ id: edgeId, source: parentId, target: nodeId });
+      edges.push({
+        id: edgeId,
+        source: parentId,
+        target: nodeId,
+        type: "default",
+        style: { stroke: "#000000", strokeWidth: 0.75 },
+      });
       edgeSet.add(edgeId);
     }
   }

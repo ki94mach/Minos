@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
-import axios from "axios";
+import api from "../api";
 import Cookies from "js-cookie";
 import { TextField, Button, Stack, FormControl, InputLabel, Select, MenuItem, Typography } from "@mui/material";
+import { API_ENDPOINTS } from "../api/endpoints";
 
 interface CharacteristicOption {
   _id: string;
@@ -59,7 +60,7 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
 
   // Fetch available characteristics for dropdown
   useEffect(() => {
-    axios.get("http://localhost:5000/api/characteristics")
+    api.get(API_ENDPOINTS.CHARACTERISTICS)
       .then((response) => {
         const parsed: CharacteristicOption[] = response.data.map((item: string) => {
           const obj = JSON.parse(item);
@@ -149,11 +150,7 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
 
     console.log("Parent Node id:", parentId);
     
-      await axios.post(
-        `http://localhost:5000/api/patients/${patientId}/add_node`,
-        payload,
-        config
-      );
+      await api.post(API_ENDPOINTS.ADD_NODE(patientId), payload, config);
       onSaved({ characteristicId: selectedId, rate });
     } catch (err) {
       console.error("Failed to add node:", err);

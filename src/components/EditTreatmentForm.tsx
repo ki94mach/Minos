@@ -12,9 +12,10 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import axios from "axios";
+import api from "../api";
 import Cookies from "js-cookie";
 import { TreatmentOption } from "./TreatmentForm";
+import { API_ENDPOINTS } from "../api/endpoints";
 
 interface EditTreatModalData {
   nodeId: string;            // the node’s Mongo _id
@@ -74,8 +75,8 @@ const EditTreatmentForm: React.FC<EditTreatmentFormProps> = ({
         };
       }
 
-      const response = await axios.put(
-        `http://localhost:5000/api/patients/${patientId}/node/${nodeId}`,
+      const response = await api.put(
+        API_ENDPOINTS.UPDATE_NODE(patientId, nodeId),
         body,
         cfg
       );

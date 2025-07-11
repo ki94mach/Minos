@@ -1,9 +1,10 @@
 import React, {useEffect, useState} from "react";
 import { TextField, Button, Typography, Container, Card, CardContent, Select, MenuItem, FormControl, InputLabel, Box, IconButton } from "@mui/material";
-import axios from "axios";
+import api from "../api";
 import BackButton from "../components/BackButton";
 import Cookies from "js-cookie";
 import { Edit, Delete } from "@mui/icons-material";
+import { API_ENDPOINTS } from "../api/endpoints";
 
 
 interface Drug {
@@ -31,7 +32,7 @@ const Drugs: React.FC = () => {
     const fetchDrugs = async () => {
         setLoading(true);
         try {
-            const response = await axios.get("http://localhost:5000/api/drugs");
+            const response = await api.get(API_ENDPOINTS.DRUGS);
             const parsedDrugs = response.data.map((item: string) => {
                 const parsed = JSON.parse(item);
                 return { ...parsed, _id: parsed._id?.$oid || parsed._id, };
@@ -64,16 +65,16 @@ const Drugs: React.FC = () => {
             };
     
             if (editingId) {                
-                await axios.put(
-                  `http://localhost:5000/api/drugs/${editingId}`,
+                await api.put(
+                  API_ENDPOINTS.DRUG_DETAIL(editingId),
                   { name, strength: Number(strength), unit },
                   config
                 );
                 setEditingId("");
                 alert("Drug updated successfully!");
               } else {
-                await axios.post(
-                  "http://localhost:5000/api/drugs",
+                await api.post(
+                  API_ENDPOINTS.DRUGS,
                   { name, strength: Number(strength), unit },
                   config
                 );
@@ -104,7 +105,7 @@ const Drugs: React.FC = () => {
         try {
           const csrfToken = Cookies.get("csrf_token");
     
-          await axios.delete(`http://localhost:5000/api/drugs/${id}`, {
+          await api.delete(API_ENDPOINTS.DRUG_DETAIL(id), {
             withCredentials: true,
             headers: {
               "Content-Type": "application/json",

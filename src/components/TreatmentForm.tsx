@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import Cookies from "js-cookie";
 import {
   Button,
@@ -11,6 +11,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { API_ENDPOINTS } from "../api/endpoints";
 
 interface Drug {
   _id: string;
@@ -53,7 +54,7 @@ export default function TreatmentForm({
 
   // Fetch all treatments of type "Regimen"
   useEffect(() => {
-    axios.get("http://localhost:5000/api/treatments")
+    api.get(API_ENDPOINTS.TREATMENTS)
       .then((res) => {
         const parsed: TreatmentOption[] = res.data.map((item: string) => {
           const obj = JSON.parse(item);
@@ -130,8 +131,7 @@ export default function TreatmentForm({
 
       console.log("Payload:", payload);
 
-      await axios.post(
-        `http://localhost:5000/api/patients/${patientId}/add_node`,
+      await api.post(API_ENDPOINTS.ADD_NODE(patientId),
         payload,
         config
       );

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../api";
 import {
   Box,
   Button,
@@ -9,6 +9,7 @@ import {
   Alert,
 } from "@mui/material";
 import { useSearchParams } from "react-router-dom";
+import { API_ENDPOINTS } from "../../api/endpoints";
 
 const ResetPassword: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -34,8 +35,8 @@ const ResetPassword: React.FC = () => {
     try {
       const csrfToken = (document.getElementById("csrf_token") as HTMLInputElement)?.value;
 
-      const response = await axios.post(
-        "/auth/reset-password",
+      const response = await api.post(
+        API_ENDPOINTS.RESET_PASSWORD,
         {
           token,
           password,
@@ -65,8 +66,8 @@ const ResetPassword: React.FC = () => {
     try {
       const csrfToken = (document.getElementById("csrf_token") as HTMLInputElement)?.value;
 
-      const response = await axios.post(
-        "/auth/forgot-password",
+      const response = await api.post(
+        API_ENDPOINTS.FORGOT_PASSWORD,
         {
           email,
         },

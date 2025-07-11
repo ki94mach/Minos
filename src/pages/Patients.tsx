@@ -18,7 +18,7 @@ import {
   DialogTitle,
   DialogContent,
 } from "@mui/material";
-import axios from "axios";
+import api from "../api";
 import BackButton from "../components/BackButton";
 import CustomNode from "../components/CustomNode";
 import Cookies from "js-cookie";
@@ -39,6 +39,7 @@ import {
   hashColor,
   applyDagreLayout
 } from "../utils/patientTreeUtils";
+import { API_ENDPOINTS } from "../api/endpoints";
 
 /* -------------------------------------------------------------------------- */
 /*                                helpers                                     */
@@ -142,45 +143,45 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
     const n = nodes.find((x: any) => x.id === uniqueCharOrTreatId);
     if (!n) return;
   
-    axios
-    .get("http://localhost:5000/api/patients")
-    .then((res) => {
-      const parsedList = res.data.map((item: string) => JSON.parse(item));
-      // Find the one whose _id (or _id.$oid) matches patientTreeId:
-      let patientDoc = parsedList.find((p: any) => {
-        const pid = p._id?.$oid || p._id;
-        return pid === patientTreeId;
-      });
-      if (!patientDoc) {
-        for (const p of parsedList) {
-          // p.tree is the root of this patient’s embedded‐tree
-          const maybeMatch = findNodeById(p.tree, uniqueCharOrTreatId);
-          if (maybeMatch) {
-            patientDoc = p;
-            break;
+    api
+      .get(API_ENDPOINTS.PATIENTS)
+      .then((res) => {
+        const parsedList = res.data.map((item: string) => JSON.parse(item));
+        // Find the one whose _id (or _id.$oid) matches patientTreeId:
+        let patientDoc = parsedList.find((p: any) => {
+          const pid = p._id?.$oid || p._id;
+          return pid === patientTreeId;
+        });
+        if (!patientDoc) {
+          for (const p of parsedList) {
+            // p.tree is the root of this patient’s embedded‐tree
+            const maybeMatch = findNodeById(p.tree, uniqueCharOrTreatId);
+            if (maybeMatch) {
+              patientDoc = p;
+              break;
+            }
           }
         }
-      }
-  
-      if (!patientDoc) {
-        alert("Could not find that patient in the list.");
-        return;
-      }
 
-      const realPatientId: string = patientDoc._id?.$oid || patientDoc._id;
-  
-      const treeObj = patientDoc.tree;
-      const foundNode = findNodeById(treeObj, uniqueCharOrTreatId);
-      if (!foundNode) {
-        alert("Node not found inside this patient’s tree.");
-        return;
-      }
-  
+        if (!patientDoc) {
+          alert("Could not find that patient in the list.");
+          return;
+        }
+
+        const realPatientId: string = patientDoc._id?.$oid || patientDoc._id;
+
+        const treeObj = patientDoc.tree;
+        const foundNode = findNodeById(treeObj, uniqueCharOrTreatId);
+        if (!foundNode) {
+          alert("Node not found inside this patient’s tree.");
+          return;
+        }
+
         const realNodeId: string = foundNode._id?.$oid || foundNode._id;
 
-        const existingParentId: string = 
-        foundNode.parent_id?._id?.$oid || foundNode.parent_id;
-  
+        const existingParentId: string =
+          foundNode.parent_id?._id?.$oid || foundNode.parent_id;
+
         if (n.data.type === "characteristic") {
           const existingType = foundNode.characteristic_data?.type || "";
           const existingName = foundNode.characteristic_data?.name || "";
@@ -193,23 +194,21 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             currentName: existingName,
             currentRate: existingRate,
             patientId: realPatientId,
-            parentId: existingParentId
+            parentId: existingParentId,
           });
-        }
-        else if (n.data.type === "treatment") {
+        } else if (n.data.type === "treatment") {
           const treatData = foundNode.treatment_data || {};
           const existingRate = foundNode.rate ?? 0;
-          const realNodeId    = foundNode._id?.$oid || foundNode._id;
+          const realNodeId = foundNode._id?.$oid || foundNode._id;
           const realPatientId = patientDoc._id?.$oid || patientDoc._id;
 
           setEditTreatModalData({
             nodeId: realNodeId,
-            currentTreatId: uniqueCharOrTreatId, 
+            currentTreatId: uniqueCharOrTreatId,
             currentRate: existingRate,
             patientId: realPatientId,
           });
         }
-  
       })
       .catch((err) => {
         console.error("Failed to fetch patientTree for editing:", err);
@@ -233,7 +232,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       return;
     }
   
-    const endpoint = `http://localhost:5000/api/patients/${patientTreeId}/node/${nodeDocId}`;
+    const endpoint = API_ENDPOINTS.DELETE_NODE(patientTreeId, nodeDocId);
   
     const csrf = Cookies.get("csrf_token") ?? "";
     const cfg  = {
@@ -241,7 +240,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
     };
   
-    axios
+    api
       .delete(endpoint, cfg)
       .then(() => {
         // remove from React-Flow state
@@ -318,7 +317,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
     }, [selectedRootId]);
 
   useEffect(() => {
-      axios.get("http://localhost:5000/api/treatments")
+      api.get(API_ENDPOINTS.TREATMENTS)
         .then((r) => {
           const list = r.data.map((x: string) => {
             const o = JSON.parse(x);
@@ -329,7 +328,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   }, [selectedRootId]);
 
   useEffect(() => {
-    axios.get("http://localhost:5000/api/patients")
+    api.get(API_ENDPOINTS.PATIENTS)
       .then((r) => {
         const parsed = r.data.map((s: string) => JSON.parse(s));
         setRawPatients(parsed);
@@ -344,7 +343,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
     if (!selectedRootId) {
       const fetchPatients = async () => {
         try {
-          const { data } = await axios.get("http://localhost:5000/api/patients");
+          const { data } = await api.get(API_ENDPOINTS.PATIENTS);
           const parsedPatients = data.map((item: string) => JSON.parse(item));
   
           const formattedNodes = parsedPatients.map((patient: any, index: number) => {
@@ -389,7 +388,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   
       const fetchCharacteristics = async () => {
         try {
-          const { data } = await axios.get("http://localhost:5000/api/characteristics");
+          const { data } = await api.get(API_ENDPOINTS.CHARACTERISTICS);
           const parsed = data.map((item: string) => {
             const obj = JSON.parse(item);
             return { ...obj, _id: obj._id.$oid };
@@ -455,7 +454,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       depthLimit: number = Infinity
     ) => {
       try {
-        const res = await axios.get("http://localhost:5000/api/patients");
+        const res = await api.get(API_ENDPOINTS.PATIENTS);
 
         const parsedPatients = res.data.map((p: string) => {
           const obj = JSON.parse(p);
@@ -524,7 +523,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         const nodesById = new Map<string, any>();
         const edges: Edge[] = [];
         const edgeSet = new Set<string>();
-    
+        
         /* ──────────────────────────────────────────────────
          * 2) DFS function: MERGE duplicate “Iran” by using
          *    characteristic_data._id as the single nodeId.
@@ -649,7 +648,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             childrenByParent.set(p, []);
           }
           childrenByParent.get(p)!.push(c);
-        });
+        });        
 
         const allFlowNodes = Array.from(nodesById.values())
         // finalNodes: typeof allFlowNodes

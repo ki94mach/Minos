@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate  } from "react-router-dom";
-import axios from "axios";
+import api from "../api";
 import {
     AppBar,
     Toolbar,
@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import LogoutIcon from "@mui/icons-material/Logout";
+import { API_ENDPOINTS } from "../api/endpoints";
 
 const Navbar: React.FC = () => {
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -27,7 +28,7 @@ const Navbar: React.FC = () => {
 
     const handleLogout = async () => {
         try {
-            await axios.get("http://localhost:5000/auth/logout", {
+            await api.get(API_ENDPOINTS.LOGOUT, {
                 withCredentials: true,
                 validateStatus: (status) => status >= 200 && status < 400, 
             });
@@ -78,7 +79,7 @@ const Navbar: React.FC = () => {
                         <ListItem 
                                 component={Link} 
                                 to="#" 
-                                onClick={(e) => {
+                                onClick={(e: any) => {
                                     e.preventDefault(); 
                                     handleLogout();
                                 }}>

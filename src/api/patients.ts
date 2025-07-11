@@ -1,12 +1,13 @@
-import axios from "axios";
+import api from "../api";
 import Cookies from "js-cookie";
+import { API_ENDPOINTS } from "./endpoints";
 
 export async function createPatientTree() {
   const csrf = Cookies.get("csrf_token") ?? "";
 
   try {
-    const response = await axios.post(
-      "http://localhost:5000/api/patients",
+    const response = await api.post(
+      API_ENDPOINTS.PATIENTS,
       {
         node: {
           node_type: "characteristic",

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { TextField, Button, Typography, Box, Link } from "@mui/material";
 import Cookies from "js-cookie";
 import api from "../../api";
+import { API_ENDPOINTS } from "../../api/endpoints";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -13,8 +14,8 @@ const Login: React.FC = () => {
   const [csrfToken, setCsrfToken] = useState("");
 
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/auth/login", {
+    api
+      .get(API_ENDPOINTS.LOGIN, {
         withCredentials: true,
         responseType: "text",
       })
@@ -40,18 +41,14 @@ const Login: React.FC = () => {
     e.preventDefault();
     setMessage("");
 
-    // const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-
-    // const csrfToken = Cookies.get("csrf_token") || "";
-
     const { data } = await api.get("/auth/csrf-token");
     const fresh = data.csrf_token;
     Cookies.set("csrf_token", fresh);
   
 
     try {
-      const response = await axios.post(
-        "http://localhost:5000/auth/login",
+      const response = await api.post(
+        API_ENDPOINTS.LOGIN,
         { email, password, csrf_token: fresh  },
         {
           withCredentials: true,
