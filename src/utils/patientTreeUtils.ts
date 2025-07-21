@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 import dagre from "dagre";
 
-export function getUniqueCharId(node: any): string {
+export function getStableNodeId(node: any): string {
   return (
     node.characteristic_data?._id?.$oid ||
     node.treatment_data?._id?.$oid ||
@@ -9,9 +9,17 @@ export function getUniqueCharId(node: any): string {
     node._id
   );
 }
+export function getDocId(node: any): string {
+  const id = node._id?.$oid || node._id;
+  if (!id) {
+    console.warn("❌ getDocId failed for node:", node);
+    throw new Error("Node is missing _id");
+  }
+  return id;
+}
 
 export function findNodeById(node: any, id: string): any | null {
-  const thisId = getUniqueCharId(node);
+  const thisId = getDocId(node);
   if (thisId === id) return node;
   // 1) Check if this node is a “characteristic” and if so, compare its characteristic_data._id
   const charId =
@@ -41,7 +49,7 @@ export function calculateSizeFromTree(
 ): Decimal | null {
   // (1) We now pass around a `Decimal` object instead of a plain number
   const dfs = (node: any, acc: Decimal): Decimal | null => {
-    const nodeId = getUniqueCharId(node);
+    const nodeId = getDocId(node);
 
     if (nodeId === targetId) {
       return acc;

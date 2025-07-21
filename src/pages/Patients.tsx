@@ -33,11 +33,12 @@ import AddTreatmentDialog from "../components/patientDialogs/AddTreatmentDialog"
 import AddFollowupDialog from "../components/patientDialogs/AddFollowupDialog";
 import { buildFlowNodes } from "../utils/buildFlowNodes";
 import {
-  getUniqueCharId,
+  getDocId,
+  getStableNodeId,
   findNodeById,
   calculateSizeFromTree,
   hashColor,
-  applyDagreLayout
+  applyDagreLayout,
 } from "../utils/patientTreeUtils";
 import { API_ENDPOINTS } from "../api/endpoints";
 
@@ -103,6 +104,7 @@ const Patients: React.FC = () => {
   const [editTreatModalData, setEditTreatModalData] = useState<EditTreatModalData|null>(null);
   const [rawPatients, setRawPatients] = useState<any[]>([]);
   const [isIranRightClick, setIsIranRightClick] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const handleNodeContext = useCallback((e: React.MouseEvent, nodeId: string) => {
     e.preventDefault();
@@ -312,9 +314,16 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
     return () => clearTimeout(timer);
   }, [nodes, edges]);
 
-  useEffect(() => {
-       drawPatientNodes();
-    }, [selectedRootId]);
+    useEffect(() => {
+      api
+        .get(API_ENDPOINTS.PATIENTS)
+        .then((r) => {
+          const parsed = r.data.map((s: string) => JSON.parse(s));
+          setRawPatients(parsed);
+          // drawPatientNodes();
+        })
+        .catch(console.error);
+    }, []); 
 
   useEffect(() => {
       api.get(API_ENDPOINTS.TREATMENTS)
@@ -327,36 +336,134 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         });
   }, [selectedRootId]);
 
-  useEffect(() => {
-    api.get(API_ENDPOINTS.PATIENTS)
-      .then((r) => {
-        const parsed = r.data.map((s: string) => JSON.parse(s));
-        setRawPatients(parsed);
-        drawPatientNodes();
-      })
-      .catch(console.error);
-  }, [selectedRootId]);
+
     
   
   // fetch patients list for the list‑view (grid at top of page)
-  useEffect(() => {
-    if (!selectedRootId) {
-      const fetchPatients = async () => {
-        try {
-          const { data } = await api.get(API_ENDPOINTS.PATIENTS);
-          const parsedPatients = data.map((item: string) => JSON.parse(item));
+  // useEffect(() => {
+  //   if (selectedRootId) return;
+  //   if (!selectedRootId) {
+  //     const fetchPatients = async () => {
+  //       try {
+  //         const { data } = await api.get(API_ENDPOINTS.PATIENTS);
+  //         const parsedPatients = data.map((item: string) => JSON.parse(item));
   
-          const formattedNodes = parsedPatients.map((patient: any, index: number) => {
-            const nodeType = patient.node.node_type;
+  //         const formattedNodes = parsedPatients.flatMap(
+  //           (patient: any, index: number) => {
+  //             const node = patient.node ?? patient.tree;
+  //             // if (!patient.node) {
+  //             //   console.warn(
+  //             //     "⛔ /patients item missing .node → skipped",
+  //             //     patient
+  //             //   );
+  //             //   return []; // nothing pushed
+  //             // }
+  //             if (!node) {
+  //               console.warn(
+  //                 "⚠️ Skipping patient with no node or tree:",
+  //                 patient
+  //               );
+  //               return [];
+  //             }
+  //             // const nodeType = patient.node.node_type;
+  //               const nodeType = node.node_type;
+  //               const docId = patient._id?.$oid || patient._id;
+  //             const base = {
+  //               id: docId,
+  //               position: { x: index * 200, y: 100 },
+  //               type: "custom" as const,
+  //             };
+
+  //             if (nodeType === "treatment") {
+  //               // const treatment = patient.node.treatment_data;
+  //               const treatment = node.treatment_data;
+  //               const drugs =
+  //                 treatment.regimen?.drugs?.map((d: any) => d.drug) || [];
+  //               return {
+  //                 ...base,
+  //                 data: {
+  //                   label: treatment.name,
+  //                   number: index + 1,
+  //                   type: nodeType,
+  //                   drugs,
+  //                 },
+  //               };
+  //             }
+
+  //             return {
+  //               ...base,
+  //               data: {
+  //                 // label: patient.node.characteristic_data.name ?? "Unnamed",
+  //                 label:
+  //                   node.characteristic_data?.name ?? "Unnamed Characteristic",
+  //                 number: index + 1,
+  //                 type: nodeType,
+  //               },
+  //             };
+  //           }
+  //         );
+  
+  //         if (!selectedRootId) {
+  //           requestAnimationFrame(() => {
+  //             setNodes(formattedNodes);
+  //           });
+  //         }
+  //       } catch (err) {
+  //         console.error("Error fetching patients:", err);
+  //       }
+  //     };
+  
+  //     const fetchCharacteristics = async () => {
+  //       try {
+  //         const { data } = await api.get(API_ENDPOINTS.CHARACTERISTICS);
+  //         const parsed = data.map((item: string) => {
+  //           const obj = JSON.parse(item);
+  //           return { ...obj, _id: obj._id.$oid };
+  //         });
+  
+  //         setAllCharacteristics(parsed);
+  //         const uniqueTypes = Array.from(new Set<string>(parsed.map((char: any) => char.type)));
+  //         setCharTypes(uniqueTypes);
+  //         if (uniqueTypes.length > 0) setSelectedCharType(uniqueTypes[0]);
+  //       } catch (err) {
+  //         console.error("Error fetching characteristics:", err);
+  //       }
+  //     };
+  
+  //     fetchPatients();
+  //     fetchCharacteristics();
+  //   }
+  // }, [selectedRootId]);
+  
+  useEffect(() => {
+    if (selectedRootId !== null) return; 
+
+    const fetchPatients = async () => {
+      try {
+        const { data } = await api.get(API_ENDPOINTS.PATIENTS);
+        const parsedPatients = data.map((item: string) => JSON.parse(item));
+        setRawPatients(parsedPatients);
+        setTimeout(() => {
+          drawPatientNodes(parsedPatients); // <- pass it explicitly if you want
+        }, 50);
+
+        const formattedNodes = parsedPatients.flatMap(
+          (patient: any, index: number) => {
+            const node = patient.node ?? patient.tree;
+            if (!node) return [];
+
+            const nodeType = node.node_type;
+            const docId = patient._id?.$oid || patient._id;
             const base = {
-              id: patient._id?.$oid || patient._id,
+              id: docId,
               position: { x: index * 200, y: 100 },
               type: "custom" as const,
             };
-  
+
             if (nodeType === "treatment") {
-              const treatment = patient.node.treatment_data;
-              const drugs = treatment.regimen?.drugs?.map((d: any) => d.drug) || [];
+              const treatment = node.treatment_data;
+              const drugs =
+                treatment.regimen?.drugs?.map((d: any) => d.drug) || [];
               return {
                 ...base,
                 data: {
@@ -367,47 +474,52 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
                 },
               };
             }
-  
+
             return {
               ...base,
               data: {
-                label: patient.node.characteristic_data.name,
+                label:
+                  node.characteristic_data?.name ?? "Unnamed Characteristic",
                 number: index + 1,
                 type: nodeType,
               },
             };
-          });
-  
-          requestAnimationFrame(() => {
-            setNodes(formattedNodes);
-          });
-        } catch (err) {
-          console.error("Error fetching patients:", err);
-        }
-      };
-  
-      const fetchCharacteristics = async () => {
-        try {
-          const { data } = await api.get(API_ENDPOINTS.CHARACTERISTICS);
-          const parsed = data.map((item: string) => {
-            const obj = JSON.parse(item);
-            return { ...obj, _id: obj._id.$oid };
-          });
-  
-          setAllCharacteristics(parsed);
-          const uniqueTypes = Array.from(new Set<string>(parsed.map((char: any) => char.type)));
-          setCharTypes(uniqueTypes);
-          if (uniqueTypes.length > 0) setSelectedCharType(uniqueTypes[0]);
-        } catch (err) {
-          console.error("Error fetching characteristics:", err);
-        }
-      };
-  
-      fetchPatients();
-      fetchCharacteristics();
-    }
+          }
+        );
+        
+      } catch (err) {
+        console.error("Error fetching patients:", err);
+      }
+    };
+
+    const fetchCharacteristics = async () => {
+      try {
+        const { data } = await api.get(API_ENDPOINTS.CHARACTERISTICS);
+        const parsed = data.map((item: string) => {
+          const obj = JSON.parse(item);
+          return { ...obj, _id: obj._id.$oid };
+        });
+
+        setAllCharacteristics(parsed);
+        const uniqueTypes = Array.from(
+          new Set<string>(parsed.map((char: any) => char.type))
+        );
+        setCharTypes(uniqueTypes);
+        if (uniqueTypes.length > 0) setSelectedCharType(uniqueTypes[0]);
+      } catch (err) {
+        console.error("Error fetching characteristics:", err);
+      }
+    };
+
+    fetchPatients();
+    fetchCharacteristics();
   }, [selectedRootId]);
-  
+
+  useEffect(() => {
+    if (rawPatients.length === 0) return;
+      drawPatientNodes();
+  }, [selectedRootId, rawPatients]);
+
 
   // update names list when the type changes
   useEffect(() => {
@@ -426,15 +538,18 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   );
 
   const onNodeClick = (_: any, node: any) => {
-    const clickedId = node.id;
-    const whichTree = node.data.treeId;
-          if (!whichTree) {
+    const stableId = node.id;
+    const clickedId = node.data.docId;
+    const treeId = node.data.treeId;
+          if (!treeId || !stableId) {
             // If somehow treeId was missing, you could fetch patients and do findNodeById to recover it.
-            alert("Error: no treeId found for this node.");
+            console.warn("🪵 Missing treeId for node:", node);
+
+            // alert("Error: no treeId found for this node.");
             return;
           }
-          navigate(`/patients/${clickedId}`, {
-            state: { color: node.data.color, treeId: whichTree },
+          navigate(`/patients/${stableId}`, {
+            state: { color: node.data.color, treeId },
           });
     //       return;
     //     }
@@ -446,7 +561,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
     // }
   };
   
-
   /* ---------------------------------------------------------------------- */
   /*   Build the merged graph of *all* patient trees without duplicates     */
   /* ---------------------------------------------------------------------- */
@@ -488,6 +602,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         if (selectedRootId && drillTreeId) {
           // 1) Find the single patient document whose _id === drillTreeId
           const patientDoc = parsedPatients.find((p: any) => {
+            findNodeById(p.tree, selectedRootId);
             const pid = p._id?.$oid || p._id;
             return pid === drillTreeId;
           });
@@ -532,12 +647,20 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
         const treeIdMap = new Map<string, string>();
         parsedPatients.forEach((p: any) => {
-          const collectIds = (node: any) => {
-            const id = getUniqueCharId(node);
-            treeIdMap.set(id, p._id?.$oid || p._id);
-            (node.children || []).forEach(collectIds);
+          const patientId = p._id?.$oid || p._id;
+          const collectAllDocIds = (node: any) => {
+            const docId = getDocId(node);
+            treeIdMap.set(docId, patientId);
+
+            const charDataId = node.characteristic_data?._id;
+            if (charDataId) {
+              const charDocId = charDataId.$oid || charDataId;
+              treeIdMap.set(charDocId, patientId);
+            }
+
+            (node.children || []).forEach(collectAllDocIds);
           };
-          collectIds(p.tree);
+          collectAllDocIds(p.tree);
         });
 
         // ──────────────────────────────────────────────────
@@ -551,7 +674,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           }
 
           let rootSizeDecimal: Decimal;
-          // const patientId = treeIdMap.get(getUniqueCharId(rootNode)) as string;
+          
           if (selectedRootId && !truePatientId) {
             const fallbackPatient = parsedPatients.find((p: any) =>
               findNodeById(p.tree, selectedRootId)
@@ -581,8 +704,24 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
               rootSizeDecimal = new Decimal(1);
             } else {
               // (B) Run our new Decimal-based DFS
-              const accDecimal = calculateSizeFromTree(patientObj.tree, selectedRootId);
-              rootSizeDecimal = accDecimal ?? new Decimal(1);
+              // const accDecimal = calculateSizeFromTree(patientObj.tree, selectedRootId);
+              const matchedNode = findNodeById(patientObj.tree, selectedRootId);
+              const realTargetId = matchedNode ? getDocId(matchedNode) : null;
+
+              if (realTargetId) {
+                const accDecimal = calculateSizeFromTree(
+                  patientObj.tree,
+                  realTargetId
+                );
+                rootSizeDecimal = accDecimal ?? new Decimal(1);
+              } else {
+                console.warn(
+                  "⚠️ Could not find node in tree to calculate size:",
+                  selectedRootId
+                );
+                rootSizeDecimal = new Decimal(1);
+              }
+              // rootSizeDecimal = accDecimal ?? new Decimal(1);
             }
             
           } else {
@@ -599,7 +738,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             null,
             rootSizeDecimal,
             (rootNode.children || []).length,
-            hashColor(getUniqueCharId(rootNode)),
+            hashColor(getStableNodeId(rootNode)),
             patientId,
             {
               selectedRootId,
@@ -609,7 +748,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
               nodesById,
               edges,
               hashColor,
-              getUniqueCharId,
+              getUniqueCharId: getStableNodeId,
               treeIdMap,
               navigate,
               depthLimit,
@@ -619,22 +758,34 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         });
 
         let finalNodes = Array.from(nodesById.values()).map((node) => {
+          const docId = node.data?.docId || node.data?.id || node.id;
           // Get real patient ID from map
-          const fallbackTreeId = treeIdMap.get(node.id) || truePatientId;
+          const fallbackTreeId =
+            treeIdMap.get(docId) || truePatientId;
 
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              treeId: node.data.treeId || fallbackTreeId,
-              docId: node.data.docId || node.data.id,
-            },
-          };
+            const finalNode = {
+              ...node,
+              data: {
+                ...node.data,
+                treeId: node.data.treeId || fallbackTreeId,
+                docId: node.data.docId || node.data.id,
+              },
+            };
+            console.log(
+              "🔍 resolving treeId for:",
+              docId,
+              " → ",
+              fallbackTreeId
+            );
+
+          if (!finalNode.data.treeId) {
+            console.warn("🚨 treeId still missing for node", finalNode);
+          }
+
+          return finalNode;
         });
 
         setNodes(finalNodes);
-        
-
     
         // ──────────────────────────────────────────────────
         // 4) AFTER DFS completes, do a “re‐layout” pass so that no two children of the same parent overlap:
@@ -663,7 +814,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         
           // (a) figure out which node is the root
           //     assume your first element in `roots` is the “Iran” node
-          const rootUniqueId = getUniqueCharId(roots[0])
+          const rootUniqueId = getStableNodeId(roots[0]);
 
           // (b) position the root in the center
           const rootNode = nodesById.get(rootUniqueId)!
@@ -689,6 +840,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           console.log("✅ Final Nodes:", finalNodes);
           setEdges(edges)
 
+          setHasLoadedOnce(true);
         const depthMap = new Map<string, number>();
         const assignDepth = (nodeId: string, depth: number) => {
           if (depthMap.has(nodeId) && depthMap.get(nodeId)! <= depth) {
@@ -739,6 +891,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       }
     };
 
+    if (!hasLoadedOnce && selectedRootId === null) return null;
+    if (selectedRootId && nodes.length === 0) return null;
   /* ---------------------------------------------------------------------- */
   /*                                  UI                                    */
   /* ---------------------------------------------------------------------- */
@@ -793,8 +947,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           transition: "background-color 0.5s ease",
         }}>
         <ReactFlow
-          nodes={debouncedNodes}
-          edges={debouncedEdges}
+          nodes={debouncedNodes ?? []}
+          edges={debouncedEdges ?? []}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
@@ -811,7 +965,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           defaultViewport={{ x: 0, y: 0, zoom: 1 }}>
           {/* <Background  variant="none" gap={12} size={1}  /> */}
         </ReactFlow>
-
         {/* Context menu (right‐click) */}
         <Menu
           open={!!ctx}
@@ -847,7 +1000,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             Add Node
           </MenuItem>
         </Menu>
-
         {/* ===== “Edit Characteristic” dialog ===== */}
         {editCharModalData && (
           <EditCharacteristicDialog
@@ -862,7 +1014,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           />
         )}
         {/* ─── end “Edit Characteristic” ─── */}
-
         {/* ===== “Edit Treatment” dialog ===== */}
         {editTreatModalData && (
           <EditTreatmentDialog
@@ -876,7 +1027,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             allTreatments={allTreatments}
           />
         )}
-
         {/* ─── end “Edit Treatment” ─── */}
       </div>
       {/* ─── end ReactFlow container ─── */}

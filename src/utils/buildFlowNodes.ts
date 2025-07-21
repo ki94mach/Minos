@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 import { Edge } from "reactflow";
 import { NavigateFunction } from "react-router-dom";
+import { getStableNodeId, getDocId } from "../utils/patientTreeUtils";
 
 export function buildFlowNodes(
   node: any,
@@ -127,9 +128,10 @@ export function buildFlowNodes(
   // ──────────────────────────────────────────────────
   // F) Create the React-Flow node object once:
   const isNewNode = !nodesById.has(nodeId);
+  const stableId = getStableNodeId(node);
   if (isNewNode) {
-    nodesById.set(nodeId, {
-      id: nodeId,
+    nodesById.set(stableId, {
+      id: stableId,
       position: { x: 0, y: 0 }, // we will re‐position later
       type: "custom",
       data: {
@@ -147,7 +149,7 @@ export function buildFlowNodes(
         alternatives: node.treatment_data?.alternatives || [],
         color: hashColor(uniqueCharId),
         isOverviewMode: isOverviewMode,
-        treeId: treeIdMap.get(nodeId),
+        treeId: treeIdMap.get(getDocId(node)) ?? "unknown",
         isOverview: isOverviewMode,
         onClick: () =>
           navigate(`/patients/${nodeId}`, {
