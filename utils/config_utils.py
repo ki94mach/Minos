@@ -23,6 +23,48 @@ def configure_secret_key(app):
     
     app.config['SECRET_KEY'] = secret_key
 
+def get_frontend_origins() -> list[str]:
+    """Origins allowed to call the API from the browser (comma-separated FRONTEND_ORIGIN)."""
+    raw = os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000")
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+def configure_cors(app: Flask) -> None:
+    """
+    Cross-origin access for the React SPA (S6 / B10).
+
+    Allows Authorization (Bearer SSO) and, when enabled, credentialed requests
+    for legacy Minos session + CSRF in local development.
+    """
+    from flask_cors import CORS
+
+    origins = get_frontend_origins()
+    supports_credentials = os.environ.get("CORS_SUPPORTS_CREDENTIALS", "true").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+    CORS(
+        app,
+        resources={
+            r"/api/*": {"origins": origins},
+            r"/auth/*": {"origins": origins},
+        },
+        supports_credentials=supports_credentials,
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-CSRFToken",
+            "X-CSRF-Token",
+        ],
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        expose_headers=["Content-Type"],
+    )
+
+    logging.info("CORS enabled for origins: %s (credentials=%s)", origins, supports_credentials)
+
+
 def configure_security(app):
     """Configure security settings including CSRF protection."""
     # CSRF Protection configuration
