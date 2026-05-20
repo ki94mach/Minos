@@ -26,6 +26,8 @@ var/
 .installed.cfg
 *.egg
 *__pycache__*
+*.pyc
+**/__pycache__/
 
 # Virtual Environment
 venv/

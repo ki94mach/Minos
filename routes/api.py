@@ -24,7 +24,7 @@ from validators.api_validators import (CharacteristicCreate, CharacteristicUpdat
                                        TreatmentCreate, PatientCreate, PatientUpdate,
                                        AddNode, UpdateNode, FollowupUpdate, FollowupCreate)
 from utils.validate_request import validate_request
-from utils.auth_security import login_required
+from utils.sso_auth import sso_required
 
 from utils.business_rules import find_node
 
@@ -35,7 +35,7 @@ api_blueprint = Blueprint('api', __name__)
 # Characteristic Endpoints
 # --------------------------------------------------
 @api_blueprint.route('/characteristics', methods=['GET'])
-@login_required
+@sso_required
 def get_characteristics():
     try:
         characteristics = CharacteristicDriver.find()
@@ -47,7 +47,7 @@ def get_characteristics():
 
 
 @api_blueprint.route('/characteristics', methods=['POST'])
-@login_required
+@sso_required
 @validate_request(CharacteristicCreate, location='json')
 def create_characteristic(validated_data):
     """
@@ -76,7 +76,7 @@ def create_characteristic(validated_data):
 
 
 @api_blueprint.route('/characteristics/<char_id>', methods=['PUT'])
-@login_required
+@sso_required
 @validate_request(CharacteristicUpdate, location='json')
 def update_characteristic(validated_data, char_id):
     """
@@ -115,7 +115,7 @@ def update_characteristic(validated_data, char_id):
 
 
 @api_blueprint.route('/characteristics/<char_id>', methods=['DELETE'])
-@login_required
+@sso_required
 def delete_characteristic(char_id):
     try:
         CharacteristicDriver.delete(char_id)
@@ -129,7 +129,7 @@ def delete_characteristic(char_id):
 # Drug Endpoints
 # --------------------------------------------------
 @api_blueprint.route('/drugs', methods=['GET'])
-@login_required
+@sso_required
 def get_drugs():
     try:
         drugs = DrugDriver.find()
@@ -141,7 +141,7 @@ def get_drugs():
 
 
 @api_blueprint.route('/drugs', methods=['POST'])
-@login_required
+@sso_required
 @validate_request(DrugCreate, location='json')
 def create_drug(validated_data):
     """
@@ -172,7 +172,7 @@ def create_drug(validated_data):
 
 
 @api_blueprint.route('/drugs/<drug_id>', methods=['PUT'])
-@login_required
+@sso_required
 @validate_request(DrugUpdate, location='json')
 def update_drug(validated_data, drug_id):
     """
@@ -214,7 +214,7 @@ def update_drug(validated_data, drug_id):
 
 
 @api_blueprint.route('/drugs/<drug_id>', methods=['DELETE'])
-@login_required
+@sso_required
 def delete_drug(drug_id):
     try:
         DrugDriver.delete(drug_id)
@@ -228,7 +228,7 @@ def delete_drug(drug_id):
 # Treatment Endpoints
 # --------------------------------------------------
 @api_blueprint.route('/treatments', methods=['GET'])
-@login_required
+@sso_required
 def get_treatments():
     try:
         treatments = TreatmentDriver.find()
@@ -241,7 +241,7 @@ def get_treatments():
 
 
 @api_blueprint.route('/treatments', methods=['POST'])
-@login_required
+@sso_required
 @validate_request(TreatmentCreate, location='json')
 def create_treatment(validated_data: TreatmentCreate):
     """
@@ -397,7 +397,7 @@ def create_treatment(validated_data: TreatmentCreate):
 
 
 @api_blueprint.route('/treatments/<treatment_id>', methods=['PUT'])
-@login_required
+@sso_required
 @validate_request(TreatmentUpdate, location='json')
 def update_treatment(validated_data, treatment_id):
     """
@@ -443,7 +443,7 @@ def update_treatment(validated_data, treatment_id):
 
 
 @api_blueprint.route('/treatments/<treatment_id>', methods=['DELETE'])
-@login_required
+@sso_required
 def delete_treatment(treatment_id):
     try:
         TreatmentDriver.delete(treatment_id)
@@ -457,7 +457,7 @@ def delete_treatment(treatment_id):
 # Patient Endpoints
 # --------------------------------------------------
 @api_blueprint.route('/patients', methods=['GET'])
-@login_required
+@sso_required
 def get_patients():
     try:
         patients = PatientDriver.find()
@@ -470,7 +470,7 @@ def get_patients():
 
 
 @api_blueprint.route('/patients', methods=['POST'])
-@login_required
+@sso_required
 @validate_request(PatientCreate, location='json')
 def create_patient(validated_data):
     """
@@ -620,7 +620,7 @@ def create_node_from_dict(node_dict, parent_id=None):
 
 # -------------------------------------------------------------------
 @api_blueprint.route('/patients/<patient_id>/add_node', methods=['POST'])
-@login_required
+@sso_required
 @validate_request(AddNode, location='json')
 def add_node(validated_data, patient_id):
     """
@@ -746,7 +746,7 @@ def add_node(validated_data, patient_id):
 
 
 @api_blueprint.route('/patients/<patient_id>', methods=['PUT'])
-@login_required
+@sso_required
 @validate_request(PatientUpdate, location='json')
 def update_patient(validated_data, patient_id):
     """
@@ -806,7 +806,7 @@ def update_patient(validated_data, patient_id):
 
 
 @api_blueprint.route('/patients/<patient_id>/node/<node_id>', methods=['PUT'])
-@login_required
+@sso_required
 @validate_request(UpdateNode, location='json')
 def update_node(validated_data, patient_id, node_id):
     """
@@ -904,7 +904,7 @@ def update_node(validated_data, patient_id, node_id):
 
 
 @api_blueprint.route('/patients/<patient_id>', methods=['DELETE'])
-@login_required
+@sso_required
 def delete_patient(patient_id):
     """
     Deletes the entire PatientTree document.
@@ -918,7 +918,7 @@ def delete_patient(patient_id):
 
 
 @api_blueprint.route('/patients/<patient_id>/node/<node_id>', methods=['DELETE'])
-@login_required
+@sso_required
 def delete_node(patient_id, node_id):
     """
     Deletes a single node from the PatientTree without discarding its children.
@@ -987,7 +987,7 @@ def delete_node(patient_id, node_id):
 # Followup Endpoints
 # --------------------------------------------------
 @api_blueprint.route('/followups', methods=['GET'])
-@login_required
+@sso_required
 def get_followups():
     """
     Retrieve all followups.
@@ -1002,7 +1002,7 @@ def get_followups():
         return jsonify({'error': "Failed to retrieve followups."}), 500
 
 @api_blueprint.route('/followups', methods=['POST'])
-@login_required
+@sso_required
 @validate_request(FollowupCreate, location='json')
 def create_followup(validated_data):
     """
@@ -1038,7 +1038,7 @@ def create_followup(validated_data):
         return jsonify({'error': str(e)}), 500
 
 @api_blueprint.route('/followups/<followup_id>', methods=['PUT'])
-@login_required
+@sso_required
 @validate_request(FollowupUpdate, location='json')
 def update_followup(validated_data, followup_id):
     """
@@ -1074,7 +1074,7 @@ def update_followup(validated_data, followup_id):
         return jsonify({'error': "An unexpected error occurred while updating the followup."}), 500
 
 @api_blueprint.route('/followups/<followup_id>', methods=['DELETE'])
-@login_required
+@sso_required
 def delete_followup(followup_id):
     try:
         FollowupDriver.delete(followup_id)

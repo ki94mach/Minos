@@ -151,8 +151,9 @@ def track_login_attempt(email: str, success: bool) -> bool:
 
 def login_required(f):
     """
-    Decorator to protect routes that require authentication.
-    Includes session timeout check and activity tracking.
+    Protect Minos auth routes (/auth/*) using Flask session.
+
+    API routes under /api/* use @sso_required from utils.sso_auth (Bearer JWT / dev bypass).
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
