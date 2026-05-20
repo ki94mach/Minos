@@ -19,7 +19,7 @@ from utils.config_utils import (
     register_error_handlers,
     configure_security_headers
 )
-from utils.sso_auth import register_dev_auth_bypass
+from utils.sso_auth import register_dev_auth_bypass, validate_auth_disabled_config
 
 # Initialize Redis client
 def get_redis_client():
@@ -59,6 +59,7 @@ def create_app():
     register_routes(app, api_blueprint, auth_blueprint)
     register_error_handlers(app)
     configure_security_headers(app)
+    validate_auth_disabled_config()
     register_dev_auth_bypass(app)
 
     return app 

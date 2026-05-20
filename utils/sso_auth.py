@@ -46,11 +46,27 @@ def is_production() -> bool:
     return os.environ.get("FLASK_ENV", "").strip().lower() == "production"
 
 
+def auth_disabled_requested() -> bool:
+    return _env_bool("AUTH_DISABLED")
+
+
+def validate_auth_disabled_config() -> None:
+    """
+    Fail fast if AUTH_DISABLED is set in production (S4 / I5).
+    Call once at application startup.
+    """
+    if auth_disabled_requested() and is_production():
+        raise RuntimeError(
+            "AUTH_DISABLED=true is not allowed when FLASK_ENV=production. "
+            "Unset AUTH_DISABLED in production deployments."
+        )
+
+
 def auth_disabled_for_dev() -> bool:
-    """True when local dev bypass is allowed (blocked in production)."""
+    """True when local dev bypass is active. Never true in production."""
     if is_production():
         return False
-    return _env_bool("AUTH_DISABLED")
+    return auth_disabled_requested()
 
 
 def get_sso_roles_claim_name() -> str:
@@ -270,6 +286,17 @@ def get_request_role() -> Optional[str]:
 
 
 def register_dev_auth_bypass(app: Flask) -> None:
+    """Register before_request hook only when AUTH_DISABLED is allowed (non-production)."""
+    validate_auth_disabled_config()
+
+    if not auth_disabled_for_dev():
+        return
+
+    logger.warning(
+        "AUTH_DISABLED is enabled: /api/* uses DEV_MOCK_* principal without SSO. "
+        "Do not use in staging or production."
+    )
+
     @app.before_request
     def _inject_dev_principal() -> None:
         if auth_disabled_for_dev():
@@ -277,10 +304,16 @@ def register_dev_auth_bypass(app: Flask) -> None:
 
 
 def sso_required(view_callable):
-    """Protect /api/* routes: SSO Bearer JWT, dev bypass, or legacy session in development."""
+    """
+    Protect /api/* routes: Bearer JWT, dev bypass (non-production only), or legacy session in development.
+    AUTH_DISABLED is ignored when FLASK_ENV=production.
+    """
 
     @wraps(view_callable)
     def wrapper(*args, **kwargs):
+        if is_production() and auth_disabled_requested():
+            return jsonify({"error": "Authentication required"}), 401
+
         principal = resolve_authenticated_principal()
         if principal is None:
             return jsonify({"error": "Authentication required"}), 401
