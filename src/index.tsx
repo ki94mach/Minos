@@ -3,16 +3,18 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import api from "./api";
-import "./styles/index.css"
+import { useMinosAuthPages } from "./auth/ssoConfig";
+import "./styles/index.css";
 
-
-(async function bootstrapCsrf() {
-  try {
-    await api.get("/auth/csrf-token");   // sets both cookie & header
-  } catch (err) {
-    console.error("CSRF bootstrap failed", err);
-  }
-})();
+if (useMinosAuthPages()) {
+  (async function bootstrapCsrf() {
+    try {
+      await api.get("/auth/csrf-token");
+    } catch (err) {
+      console.error("CSRF bootstrap failed", err);
+    }
+  })();
+}
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

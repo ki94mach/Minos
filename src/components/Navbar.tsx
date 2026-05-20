@@ -16,8 +16,13 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { API_ENDPOINTS } from "../api/endpoints";
+import {
+    useMinosAuthPages,
+    redirectToSsoLogout,
+} from "../auth/ssoConfig";
 
 const Navbar: React.FC = () => {
+    const showMinosAuth = useMinosAuthPages();
     const [drawerOpen, setDrawerOpen] = useState(false);
 
     const toggleDrawer = (open: boolean) => () => {
@@ -27,16 +32,19 @@ const Navbar: React.FC = () => {
     const navigate = useNavigate();
 
     const handleLogout = async () => {
+        if (!showMinosAuth) {
+            redirectToSsoLogout();
+            return;
+        }
         try {
             await api.get(API_ENDPOINTS.LOGOUT, {
                 withCredentials: true,
-                validateStatus: (status) => status >= 200 && status < 400, 
+                validateStatus: (status) => status >= 200 && status < 400,
             });
         } catch (error) {
             console.error("Logout error:", error);
-           
         } finally {
-            navigate("/auth/login"); 
+            navigate("/auth/login");
         }
     };
 
@@ -46,7 +54,9 @@ const Navbar: React.FC = () => {
         { text: "Drugs", path: "/drugs" },
         { text: "Patients", path: "/patients" },
         { text: "Treatments", path: "/treatments" },
-        { text: "Change Password", path: "/auth/change-password" }
+        ...(showMinosAuth
+            ? [{ text: "Change Password", path: "/auth/change-password" }]
+            : []),
     ];
 
     return (
