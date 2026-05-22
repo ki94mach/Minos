@@ -35,7 +35,7 @@ def get_redis_connection():
         return redis_client
     except ImportError:
         # Fallback to config-based connection
-        redis_url = current_app.config.get('SESSION_REDIS', 'redis://:MinosProject1234@10.20.52.20:6379/0')
+        redis_url = current_app.config.get('SESSION_REDIS', 'redis://localhost:6379/0')
         if isinstance(redis_url, str):
             return redis.from_url(redis_url)
         # If SESSION_REDIS is already a Redis instance
