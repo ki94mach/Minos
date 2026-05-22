@@ -522,14 +522,13 @@ class TreatmentData(BaseModel):
 
     @model_validator(mode="after")
     def validate_against_database(self) -> "TreatmentData":
-        # First validate embedded documents
-        # if self.regimen:
-        #     self.regimen.validate_against_database()
-        # if self.alternatives:
-        #     for alt in self.alternatives:
-        #         alt.validate_against_database()
+        if self.regimen:
+            for item in self.regimen.drugs:
+                item.drug.validate_against_database()
+        if self.alternatives:
+            for alt in self.alternatives:
+                alt.validate_against_database()
 
-        # Then validate against database record
         treatment_data = {
             '_id': str(self.id),
             'name': self.name,
@@ -694,6 +693,22 @@ class PatientUpdate(BaseModel):
             raise ValueError("Root node must not have a parent_id")
         return self
 
+def _validate_patient_node_embedded_data(node: PatientNode) -> None:
+    """Ensure embedded catalog/followup copies match MongoDB master records (B3)."""
+    if node.node_type == "characteristic":
+        if not node.characteristic_data:
+            raise ValueError("characteristic_data is required for characteristic nodes")
+        node.characteristic_data.validate_against_database()
+    elif node.node_type == "treatment":
+        if not node.treatment_data:
+            raise ValueError("treatment_data is required for treatment nodes")
+        node.treatment_data.validate_against_database()
+    elif node.node_type == "followup":
+        if not node.followup_data:
+            raise ValueError("followup_data is required for followup nodes")
+        node.followup_data.validate_against_database()
+
+
 class AddNode(BaseModel):
     parent_node_id: Optional[PyObjectId] = None
     node: PatientNode
@@ -701,7 +716,6 @@ class AddNode(BaseModel):
 
     @model_validator(mode="after")
     def validate_parent_child_relationship(self) -> "AddNode":
-        # Validate parent-child relationship
         if self.parent_node_id:
             if self.node.parent_id and str(self.node.parent_id) != str(self.parent_node_id):
                 raise ValueError(
@@ -709,33 +723,11 @@ class AddNode(BaseModel):
                     )
             self.node.parent_id = self.parent_node_id
 
-        # Validate the main node's embedded data based on type
-        # if self.node.node_type == "characteristic":
-        #     if not self.node.characteristic_data:
-        #         raise ValueError("characteristic_data is required for characteristic nodes")
-        #     self.node.characteristic_data.validate_against_database()
-        # elif self.node.node_type == "treatment":
-        #     if not self.node.treatment_data:
-        #         raise ValueError("treatment_data is required for treatment nodes")
-        #     self.node.treatment_data.validate_against_database()
-        # elif self.node.node_type == "followup":
-        #     if not self.node.followup_data:
-        #         raise ValueError("followup_data is required for followup nodes")
-        #     self.node.followup_data.validate_against_database()
+        _validate_patient_node_embedded_data(self.node)
 
-        # Recursively validate children if present
-        # if self.children:
-        #     for child in self.children:
-        #         # Set parent ID for children
-        #         child.parent_id = self.node._id if hasattr(self.node, '_id') else None
-                
-        #         # Validate child's embedded data
-        #         if child.node_type == "characteristic" and child.characteristic_data:
-        #             child.characteristic_data.validate_against_database()
-        #         elif child.node_type == "treatment" and child.treatment_data:
-        #             child.treatment_data.validate_against_database()
-        #         elif child.node_type == "followup" and child.followup_data:
-        #             child.followup_data.validate_against_database()
+        if self.children:
+            for child in self.children:
+                _validate_patient_node_embedded_data(child)
 
         return self
 
