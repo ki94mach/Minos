@@ -17,6 +17,7 @@ from models.token.driver import TokenDriver
 
 from utils.validate_request import validate_request
 from utils.api_errors import error_response
+from utils.auth_policy import registration_required
 from validators.auth_validators import (
     LoginUserSchema,
     RegisterUserSchema,
@@ -97,6 +98,7 @@ def logout():
 # ----------------- REGISTER -----------------
 
 @auth_blueprint.route('/register', methods=['GET'])
+@registration_required
 def register_get():
     if session.get('user_id'):
         return redirect(url_for('api.get_characteristics'))
@@ -104,6 +106,7 @@ def register_get():
 
 
 @auth_blueprint.route('/register', methods=['POST'])
+@registration_required
 @validate_request(RegisterUserSchema, location='json')
 def register_post(validated_data):
     email = validated_data.email
