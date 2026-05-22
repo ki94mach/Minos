@@ -120,15 +120,24 @@ def configure_session(app, redis_client):
     Session(app)
 
 def configure_database(app):
-    """Configure database connection."""
-    db_name = os.environ.get('MONGO_DBNAME')
-    db_host = os.environ.get('MONGO_URI')
-    
-    app.config['MONGO_DBNAME'] = db_name
-    app.config['MONGO_URI'] = db_host
+    """
+    Configure MongoDB from MONGO_URI + MONGO_DBNAME (see .env.example).
 
-    # Connect to MongoDB
-    connect_db(db_name=app.config['MONGO_DBNAME'], host=app.config['MONGO_URI'])
+    Defaults match models/meta.py for local MongoDB without a .env file.
+    """
+    db_name = os.environ.get("MONGO_DBNAME", "minos_db").strip()
+    db_host = os.environ.get("MONGO_URI", "mongodb://localhost:27017/").strip()
+
+    if not db_name or not db_host:
+        raise RuntimeError(
+            "MONGO_DBNAME and MONGO_URI must be non-empty. "
+            "Copy .env.example to .env and set both variables."
+        )
+
+    app.config["MONGO_DBNAME"] = db_name
+    app.config["MONGO_URI"] = db_host
+    connect_db(db_name=db_name, host=db_host)
+    logging.info("MongoDB configured: db=%s host=%s", db_name, db_host)
 
 def register_routes(app, api_blueprint, auth_blueprint):
     """Register application routes and blueprints."""
