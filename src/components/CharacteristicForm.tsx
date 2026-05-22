@@ -3,6 +3,7 @@ import api from "../api";
 import Cookies from "js-cookie";
 import { TextField, Button, Stack, FormControl, Autocomplete } from "@mui/material";
 import { API_ENDPOINTS } from "../api/endpoints";
+import { asApiList } from "../api/parseApiList";
 
 interface CharacteristicOption {
   _id: string;
@@ -63,11 +64,13 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
   useEffect(() => {
     api.get(API_ENDPOINTS.CHARACTERISTICS)
       .then((response) => {
-        const parsed: CharacteristicOption[] = response.data.map((item: string) => {
-          const obj = JSON.parse(item);
-          return { _id: obj._id.$oid, type: obj.type, name: obj.name };
-        });
-        setOptions(parsed);
+        setOptions(
+          asApiList<CharacteristicOption>(response.data).map((obj) => ({
+            _id: String(obj._id),
+            type: obj.type,
+            name: obj.name,
+          }))
+        );
       })
       .catch((err) => console.error("Failed to load characteristics:", err));
   }, []);

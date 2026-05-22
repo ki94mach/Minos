@@ -25,6 +25,7 @@ from validators.api_validators import (CharacteristicCreate, CharacteristicUpdat
                                        AddNode, UpdateNode, FollowupUpdate, FollowupCreate)
 from utils.validate_request import validate_request
 from utils.sso_auth import sso_required
+from utils.serialize import serialize_documents
 
 from utils.business_rules import find_node
 
@@ -39,8 +40,7 @@ api_blueprint = Blueprint('api', __name__)
 def get_characteristics():
     try:
         characteristics = CharacteristicDriver.find()
-        data = [char.to_json() for char in characteristics]
-        return jsonify(data), 200
+        return jsonify(serialize_documents(characteristics)), 200
     except Exception as e:
         logging.error(f"Error fetching characteristics: {e}")
         return jsonify({'error': "Failed to retrieve characteristics."}), 500
@@ -133,8 +133,7 @@ def delete_characteristic(char_id):
 def get_drugs():
     try:
         drugs = DrugDriver.find()
-        data = [drug.to_json() for drug in drugs]
-        return jsonify(data), 200
+        return jsonify(serialize_documents(drugs)), 200
     except Exception as e:
         logging.error(f"Error fetching drugs: {e}")
         return jsonify({'error': "Failed to retrieve drugs."}), 500
@@ -232,8 +231,7 @@ def delete_drug(drug_id):
 def get_treatments():
     try:
         treatments = TreatmentDriver.find()
-        data = [treatment.to_json() for treatment in treatments]
-        return jsonify(data), 200
+        return jsonify(serialize_documents(treatments)), 200
     except Exception as e:
         print(e)
         logging.error(f"Error fetching treatments: {e}")
@@ -461,8 +459,7 @@ def delete_treatment(treatment_id):
 def get_patients():
     try:
         patients = PatientDriver.find()
-        data = [patient.to_json() for patient in patients]
-        return jsonify(data), 200
+        return jsonify(serialize_documents(patients)), 200
     except Exception as e:
         print(e)
         logging.error(f"Error fetching patients: {e}")
@@ -995,8 +992,7 @@ def get_followups():
     """
     try:
         followups = FollowupDriver.find()
-        data = [followup.to_json() for followup in followups]
-        return jsonify(data), 200
+        return jsonify(serialize_documents(followups)), 200
     except Exception as e:
         logging.error(f"Error fetching followups: {e}")
         return jsonify({'error': "Failed to retrieve followups."}), 500

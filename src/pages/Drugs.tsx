@@ -5,6 +5,7 @@ import BackButton from "../components/BackButton";
 import Cookies from "js-cookie";
 import { Edit, Delete } from "@mui/icons-material";
 import { API_ENDPOINTS } from "../api/endpoints";
+import { asApiList } from "../api/parseApiList";
 
 
 interface Drug {
@@ -33,11 +34,7 @@ const Drugs: React.FC = () => {
         setLoading(true);
         try {
             const response = await api.get(API_ENDPOINTS.DRUGS);
-            const parsedDrugs = response.data.map((item: string) => {
-                const parsed = JSON.parse(item);
-                return { ...parsed, _id: parsed._id?.$oid || parsed._id, };
-              });
-            setDrugs(parsedDrugs);
+            setDrugs(asApiList<Drug>(response.data));
 
         } catch (error) {
             console.error("Error fetching drugs:", error);

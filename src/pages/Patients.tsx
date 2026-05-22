@@ -40,6 +40,7 @@ import {
   applyDagreLayout
 } from "../utils/patientTreeUtils";
 import { API_ENDPOINTS } from "../api/endpoints";
+import { asApiList } from "../api/parseApiList";
 
 /* -------------------------------------------------------------------------- */
 /*                                helpers                                     */
@@ -146,12 +147,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
     api
       .get(API_ENDPOINTS.PATIENTS)
       .then((res) => {
-        const parsedList = res.data.map((item: string) => JSON.parse(item));
-        // Find the one whose _id (or _id.$oid) matches patientTreeId:
-        let patientDoc = parsedList.find((p: any) => {
-          const pid = p._id?.$oid || p._id;
-          return pid === patientTreeId;
-        });
+        const parsedList = asApiList<any>(res.data);
+        let patientDoc = parsedList.find((p: any) => String(p._id) === patientTreeId);
         if (!patientDoc) {
           for (const p of parsedList) {
             // p.tree is the root of this patient’s embedded‐tree
@@ -318,20 +315,13 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
   useEffect(() => {
       api.get(API_ENDPOINTS.TREATMENTS)
-        .then((r) => {
-          const list = r.data.map((x: string) => {
-            const o = JSON.parse(x);
-            return { ...o, _id: o._id.$oid };
-          });
-          setAllTreatments(list);
-        });
+        .then((r) => setAllTreatments(asApiList(r.data)))
   }, [selectedRootId]);
 
   useEffect(() => {
     api.get(API_ENDPOINTS.PATIENTS)
       .then((r) => {
-        const parsed = r.data.map((s: string) => JSON.parse(s));
-        setRawPatients(parsed);
+        setRawPatients(asApiList(r.data));
         drawPatientNodes();
       })
       .catch(console.error);
@@ -344,12 +334,12 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       const fetchPatients = async () => {
         try {
           const { data } = await api.get(API_ENDPOINTS.PATIENTS);
-          const parsedPatients = data.map((item: string) => JSON.parse(item));
-  
+          const parsedPatients = asApiList<any>(data);
+
           const formattedNodes = parsedPatients.map((patient: any, index: number) => {
             const nodeType = patient.node.node_type;
             const base = {
-              id: patient._id?.$oid || patient._id,
+              id: String(patient._id),
               position: { x: index * 200, y: 100 },
               type: "custom" as const,
             };
@@ -389,11 +379,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       const fetchCharacteristics = async () => {
         try {
           const { data } = await api.get(API_ENDPOINTS.CHARACTERISTICS);
-          const parsed = data.map((item: string) => {
-            const obj = JSON.parse(item);
-            return { ...obj, _id: obj._id.$oid };
-          });
-  
+          const parsed = asApiList<any>(data);
+
           setAllCharacteristics(parsed);
           const uniqueTypes = Array.from(new Set<string>(parsed.map((char: any) => char.type)));
           setCharTypes(uniqueTypes);
@@ -456,14 +443,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       try {
         const res = await api.get(API_ENDPOINTS.PATIENTS);
 
-        const parsedPatients = res.data.map((p: string) => {
-          const obj = JSON.parse(p);
-          return {
-            ...obj,
-            _id: obj._id.$oid,
-          };
-        });
-        // const parsedPatients = data.map((item: string) => JSON.parse(item));
+        const parsedPatients = asApiList<any>(res.data);
 
         // Choose either all roots (overview) or the single drilled‐in root:
         // const roots = selectedRootId

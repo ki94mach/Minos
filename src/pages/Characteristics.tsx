@@ -5,6 +5,7 @@ import api from "../api";
 import BackButton from "../components/BackButton";
 import Cookies from "js-cookie";
 import { API_ENDPOINTS } from "../api/endpoints";
+import { asApiList } from "../api/parseApiList";
 
 interface Characteristic {
     _id: string;
@@ -28,12 +29,7 @@ const Characteristics: React.FC = () => {
     const fetchCharacteristics = async () => {
         try {
             const response = await api.get(API_ENDPOINTS.CHARACTERISTICS);
-            const parsed = response.data.map((item: string) => {
-                const obj = JSON.parse(item);
-                return { ...obj, _id: obj._id.$oid };
-              });
-
-    setCharacteristics(parsed);
+            setCharacteristics(asApiList<Characteristic>(response.data));
         } catch (error) {
             console.error("Error fetching characteristics:", error);
             setErrors("Error fetching characteristics.");

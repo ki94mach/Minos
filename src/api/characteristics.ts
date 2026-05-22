@@ -1,6 +1,7 @@
 import Cookies from "js-cookie";
 import { API_ENDPOINTS } from "./endpoints";
 import api from "../api";
+import { asApiList } from "./parseApiList";
 
 export interface CharacteristicItem {
   _id: string;
@@ -19,10 +20,11 @@ function authHeaders() {
 
 export async function listCharacteristics() {
   const { data } = await api.get(API_ENDPOINTS.CHARACTERISTICS);
-  return data.map((s: string) => {
-    const obj = JSON.parse(s);
-    return { ...obj, _id: obj._id.$oid, rate: Number(obj.rate) } as CharacteristicItem;
-  });
+  return asApiList<CharacteristicItem>(data).map((obj) => ({
+    ...obj,
+    _id: String(obj._id),
+    rate: Number(obj.rate),
+  }));
 }
 
 export async function saveCharacteristic(body: {

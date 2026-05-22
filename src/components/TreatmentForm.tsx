@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import { API_ENDPOINTS } from "../api/endpoints";
+import { asApiList } from "../api/parseApiList";
 
 interface Drug {
   _id: string;
@@ -56,14 +57,7 @@ export default function TreatmentForm({
   useEffect(() => {
     api.get(API_ENDPOINTS.TREATMENTS)
       .then((res) => {
-        const parsed: TreatmentOption[] = res.data.map((item: string) => {
-          const obj = JSON.parse(item);
-          return {
-            ...obj,
-            _id: obj._id.$oid,
-          };
-        });
-        setTreatments(parsed);
+        setTreatments(asApiList<TreatmentOption>(res.data));
       })
       .catch((err) => console.error("Failed to load treatments:", err));
   }, []);

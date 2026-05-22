@@ -5,6 +5,7 @@ matplotlib~=3.10.0
 pyvis~=0.3.2
 pymongo~=4.11.1
 flask~=3.0.3
+python-dotenv~=1.0.0
 mongoengine~=0.29.1
 khayyam
 redis~=5.0.1

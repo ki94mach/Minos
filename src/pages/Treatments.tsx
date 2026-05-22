@@ -10,6 +10,7 @@ import BackButton from "../components/BackButton";
 import { Edit, Delete } from "@mui/icons-material";
 import Cookies from "js-cookie";
 import { API_ENDPOINTS } from "../api/endpoints";
+import { asApiList } from "../api/parseApiList";
 
 interface Drug {
     _id: string;
@@ -69,14 +70,7 @@ const Treatments: React.FC = () => {
     const fetchDrugs = async () => {
         try {
             const response = await api.get(API_ENDPOINTS.DRUGS);
-            const parsedDrugs = response.data.map((item: string) => {
-                const obj = JSON.parse(item);
-                return {
-                  ...obj,
-                  _id: obj._id.$oid 
-                };
-              });
-            setDrugs(parsedDrugs);
+            setDrugs(asApiList(response.data));
         } catch (error) {
             console.error("Error fetching drugs:", error);
         }
@@ -85,11 +79,7 @@ const Treatments: React.FC = () => {
     const fetchTreatments = async () => {
         try {
             const response = await api.get(API_ENDPOINTS.TREATMENTS);
-            const parsedTreatments = response.data.map((item: string) => {
-                const obj = JSON.parse(item);
-                return { ...obj, _id: obj._id.$oid };
-              });
-            setTreatments(parsedTreatments);
+            setTreatments(asApiList(response.data));
         } catch (error) {
             console.error("Error fetching treatments:", error);
         }
