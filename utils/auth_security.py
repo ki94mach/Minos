@@ -1,6 +1,8 @@
 import re
 import bcrypt
-from flask import session, request, jsonify, redirect, url_for, current_app
+from flask import session, request, redirect, url_for, current_app
+
+from utils.api_errors import error_response
 from functools import wraps
 import time
 import secrets
@@ -159,13 +161,13 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         user_id = session.get('user_id')
         if not user_id:
-            return jsonify({'error': 'Authentication required'}), 401
+            return error_response('Authentication required', 401)
         
         # Check session timeout
         created_at = session.get('created_at', 0)
         if time.time() - created_at > (SESSION_TIMEOUT_MINUTES * 60):
             clear_user_session()
-            return jsonify({'error': 'Session expired'}), 401
+            return error_response('Session expired', 401)
         
         # Update session activity timestamp
         try:

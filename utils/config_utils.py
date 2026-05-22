@@ -10,6 +10,8 @@ from flask import Flask, session
 from typing import Dict, Any, Optional
 from werkzeug.exceptions import HTTPException
 
+from utils.api_errors import error_body
+
 # Initialize extensions
 mail = Mail()
 csrf = CSRFProtect()
@@ -155,10 +157,7 @@ def register_error_handlers(app):
     """Register error handlers."""
     @app.errorhandler(CSRFError)
     def handle_csrf_error(e):
-        return {
-            'error': 'CSRF token validation failed',
-            'message': e.description
-        }, 400
+        return error_body('CSRF token validation failed', [str(e.description)]), 400
 
 def configure_security_headers(app):
     """Configure security headers for responses."""
@@ -236,80 +235,51 @@ def configure_logging(app: Flask) -> None:
         app.logger.addFilter(SensitiveDataFilter())
 
 def register_error_handlers(app: Flask) -> None:
-    """Register error handlers for common scenarios."""
-    
+    """Register error handlers for common scenarios (C5)."""
+
     @app.errorhandler(400)
     def handle_bad_request(e):
-        logging.warning(f"Bad request: {e}")
-        return {
-            'error': 'Bad Request',
-            'message': str(e)
-        }, 400
+        logging.warning("Bad request: %s", e)
+        details = [str(e)] if str(e) else None
+        return error_body("Bad Request", details), 400
 
     @app.errorhandler(401)
     def handle_unauthorized(e):
-        return {
-            'error': 'Unauthorized',
-            'message': 'Authentication required'
-        }, 401
+        return error_body("Authentication required"), 401
 
     @app.errorhandler(403)
     def handle_forbidden(e):
-        return {
-            'error': 'Forbidden',
-            'message': 'You do not have permission to access this resource'
-        }, 403
+        return error_body("You do not have permission to access this resource."), 403
 
     @app.errorhandler(404)
     def handle_not_found(e):
-        return {
-            'error': 'Not Found',
-            'message': 'The requested resource was not found'
-        }, 404
+        return error_body("The requested resource was not found."), 404
 
     @app.errorhandler(405)
     def handle_method_not_allowed(e):
-        return {
-            'error': 'Method Not Allowed',
-            'message': 'The method is not allowed for this endpoint'
-        }, 405
+        return error_body("The method is not allowed for this endpoint."), 405
 
     @app.errorhandler(429)
     def handle_too_many_requests(e):
-        return {
-            'error': 'Too Many Requests',
-            'message': 'Please try again later'
-        }, 429
+        return error_body("Please try again later."), 429
 
     @app.errorhandler(500)
     def handle_server_error(e):
-        logging.error(f"Internal server error: {e}")
-        return {
-            'error': 'Internal Server Error',
-            'message': 'An unexpected error occurred'
-        }, 500
+        logging.error("Internal server error: %s", e)
+        return error_body("An unexpected error occurred."), 500
 
     @app.errorhandler(CSRFError)
     def handle_csrf_error(e):
-        logging.warning(f"CSRF validation failed: {e}")
-        return {
-            'error': 'CSRF token validation failed',
-            'message': str(e)
-        }, 400
+        logging.warning("CSRF validation failed: %s", e)
+        return error_body("CSRF token validation failed", [str(e.description)]), 400
 
     @app.errorhandler(Exception)
     def handle_unhandled_exception(e):
         if isinstance(e, HTTPException):
-            return {
-                'error': e.name,
-                'message': e.description
-            }, e.code
-        
-        logging.error(f"Unhandled exception: {e}", exc_info=True)
-        return {
-            'error': 'Internal Server Error',
-            'message': 'An unexpected error occurred'
-        }, 500
+            return error_body(e.description or e.name), e.code
+
+        logging.error("Unhandled exception: %s", e, exc_info=True)
+        return error_body("An unexpected error occurred."), 500
 
 def configure_security_headers(app: Flask) -> None:
     """Configure security headers for responses."""

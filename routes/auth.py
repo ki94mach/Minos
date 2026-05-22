@@ -15,8 +15,8 @@ from models.tables import RoleEnum, User
 from models.user.driver import UserDriver
 from models.token.driver import TokenDriver
 
-# Import the validation decorator and schemas
 from utils.validate_request import validate_request
+from utils.api_errors import error_response
 from validators.auth_validators import (
     LoginUserSchema,
     RegisterUserSchema,
@@ -32,21 +32,18 @@ auth_blueprint = Blueprint('auth', __name__)
 
 @auth_blueprint.route("/csrf-token", methods=["GET"])
 def get_csrf_token():
-    token = generate_csrf()          # ➊ store in session + return value
+    token = generate_csrf()
     resp  = jsonify({"csrf_token": token})
-    # ➋ make the browser store it; SameSite=None needed for localhost:3000 → 5000
     resp.set_cookie(
         "csrf_token", token,
-        secure=False,                # True in production behind HTTPS
+        secure=False,
         samesite="None",
-        httponly=False               # React must be able to read it
+        httponly=False
     )
     return resp
 
 @auth_blueprint.route('/login', methods=['GET'])
 def login_get():
-    # if session.get('user_id'):
-    #     return redirect(url_for('api.get_characteristics'))
     return render_template('index.html')
 
 
@@ -57,25 +54,22 @@ def login_post(validated_data):
     password = validated_data.password
 
     try:
-        # Check if account is locked due to too many failed attempts
         if track_login_attempt(email, False):
-            return jsonify({
-                'status': 'fail', 
-                'error': 'Account temporarily locked due to too many failed login attempts. Please try again later.'
-            }), 429
+            return error_response(
+                'Account temporarily locked due to too many failed login attempts. Please try again later.',
+                429,
+            )
 
         user = UserDriver.get_user_by_email(email=email)
         if not user or not verify_password(password, user.password_hash):
             logging.warning(f'Failed login attempt for email: {email}')
-            return jsonify({'status': 'fail', 'error': 'Invalid credentials.'}), 401
+            return error_response('Invalid credentials.', 401)
 
         if not user.is_active:
-            return jsonify({'status': 'fail', 'error': 'Your account is inactive. Please contact support.'}), 403
+            return error_response('Your account is inactive. Please contact support.', 403)
 
-        # Reset login attempt counter
         track_login_attempt(email, True)
 
-        # Create session
         set_user_session(
             user_id=str(user.id),
             email=user.email,
@@ -90,7 +84,7 @@ def login_post(validated_data):
 
     except Exception as e:
         logging.error(f'Unexpected error during login: {e}')
-        return jsonify({'status': 'fail', 'error': 'An unexpected error occurred. Please try again later.'}), 500
+        return error_response('An unexpected error occurred. Please try again later.', 500)
 
 
 @auth_blueprint.route('/logout', methods=['GET'])
@@ -116,12 +110,10 @@ def register_post(validated_data):
     password = validated_data.password
 
     try:
-        # Check if the user already exists
         existing_user = UserDriver.get_user_by_email(email=email)
         if existing_user:
-            return jsonify({'status': 'fail', 'error': 'Email already registered.'}), 409
+            return error_response('Email already registered.', 409)
 
-        # Create a new user with a default USER role
         new_user = User(
             email=email,
             password_hash=hash_password(password),
@@ -131,7 +123,6 @@ def register_post(validated_data):
 
         user_id = UserDriver.insert(new_user)
 
-        # Automatically log in the new user
         set_user_session(
             user_id=str(user_id),
             email=email,
@@ -146,7 +137,7 @@ def register_post(validated_data):
 
     except Exception as e:
         logging.error(f'Error during registration: {e}')
-        return jsonify({'status': 'fail', 'error': 'An unexpected error occurred. Please try again later.'}), 500
+        return error_response('An unexpected error occurred. Please try again later.', 500)
 
 
 # ----------------- CHANGE PASSWORD -----------------
@@ -154,9 +145,7 @@ def register_post(validated_data):
 @auth_blueprint.route('/change-password', methods=['GET'])
 @login_required
 def change_password_get():
-    # return render_template('change_password.html')
     return redirect("http://localhost:3000/auth/change-password")  
-
 
 
 @auth_blueprint.route('/change-password', methods=['POST'])
@@ -171,7 +160,7 @@ def change_password(validated_data):
         user = UserDriver.get_user_by_email(email=user_email)
 
         if not verify_password(current_password, user.password_hash):
-            return jsonify({'status': 'fail', 'error': 'Current password is incorrect.'}), 401
+            return error_response('Current password is incorrect.', 401)
 
         user.password_hash = hash_password(new_password)
         UserDriver.update(user)
@@ -179,7 +168,7 @@ def change_password(validated_data):
 
     except Exception as e:
         logging.error(f'Error changing password: {e}')
-        return jsonify({'status': 'fail', 'error': 'An unexpected error occurred. Please try again later.'}), 500
+        return error_response('An unexpected error occurred. Please try again later.', 500)
 
 
 # ----------------- FORGOT PASSWORD -----------------
@@ -199,7 +188,6 @@ def forgot_password_post(validated_data):
     try:
         user = UserDriver.get_user_by_email(email=email)
 
-        # Return the same response whether or not the email exists to prevent enumeration
         if not user:
             logging.info(f"Password reset requested for non-existent email: {email}")
             return jsonify({'message': 'If your email is registered, you will receive password reset instructions.'}), 200
@@ -212,7 +200,7 @@ def forgot_password_post(validated_data):
 
     except Exception as e:
         logging.error(f'Error during forgot password process: {e}')
-        return jsonify({'status': 'fail', 'error': 'An unexpected error occurred. Please try again later.'}), 500
+        return error_response('An unexpected error occurred. Please try again later.', 500)
 
 
 # ----------------- RESET PASSWORD -----------------
@@ -240,7 +228,7 @@ def reset_password_post(validated_data):
         user = TokenDriver.validate_reset_token(token)
         if not user:
             logging.warning("Invalid or expired password reset token used")
-            return jsonify({'status': 'fail', 'error': 'The password reset link is invalid or has expired.'}), 400
+            return error_response('The password reset link is invalid or has expired.', 400)
 
         user.password_hash = hash_password(password)
         UserDriver.update(user)
@@ -249,4 +237,4 @@ def reset_password_post(validated_data):
 
     except Exception as e:
         logging.error(f'Error during password reset: {e}')
-        return jsonify({'status': 'fail', 'error': 'An unexpected error occurred. Please try again later.'}), 500
+        return error_response('An unexpected error occurred. Please try again later.', 500)

@@ -59,11 +59,7 @@ const Login: React.FC = () => {
         }
       );
 
-      if (response.data.status === "fail") {
-        setMessage(response.data.error);
-      } else {
-        navigate("/home");
-      }
+      navigate("/home");
     } catch (error: any) {
       const errMsg = error.response?.data?.error || "An error occurred. Please try again.";
       setMessage(errMsg);

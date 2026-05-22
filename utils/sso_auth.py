@@ -14,7 +14,9 @@ from typing import Any, Iterable, Optional
 
 import jwt
 from jwt import PyJWKClient
-from flask import Flask, g, has_request_context, jsonify, request, session
+from flask import Flask, g, has_request_context, request, session
+
+from utils.api_errors import error_response
 
 from models.tables import RoleEnum
 
@@ -312,11 +314,11 @@ def sso_required(view_callable):
     @wraps(view_callable)
     def wrapper(*args, **kwargs):
         if is_production() and auth_disabled_requested():
-            return jsonify({"error": "Authentication required"}), 401
+            return error_response("Authentication required", 401)
 
         principal = resolve_authenticated_principal()
         if principal is None:
-            return jsonify({"error": "Authentication required"}), 401
+            return error_response("Authentication required", 401)
         set_request_principal(principal)
         return view_callable(*args, **kwargs)
 

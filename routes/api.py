@@ -26,6 +26,7 @@ from validators.api_validators import (CharacteristicCreate, CharacteristicUpdat
 from utils.validate_request import validate_request
 from utils.sso_auth import sso_required
 from utils.serialize import serialize_documents
+from utils.api_errors import error_response
 
 from utils.business_rules import find_node
 
@@ -43,9 +44,7 @@ def get_characteristics():
         return jsonify(serialize_documents(characteristics)), 200
     except Exception as e:
         logging.error(f"Error fetching characteristics: {e}")
-        return jsonify({'error': "Failed to retrieve characteristics."}), 500
-
-
+        return error_response("Failed to retrieve characteristics.", 500)
 @api_blueprint.route('/characteristics', methods=['POST'])
 @sso_required
 @validate_request(CharacteristicCreate, location='json')
@@ -69,12 +68,10 @@ def create_characteristic(validated_data):
         return jsonify({'id': str(char_id)}), 201
     except NotUniqueError:
         logging.error("Duplicate characteristic detected.")
-        return jsonify({'error': f"A characteristic with type '{char_type}' and name '{name}' already exists."}), 409
+        return error_response(f"A characteristic with type '{char_type}' and name '{name}' already exists.", 409)
     except Exception as e:
         logging.error(f"Error creating characteristic: {e}")
-        return jsonify({'error': "An unexpected error occurred while creating the characteristic."}), 500
-
-
+        return error_response("An unexpected error occurred while creating the characteristic.", 500)
 @api_blueprint.route('/characteristics/<char_id>', methods=['PUT'])
 @sso_required
 @validate_request(CharacteristicUpdate, location='json')
@@ -90,8 +87,7 @@ def update_characteristic(validated_data, char_id):
     try:
         char = CharacteristicDriver.find(id=char_id).first()
         if not char:
-            return jsonify({'error': 'Characteristic not found'}), 404
-
+            return error_response('Characteristic not found', 404)
         # Update only provided fields, data is already validated and transformed
         updates = {}
         if validated_data.type is not None:
@@ -107,13 +103,13 @@ def update_characteristic(validated_data, char_id):
         return jsonify({'message': 'Characteristic updated'}), 200
     except NotUniqueError:
         logging.error("Duplicate characteristic detected during update.")
-        return jsonify(
-            {'error': "Update failed: A characteristic with the provided type and name already exists."}), 409
+        return error_response(
+            "Update failed: A characteristic with the provided type and name already exists.",
+            409,
+        )
     except Exception as e:
         logging.error(f"Error updating characteristic: {e}")
-        return jsonify({'error': "An unexpected error occurred while updating the characteristic."}), 500
-
-
+        return error_response("An unexpected error occurred while updating the characteristic.", 500)
 @api_blueprint.route('/characteristics/<char_id>', methods=['DELETE'])
 @sso_required
 def delete_characteristic(char_id):
@@ -122,9 +118,7 @@ def delete_characteristic(char_id):
         return jsonify({'message': 'Characteristic deleted'}), 200
     except Exception as e:
         logging.error(f"Error deleting characteristic: {e}")
-        return jsonify({'error': "An unexpected error occurred while deleting the characteristic."}), 500
-
-
+        return error_response("An unexpected error occurred while deleting the characteristic.", 500)
 # --------------------------------------------------
 # Drug Endpoints
 # --------------------------------------------------
@@ -136,9 +130,7 @@ def get_drugs():
         return jsonify(serialize_documents(drugs)), 200
     except Exception as e:
         logging.error(f"Error fetching drugs: {e}")
-        return jsonify({'error': "Failed to retrieve drugs."}), 500
-
-
+        return error_response("Failed to retrieve drugs.", 500)
 @api_blueprint.route('/drugs', methods=['POST'])
 @sso_required
 @validate_request(DrugCreate, location='json')
@@ -163,13 +155,13 @@ def create_drug(validated_data):
         return jsonify({'id': str(drug_id)}), 201
     except NotUniqueError:
         logging.error("Duplicate drug detected.")
-        return jsonify(
-            {'error': f"Drug with name '{name}', strength '{strength}', and unit '{unit}' already exists."}), 409
+        return error_response(
+            f"Drug with name '{name}', strength '{strength}', and unit '{unit}' already exists.",
+            409,
+        )
     except Exception as e:
         logging.error(f"Error creating drug: {e}")
-        return jsonify({'error': "An unexpected error occurred while creating the drug."}), 500
-
-
+        return error_response("An unexpected error occurred while creating the drug.", 500)
 @api_blueprint.route('/drugs/<drug_id>', methods=['PUT'])
 @sso_required
 @validate_request(DrugUpdate, location='json')
@@ -186,8 +178,7 @@ def update_drug(validated_data, drug_id):
     try:
         drug = DrugDriver.find(id=drug_id).first()
         if not drug:
-            return jsonify({'error': 'Drug not found'}), 404
-
+            return error_response('Drug not found', 404)
         # Update only provided fields, data is already validated and transformed
         updates = {}
         if validated_data.name is not None:
@@ -205,13 +196,13 @@ def update_drug(validated_data, drug_id):
         return jsonify({'message': 'Drug updated'}), 200
     except NotUniqueError:
         logging.error("Duplicate drug detected during update.")
-        return jsonify(
-            {'error': "Update failed: A drug with the provided name, strength, and unit already exists."}), 409
+        return error_response(
+            "Update failed: A drug with the provided name, strength, and unit already exists.",
+            409,
+        )
     except Exception as e:
         logging.error(f"Error updating drug: {e}")
-        return jsonify({'error': "An unexpected error occurred while updating the drug."}), 500
-
-
+        return error_response("An unexpected error occurred while updating the drug.", 500)
 @api_blueprint.route('/drugs/<drug_id>', methods=['DELETE'])
 @sso_required
 def delete_drug(drug_id):
@@ -220,9 +211,7 @@ def delete_drug(drug_id):
         return jsonify({'message': 'Drug deleted'}), 200
     except Exception as e:
         logging.error(f"Error deleting drug: {e}")
-        return jsonify({'error': "An unexpected error occurred while deleting the drug."}), 500
-
-
+        return error_response("An unexpected error occurred while deleting the drug.", 500)
 # --------------------------------------------------
 # Treatment Endpoints
 # --------------------------------------------------
@@ -235,9 +224,7 @@ def get_treatments():
     except Exception as e:
         print(e)
         logging.error(f"Error fetching treatments: {e}")
-        return jsonify({'error': "Failed to retrieve treatments."}), 500
-
-
+        return error_response("Failed to retrieve treatments.", 500)
 @api_blueprint.route('/treatments', methods=['POST'])
 @sso_required
 @validate_request(TreatmentCreate, location='json')
@@ -354,12 +341,12 @@ def create_treatment(validated_data: TreatmentCreate):
 
         if treatment_type == "Regimen":
             if not raw_regimen:
-                return jsonify({'error': 'Regimen is required for treatment type "Regimen"'}), 400
+                return error_response('Regimen is required for treatment type "Regimen"', 400)
             regimen_doc = RegimenDoc(**raw_regimen)
         
         elif treatment_type == "Alternative":
             if not raw_alts:
-                return jsonify({'error': 'Alternatives are required for treatment type "Alternative"'}), 400
+                return error_response('Alternatives are required for treatment type "Alternative"', 400)
             for alt in raw_alts:
                 alt_regimen = alt["regimen"]
                 alt_regimen_doc = RegimenDoc(**alt_regimen)
@@ -388,12 +375,10 @@ def create_treatment(validated_data: TreatmentCreate):
 
     except NotUniqueError:
         logging.error("Duplicate treatment detected.")
-        return jsonify({"error": "A treatment with similar properties already exists"}), 409
+        return error_response("A treatment with similar properties already exists", 409)
     except Exception as e:
         logging.error(f"Error creating treatment: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
+        return error_response(str(e), 500)
 @api_blueprint.route('/treatments/<treatment_id>', methods=['PUT'])
 @sso_required
 @validate_request(TreatmentUpdate, location='json')
@@ -409,8 +394,7 @@ def update_treatment(validated_data, treatment_id):
     try:
         treatment = TreatmentDriver.find(id=treatment_id).first()
         if not treatment:
-            return jsonify({'error': 'Treatment not found'}), 404
-
+            return error_response('Treatment not found', 404)
         if validated_data.name is not None:
             treatment.name = validated_data.name
         if validated_data.type is not None:
@@ -434,12 +418,10 @@ def update_treatment(validated_data, treatment_id):
         return jsonify({'message': 'Treatment updated'}), 200
     except NotUniqueError:
         logging.error("Duplicate treatment detected during update.")
-        return jsonify({'error': "Update failed: A treatment with similar properties already exists."}), 409
+        return error_response("Update failed: A treatment with similar properties already exists.", 409)
     except Exception as e:
         logging.error(f"Error updating treatment: {e}")
-        return jsonify({'error': "An unexpected error occurred while updating the treatment."}), 500
-
-
+        return error_response("An unexpected error occurred while updating the treatment.", 500)
 @api_blueprint.route('/treatments/<treatment_id>', methods=['DELETE'])
 @sso_required
 def delete_treatment(treatment_id):
@@ -448,9 +430,7 @@ def delete_treatment(treatment_id):
         return jsonify({'message': 'Treatment deleted'}), 200
     except Exception as e:
         logging.error(f"Error deleting treatment: {e}")
-        return jsonify({'error': "An unexpected error occurred while deleting the treatment."}), 500
-
-
+        return error_response("An unexpected error occurred while deleting the treatment.", 500)
 # --------------------------------------------------
 # Patient Endpoints
 # --------------------------------------------------
@@ -463,9 +443,7 @@ def get_patients():
     except Exception as e:
         print(e)
         logging.error(f"Error fetching patients: {e}")
-        return jsonify({'error': "Failed to retrieve patients."}), 500
-
-
+        return error_response("Failed to retrieve patients.", 500)
 @api_blueprint.route('/patients', methods=['POST'])
 @sso_required
 @validate_request(PatientCreate, location='json')
@@ -556,15 +534,13 @@ def create_patient(validated_data):
 
     except ValueError as ve:
         logging.error(f"Validation error creating patient: {ve}")
-        return jsonify({'error': str(ve)}), 400
+        return error_response(str(ve), 400)
     except NotUniqueError:
         logging.error("Duplicate patient tree detected.")
-        return jsonify({'error': "A patient with a similar tree structure already exists."}), 409
+        return error_response("A patient with a similar tree structure already exists.", 409)
     except Exception as e:
         logging.error(f"Error creating patient: {e}")
-        return jsonify({'error': "An unexpected error occurred while creating the patient."}), 500
-
-
+        return error_response("An unexpected error occurred while creating the patient.", 500)
 def create_node_from_dict(node_dict, parent_id=None):
     """
     Recursively convert a dictionary (representing a node) into a Node instance.
@@ -678,8 +654,7 @@ def add_node(validated_data, patient_id):
         
         patient_tree = PatientDriver.find(id=patient_id).first()
         if not patient_tree:
-            return jsonify({'error': 'Patient not found'}), 404
-
+            return error_response('Patient not found', 404)
         if '_id' not in new_node_data:
             new_node_data['_id'] = ObjectId()
         if parent_node_id:
@@ -705,8 +680,7 @@ def add_node(validated_data, patient_id):
         if parent_node_id:
             parent_node = find_node(patient_tree.tree, str(parent_node_id))
             if not parent_node:
-                return jsonify({'error': 'Parent node not found'}), 404
-                
+                return error_response('Parent node not found', 404)
             parent_node.children.append(new_node)
         else:
             patient_tree.tree.children.append(new_node)
@@ -736,12 +710,10 @@ def add_node(validated_data, patient_id):
 
     except ValueError as ve:
         logging.error(f"Validation error adding node: {ve}")
-        return jsonify({'error': str(ve)}), 400
+        return error_response(str(ve), 400)
     except Exception as e:
         logging.error(f"Error adding node: {e}")
-        return jsonify({'error': "An unexpected error occurred while adding the node."}), 500
-
-
+        return error_response("An unexpected error occurred while adding the node.", 500)
 @api_blueprint.route('/patients/<patient_id>', methods=['PUT'])
 @sso_required
 @validate_request(PatientUpdate, location='json')
@@ -771,8 +743,7 @@ def update_patient(validated_data, patient_id):
     try:
         patient = PatientDriver.find(id=patient_id).first()
         if not patient:
-            return jsonify({'error': 'Patient not found'}), 404
-
+            return error_response('Patient not found', 404)
         # Update patient size if provided.
         if validated_data.size is not None:
             patient.size = validated_data.size
@@ -789,8 +760,7 @@ def update_patient(validated_data, patient_id):
                 patient.tree_hash = hashlib.sha256(hash_input).hexdigest()
             except Exception as e:
                 logging.error(f"Error updating patient tree: {e}")
-                return jsonify({'error': "Invalid tree structure provided."}), 400
-
+                return error_response("Invalid tree structure provided.", 400)
         # Replace the entire document using a full document replacement.
         from mongoengine.connection import get_db
         db = get_db()
@@ -799,9 +769,7 @@ def update_patient(validated_data, patient_id):
         return jsonify({'message': 'Patient updated'}), 200
     except Exception as e:
         logging.error(f"Error updating patient: {e}")
-        return jsonify({'error': "An unexpected error occurred while updating the patient."}), 500
-
-
+        return error_response("An unexpected error occurred while updating the patient.", 500)
 @api_blueprint.route('/patients/<patient_id>/node/<node_id>', methods=['PUT'])
 @sso_required
 @validate_request(UpdateNode, location='json')
@@ -835,13 +803,11 @@ def update_node(validated_data, patient_id, node_id):
     """
     try:
         if not validated_data:
-            return jsonify({'error': 'No update data provided.'}), 400
-
+            return error_response('No update data provided.', 400)
         # Fetch the PatientTree document.
         patient_tree = PatientDriver.find(id=patient_id).first()
         if not patient_tree:
-            return jsonify({'error': 'Patient not found.'}), 404
-
+            return error_response('Patient not found.', 404)
         # Recursive function to find the node with the given _id.
         def find_node(node, target_id):
             if str(node._id) == target_id:
@@ -854,8 +820,7 @@ def update_node(validated_data, patient_id, node_id):
 
         target_node = find_node(patient_tree.tree, node_id)
         if not target_node:
-            return jsonify({'error': 'Node not found in patient tree.'}), 404
-
+            return error_response('Node not found in patient tree.', 404)
         # Update node fields if provided.
         if validated_data.rate is not None:
             target_node.rate = validated_data.rate
@@ -897,9 +862,7 @@ def update_node(validated_data, patient_id, node_id):
 
     except Exception as e:
         logging.error(f"Error updating node: {e}")
-        return jsonify({'error': "An unexpected error occurred while updating the node."}), 500
-
-
+        return error_response("An unexpected error occurred while updating the node.", 500)
 @api_blueprint.route('/patients/<patient_id>', methods=['DELETE'])
 @sso_required
 def delete_patient(patient_id):
@@ -911,9 +874,7 @@ def delete_patient(patient_id):
         return jsonify({'message': 'Patient deleted'}), 200
     except Exception as e:
         logging.error(f"Error deleting patient: {e}")
-        return jsonify({'error': "An unexpected error occurred while deleting the patient."}), 500
-
-
+        return error_response("An unexpected error occurred while deleting the patient.", 500)
 @api_blueprint.route('/patients/<patient_id>/node/<node_id>', methods=['DELETE'])
 @sso_required
 def delete_node(patient_id, node_id):
@@ -937,8 +898,7 @@ def delete_node(patient_id, node_id):
         # Fetch the PatientTree document.
         patient_tree = PatientDriver.find(id=patient_id).first()
         if not patient_tree:
-            return jsonify({'error': 'Patient not found'}), 404
-
+            return error_response('Patient not found', 404)
         # Recursive function to remove a node and splice its children into the parent's list.
         def remove_node(node, target_id):
             new_children = []
@@ -962,8 +922,7 @@ def delete_node(patient_id, node_id):
         # Remove the target node from the tree starting at the root.
         removed = remove_node(patient_tree.tree, node_id)
         if not removed:
-            return jsonify({'error': 'Node not found in patient tree'}), 404
-
+            return error_response('Node not found in patient tree', 404)
         # Recompute the tree_hash over the updated tree.
         hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
         patient_tree.tree_hash = hashlib.sha256(hash_input).hexdigest()
@@ -977,9 +936,7 @@ def delete_node(patient_id, node_id):
 
     except Exception as e:
         logging.error(f"Error deleting node: {e}")
-        return jsonify({'error': "An unexpected error occurred while deleting the node."}), 500
-
-
+        return error_response("An unexpected error occurred while deleting the node.", 500)
 # --------------------------------------------------
 # Followup Endpoints
 # --------------------------------------------------
@@ -995,8 +952,7 @@ def get_followups():
         return jsonify(serialize_documents(followups)), 200
     except Exception as e:
         logging.error(f"Error fetching followups: {e}")
-        return jsonify({'error': "Failed to retrieve followups."}), 500
-
+        return error_response("Failed to retrieve followups.", 500)
 @api_blueprint.route('/followups', methods=['POST'])
 @sso_required
 @validate_request(FollowupCreate, location='json')
@@ -1027,12 +983,13 @@ def create_followup(validated_data):
         return jsonify({'id': str(followup_id)}), 201
     except NotUniqueError:
         logging.error("Duplicate followup detected.")
-        return jsonify(
-            {'error': "A followup with the given name, overall survival, patient, and parent already exists."}), 409
+        return error_response(
+            "A followup with the given name, overall survival, patient, and parent already exists.",
+            409,
+        )
     except Exception as e:
         logging.error(f"Error creating followup: {e}")
-        return jsonify({'error': str(e)}), 500
-
+        return error_response(str(e), 500)
 @api_blueprint.route('/followups/<followup_id>', methods=['PUT'])
 @sso_required
 @validate_request(FollowupUpdate, location='json')
@@ -1047,8 +1004,7 @@ def update_followup(validated_data, followup_id):
     try:
         followup = FollowupDriver.find(id=followup_id).first()
         if not followup:
-            return jsonify({'error': 'Followup not found'}), 404
-
+            return error_response('Followup not found', 404)
         # Update only provided fields, data is already validated
         updates = {}
         if validated_data.name is not None:
@@ -1064,11 +1020,10 @@ def update_followup(validated_data, followup_id):
         return jsonify({'message': 'Followup updated'}), 200
     except NotUniqueError:
         logging.error("Duplicate followup detected during update.")
-        return jsonify({'error': "Update failed: A followup with similar properties already exists."}), 409
+        return error_response("Update failed: A followup with similar properties already exists.", 409)
     except Exception as e:
         logging.error(f"Error updating followup: {e}")
-        return jsonify({'error': "An unexpected error occurred while updating the followup."}), 500
-
+        return error_response("An unexpected error occurred while updating the followup.", 500)
 @api_blueprint.route('/followups/<followup_id>', methods=['DELETE'])
 @sso_required
 def delete_followup(followup_id):
@@ -1077,4 +1032,4 @@ def delete_followup(followup_id):
         return jsonify({'message': 'Followup deleted'}), 200
     except Exception as e:
         logging.error(f"Error deleting followup: {e}")
-        return jsonify({'error': "An unexpected error occurred while deleting the followup."}), 500
+        return error_response("An unexpected error occurred while deleting the followup.", 500)

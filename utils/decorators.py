@@ -1,31 +1,33 @@
 # utils/decorators.py
 from functools import wraps
-from flask import request, jsonify
+from flask import request
 from pydantic import ValidationError
 
+from utils.api_errors import error_response, pydantic_error_details
 from utils.sso_auth import ADMIN, USER, get_request_role
 
-# Re-export for callers that import ADMIN/USER from decorators.
 __all__ = ["ADMIN", "USER", "validate_request", "require_role"]
 
 
 def validate_request(pydantic_model):
+    """Legacy decorator; prefer utils.validate_request.validate_request."""
+
     def decorator(view_callable):
         @wraps(view_callable)
         def wrapper(*args, **kwargs):
             try:
                 data = request.get_json()
-                # Use Pydantic to parse/validate the incoming JSON.
-                # Adjust the method depending on your Pydantic version (model_validate for v2 or parse_obj for v1)
                 validated_data = pydantic_model.model_validate(data)
-                # Attach validated data to the request context if needed.
                 request.validated_data = validated_data
                 return view_callable(*args, **kwargs)
             except ValidationError as e:
-                error_messages = [f"{err['msg'].replace('Value error,', '').strip()}" for err in e.errors()]
-                return jsonify({'success': False, 'error': 'VALIDATION ERROR!', 'details': error_messages}), 400
+                return error_response(
+                    "Validation failed",
+                    422,
+                    pydantic_error_details(e),
+                )
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)}), 500
+                return error_response(str(e), 500)
 
         return wrapper
 
@@ -40,7 +42,10 @@ def require_role(allowed_roles):
         def wrapper(*args, **kwargs):
             user_role = get_request_role()
             if user_role not in allowed:
-                return jsonify({'error': 'You do not have permission to access this resource.'}), 403
+                return error_response(
+                    "You do not have permission to access this resource.",
+                    403,
+                )
             return view_callable(*args, **kwargs)
 
         return wrapper
