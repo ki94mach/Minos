@@ -2,7 +2,7 @@ import { Dialog, DialogContent } from "@mui/material";
 import CharacteristicForm from "../CharacteristicForm";
 import type { OneChar } from "../EditCharacteristicForm";
 import type { Node } from "reactflow";
-import { API_ENDPOINTS } from "../../api/endpoints";
+import { createPatient } from "../../api/patients";
 
 type Props = {
   open: boolean;
@@ -41,51 +41,46 @@ export default function AddCharacteristicDialog({
             onClose();
 
             if (isIranRightClick) {
-              const csrf =
-                document.cookie.match(/csrf_token=([^;]+)/)?.[1] ?? "";
               const charObj = allChars.find((c) => c._id === characteristicId);
-              if (!charObj) return alert("Characteristic not found");
+              if (!charObj) {
+                alert("Characteristic not found");
+                return;
+              }
 
               const size = Math.round(parentSize * rate);
-              const payload = {
-                node: {
-                  node_type: "characteristic",
-                  rate: 1.0,
-                  size: parentSize,
-                  parent_id: null,
-                  characteristic_data: {
-                    _id: "67d01f7b9e8a82122fb0331b",
-                    char_type: "Population",
-                    name: "Iran",
-                  },
-                  children: [
-                    {
-                      node_type: "characteristic",
-                      rate,
-                      size,
-                      parent_id: null,
-                      characteristic_data: {
-                        _id: characteristicId,
-                        char_type: charObj.type,
-                        name: charObj.name,
-                      },
+              try {
+                await createPatient({
+                  node: {
+                    node_type: "characteristic",
+                    rate: 1.0,
+                    size: parentSize,
+                    parent_id: null,
+                    characteristic_data: {
+                      _id: "67d01f7b9e8a82122fb0331b",
+                      char_type: "Population",
+                      name: "Iran",
                     },
-                  ],
-                },
-              };
-
-              await fetch(API_ENDPOINTS.PATIENTS, {
-                method: "POST",
-                credentials: "include",
-                headers: {
-                  "Content-Type": "application/json",
-                  "X-CSRFToken": csrf,
-                },
-                body: JSON.stringify(payload),
-              })
-                .then(() => alert("Patient created."))
-                .then(() => window.location.reload())
-                .catch((e) => alert("❌ Failed to create patient"));
+                    children: [
+                      {
+                        node_type: "characteristic",
+                        rate,
+                        size,
+                        parent_id: null,
+                        characteristic_data: {
+                          _id: characteristicId,
+                          char_type: charObj.type,
+                          name: charObj.name,
+                        },
+                      },
+                    ],
+                  },
+                });
+                alert("Patient created.");
+                await onSaved();
+              } catch (e) {
+                console.error(e);
+                alert("Failed to create patient");
+              }
             } else {
               await onSaved();
             }
