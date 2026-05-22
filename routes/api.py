@@ -845,9 +845,15 @@ def update_node(validated_data, patient_id, node_id):
         elif target_node.node_type == 'followup' and validated_data.followup_data:
             target_node.followup_data = FollowupEmbedded(**validated_data.followup_data)
 
-        # Optionally, update children if provided.
-        if validated_data.children:
-            target_node.children = validated_data.children
+        # Optionally, update children if provided (convert Pydantic → MongoEngine embeds).
+        if validated_data.children is not None:
+            target_node.children = [
+                create_node_from_dict(
+                    child.model_dump(by_alias=True, exclude_none=True),
+                    parent_id=target_node._id,
+                )
+                for child in validated_data.children
+            ]
 
         # Recompute the tree_hash over the entire tree.
         hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
