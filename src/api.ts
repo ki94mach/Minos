@@ -1,18 +1,19 @@
 import axios from "axios";
 import Cookies from "js-cookie";
+import { API_BASE_URL } from "./api/config";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000",
+  baseURL: API_BASE_URL,
   withCredentials: true,
-  xsrfCookieName: "csrf_token",   // ➊ tell Axios where to read from
-  xsrfHeaderName: "X-CSRFToken",  // ➋ and what header to emit
+  xsrfCookieName: "csrf_token",
+  xsrfHeaderName: "X-CSRFToken",
 });
 
 api.interceptors.request.use((config) => {
-  // fallback for non‑mutating methods where Axios skips xsrf magic
   const token = Cookies.get("csrf_token");
   if (token) config.headers["X-CSRFToken"] = token;
   return config;
 });
 
 export default api;
+export { API_BASE_URL } from "./api/config";
