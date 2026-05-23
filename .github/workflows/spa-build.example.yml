@@ -19,6 +19,14 @@ jobs:
 
       - run: npm ci
 
+      - name: Audit API production env (I5)
+        env:
+          FLASK_ENV: production
+          SSO_ISSUER: https://idp.example.com/realms/minos
+          SSO_AUDIENCE: minos-api
+          SSO_JWKS_URL: https://idp.example.com/realms/minos/protocol/openid-connect/certs
+        run: python scripts/audit-production-env.py
+
       - name: Build static SPA
         env:
           REACT_APP_API_URL: ${{ vars.REACT_APP_API_URL }}

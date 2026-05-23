@@ -1,0 +1,18 @@
+"""
+Gunicorn configuration for production (I6).
+Override via environment: PORT, GUNICORN_WORKERS, GUNICORN_THREADS, GUNICORN_TIMEOUT.
+"""
+import os
+
+bind = f"0.0.0.0:{os.environ.get('PORT', '5000')}"
+workers = int(os.environ.get("GUNICORN_WORKERS", "4"))
+threads = int(os.environ.get("GUNICORN_THREADS", "2"))
+timeout = int(os.environ.get("GUNICORN_TIMEOUT", "120"))
+worker_class = "gthread"
+wsgi_app = "run:app"
+
+accesslog = "-"
+errorlog = "-"
+loglevel = os.environ.get("GUNICORN_LOG_LEVEL", "info")
+capture_output = True
+preload_app = True

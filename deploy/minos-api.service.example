@@ -1,0 +1,25 @@
+# systemd unit for Minos API (I6) — copy to /etc/systemd/system/minos-api.service
+#
+#   sudo cp deploy/minos-api.service.example /etc/systemd/system/minos-api.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now minos-api
+
+[Unit]
+Description=Minos Flask API (Gunicorn)
+After=network.target redis.service mongod.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=minos
+Group=minos
+WorkingDirectory=/opt/minos
+EnvironmentFile=/opt/minos/.env
+ExecStart=/opt/minos/.venv/bin/gunicorn -c gunicorn.conf.py run:app
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
