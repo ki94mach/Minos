@@ -27,6 +27,7 @@ from utils.validate_request import validate_request
 from utils.sso_auth import sso_required
 from utils.serialize import serialize_documents
 from utils.api_errors import error_response
+from utils.utils import Utils
 
 from utils.business_rules import find_node
 
@@ -519,9 +520,7 @@ def create_patient(validated_data):
 
         new_node = Node(**node_data)
         
-        # Generate tree hash
-        hash_input = f"{new_node.to_mongo().to_dict()}".encode('utf-8')
-        tree_hash = hashlib.sha256(hash_input).hexdigest()
+        tree_hash = Utils.compute_tree_hash(new_node)
 
         # Create and save the PatientTree
         patient_tree = PatientTree(
@@ -685,8 +684,7 @@ def add_node(validated_data, patient_id):
         else:
             patient_tree.tree.children.append(new_node)
 
-        hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
-        patient_tree.tree_hash = hashlib.sha256(hash_input).hexdigest()
+        patient_tree.tree_hash = Utils.compute_tree_hash(patient_tree.tree)
         def fix_tree_node(node):
             # Fix characteristic_data.char_type
             if getattr(node, 'node_type', None) == 'characteristic':
@@ -755,9 +753,7 @@ def update_patient(validated_data, patient_id):
                 # Convert the incoming JSON to a Node instance.
                 new_tree = Node(**validated_data.tree)
                 patient.tree = new_tree
-                # Recompute tree_hash based on the full tree.
-                hash_input = f"{new_tree.to_mongo().to_dict()}".encode('utf-8')
-                patient.tree_hash = hashlib.sha256(hash_input).hexdigest()
+                patient.tree_hash = Utils.compute_tree_hash(new_tree)
             except Exception as e:
                 logging.error(f"Error updating patient tree: {e}")
                 return error_response("Invalid tree structure provided.", 400)
@@ -855,9 +851,7 @@ def update_node(validated_data, patient_id, node_id):
                 for child in validated_data.children
             ]
 
-        # Recompute the tree_hash over the entire tree.
-        hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
-        patient_tree.tree_hash = hashlib.sha256(hash_input).hexdigest()
+        patient_tree.tree_hash = Utils.compute_tree_hash(patient_tree.tree)
 
         # Replace the entire document using full document replacement.
         from mongoengine.connection import get_db
@@ -929,9 +923,7 @@ def delete_node(patient_id, node_id):
         removed = remove_node(patient_tree.tree, node_id)
         if not removed:
             return error_response('Node not found in patient tree', 404)
-        # Recompute the tree_hash over the updated tree.
-        hash_input = f"{patient_tree.tree.to_mongo().to_dict()}".encode('utf-8')
-        patient_tree.tree_hash = hashlib.sha256(hash_input).hexdigest()
+        patient_tree.tree_hash = Utils.compute_tree_hash(patient_tree.tree)
 
         # Replace the entire document using full document replacement.
         from mongoengine.connection import get_db

@@ -10,11 +10,11 @@ class Utils:
     @staticmethod
     def compute_tree_hash(tree):
         """
-        Compute a SHA-256 hash of the tree structure.
-        The 'tree' should be serializable to JSON. We use sort_keys=True to ensure
-        consistent ordering.
+        Compute a SHA-256 hash of a patient tree (MongoEngine Node or BSON dict).
+        Uses canonical JSON (sort_keys, default=str) so identical trees always
+        produce the same hash regardless of dict insertion order.
         """
-        # Serialize the tree to a JSON string. You might want to filter out fields
-        # that you do not wish to include in the hash computation.
-        tree_json = json.dumps(tree, sort_keys=True)
-        return hashlib.sha256(tree_json.encode('utf-8')).hexdigest()
+        if hasattr(tree, "to_mongo"):
+            tree = tree.to_mongo().to_dict()
+        tree_json = json.dumps(tree, sort_keys=True, default=str)
+        return hashlib.sha256(tree_json.encode("utf-8")).hexdigest()
