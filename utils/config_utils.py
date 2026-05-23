@@ -6,7 +6,7 @@ from flask_wtf.csrf import CSRFProtect, CSRFError
 from flask_mail import Mail
 from flask_session import Session
 from models.meta import connect_db
-from flask import Flask, session
+from flask import Flask, jsonify, session
 from typing import Dict, Any, Optional
 from werkzeug.exceptions import HTTPException
 
@@ -148,6 +148,20 @@ def register_routes(app, api_blueprint, auth_blueprint):
     def home():
         from flask import redirect
         return redirect('/auth/login')
+
+    @app.route('/health', methods=['GET'])
+    def health():
+        """Liveness/readiness for deploy and load balancers (no auth)."""
+        body = {'status': 'ok'}
+        try:
+            from mongoengine.connection import get_db
+            get_db().client.admin.command('ping')
+            body['mongo'] = 'ok'
+        except Exception as exc:
+            logging.warning('Health check: MongoDB ping failed: %s', exc)
+            body['mongo'] = 'unreachable'
+            return jsonify(body), 503
+        return jsonify(body), 200
 
     # Register blueprints
     app.register_blueprint(api_blueprint, url_prefix='/api')

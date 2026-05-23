@@ -483,15 +483,6 @@ def create_patient(validated_data):
         if '_id' not in node_data:
             node_data['_id'] = ObjectId()
 
-        # Create the Node instance with processed data
-        import pprint
-        pprint.pprint(node_data)
-        for child in node_data.get("children", []):
-            if '_id' not in child:
-                print("❌ Missing _id in child:", child)
-            else:
-                print("✅ Child has _id:", child['_id'])
-
         def convert_ids_recursively(node):
              if isinstance(node, dict):
                 # Assign _id if missing
