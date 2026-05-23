@@ -18,6 +18,7 @@ from models.token.driver import TokenDriver
 from utils.validate_request import validate_request
 from utils.api_errors import error_response
 from utils.auth_policy import registration_required
+from utils.config_utils import cookie_secure_enabled
 from validators.auth_validators import (
     LoginUserSchema,
     RegisterUserSchema,
@@ -35,11 +36,13 @@ auth_blueprint = Blueprint('auth', __name__)
 def get_csrf_token():
     token = generate_csrf()
     resp  = jsonify({"csrf_token": token})
+    secure = cookie_secure_enabled()
     resp.set_cookie(
-        "csrf_token", token,
-        secure=False,
-        samesite="None",
-        httponly=False
+        "csrf_token",
+        token,
+        secure=secure,
+        samesite="None" if secure else "Lax",
+        httponly=False,
     )
     return resp
 

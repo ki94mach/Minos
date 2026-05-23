@@ -16,6 +16,51 @@ from utils.api_errors import error_body
 mail = Mail()
 csrf = CSRFProtect()
 
+
+def cookie_secure_enabled() -> bool:
+    """True when session/CSRF cookies must be Secure (HTTPS only) — I2."""
+    if os.environ.get("FLASK_ENV") == "production":
+        return True
+    return os.environ.get("FORCE_HTTPS", "").lower() in ("1", "true", "yes")
+
+
+def configure_https(app: Flask) -> None:
+    """
+    Production HTTPS: secure cookies, CSRF SSL strict, optional reverse-proxy trust (I2).
+    TLS termination is expected at the load balancer / ingress; set BEHIND_PROXY=true
+    when the app receives X-Forwarded-Proto: https.
+    """
+    secure_cookies = cookie_secure_enabled()
+
+    app.config["SESSION_COOKIE_SECURE"] = secure_cookies
+    app.config["WTF_CSRF_SSL_STRICT"] = secure_cookies
+
+    if secure_cookies:
+        app.config["PREFERRED_URL_SCHEME"] = "https"
+
+    behind_proxy = os.environ.get("BEHIND_PROXY", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if behind_proxy:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=1,
+            x_proto=1,
+            x_host=1,
+            x_prefix=1,
+        )
+        logging.info(
+            "ProxyFix enabled (X-Forwarded-Proto); use HTTPS on the public URL"
+        )
+
+    if secure_cookies:
+        logging.info("Secure cookies enabled (SESSION_COOKIE_SECURE, CSRF SSL strict)")
+
+
 def configure_secret_key(app):
     """Configure the application secret key."""
     secret_key = os.environ.get('SECRET_KEY')
@@ -72,7 +117,7 @@ def configure_security(app):
     # CSRF Protection configuration
     app.config['WTF_CSRF_ENABLED'] = True
     app.config['WTF_CSRF_TIME_LIMIT'] = 7200  # 1 hour in seconds
-    app.config['WTF_CSRF_SSL_STRICT'] = os.environ.get('FLASK_ENV') == 'production'
+    app.config['WTF_CSRF_SSL_STRICT'] = cookie_secure_enabled()
     app.config['WTF_CSRF_METHODS'] = ['POST', 'PUT', 'PATCH', 'DELETE']
     app.config['WTF_CSRF_CHECK_DEFAULT'] = True
     
@@ -113,9 +158,11 @@ def configure_session(app, redis_client):
     
     # Common session settings
     app.config['SESSION_COOKIE_NAME'] = 'session'
-    app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
+    app.config['SESSION_COOKIE_SECURE'] = cookie_secure_enabled()
     app.config['SESSION_COOKIE_HTTPONLY'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SAMESITE'] = os.environ.get(
+        'SESSION_COOKIE_SAMESITE', 'Lax'
+    )
     app.config['SESSION_REFRESH_EACH_REQUEST'] = True
     
     # Initialize Flask-Session
@@ -151,15 +198,12 @@ def register_routes(app, api_blueprint, auth_blueprint):
 
     @app.route('/health', methods=['GET'])
     def health():
-        """Liveness/readiness for deploy and load balancers (no auth)."""
-        body = {'status': 'ok'}
-        try:
-            from mongoengine.connection import get_db
-            get_db().client.admin.command('ping')
-            body['mongo'] = 'ok'
-        except Exception as exc:
-            logging.warning('Health check: MongoDB ping failed: %s', exc)
-            body['mongo'] = 'unreachable'
+        """Liveness/readiness for deploy and load balancers (I1 / B8, no auth)."""
+        from models.meta import check_mongo_health
+
+        mongo_ok, mongo_details = check_mongo_health()
+        body = {'status': 'ok' if mongo_ok else 'degraded', **mongo_details}
+        if not mongo_ok:
             return jsonify(body), 503
         return jsonify(body), 200
 

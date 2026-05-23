@@ -11,6 +11,7 @@ from routes.api import api_blueprint
 from routes.auth import auth_blueprint
 from utils.config_utils import (
     configure_secret_key,
+    configure_https,
     configure_cors,
     configure_security,
     configure_email,
@@ -51,6 +52,7 @@ def create_app():
     
     # Configure application
     configure_secret_key(app)
+    configure_https(app)
     configure_cors(app)
     configure_security(app)
     configure_email(app)
