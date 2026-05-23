@@ -25,6 +25,7 @@ from validators.api_validators import (CharacteristicCreate, CharacteristicUpdat
                                        AddNode, UpdateNode, FollowupUpdate, FollowupCreate)
 from utils.validate_request import validate_request
 from utils.sso_auth import sso_required
+from utils.decorators import require_role, ADMIN
 from utils.serialize import serialize_documents
 from utils.api_errors import error_response
 from utils.utils import Utils
@@ -113,6 +114,7 @@ def update_characteristic(validated_data, char_id):
         return error_response("An unexpected error occurred while updating the characteristic.", 500)
 @api_blueprint.route('/characteristics/<char_id>', methods=['DELETE'])
 @sso_required
+@require_role([ADMIN])
 def delete_characteristic(char_id):
     try:
         CharacteristicDriver.delete(char_id)
@@ -206,6 +208,7 @@ def update_drug(validated_data, drug_id):
         return error_response("An unexpected error occurred while updating the drug.", 500)
 @api_blueprint.route('/drugs/<drug_id>', methods=['DELETE'])
 @sso_required
+@require_role([ADMIN])
 def delete_drug(drug_id):
     try:
         DrugDriver.delete(drug_id)
@@ -425,6 +428,7 @@ def update_treatment(validated_data, treatment_id):
         return error_response("An unexpected error occurred while updating the treatment.", 500)
 @api_blueprint.route('/treatments/<treatment_id>', methods=['DELETE'])
 @sso_required
+@require_role([ADMIN])
 def delete_treatment(treatment_id):
     try:
         TreatmentDriver.delete(treatment_id)
@@ -850,6 +854,7 @@ def update_node(validated_data, patient_id, node_id):
         return error_response("An unexpected error occurred while updating the node.", 500)
 @api_blueprint.route('/patients/<patient_id>', methods=['DELETE'])
 @sso_required
+@require_role([ADMIN])
 def delete_patient(patient_id):
     """
     Deletes the entire PatientTree document.
@@ -1009,6 +1014,7 @@ def update_followup(validated_data, followup_id):
         return error_response("An unexpected error occurred while updating the followup.", 500)
 @api_blueprint.route('/followups/<followup_id>', methods=['DELETE'])
 @sso_required
+@require_role([ADMIN])
 def delete_followup(followup_id):
     try:
         FollowupDriver.delete(followup_id)
