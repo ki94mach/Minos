@@ -735,28 +735,22 @@ def update_patient(validated_data, patient_id):
           "children": [ ... ]           // Optional: list of child nodes (must follow the same structure)
       }
     }
-    If "tree" is provided, the endpoint will update the patient tree and recompute the tree_hash.
-    Otherwise, only the "size" field will be updated.
+    Updates the patient tree and recomputes tree_hash. Root node size lives on tree.size.
     """
     try:
         patient = PatientDriver.find(id=patient_id).first()
         if not patient:
             return error_response('Patient not found', 404)
-        # Update patient size if provided.
-        if validated_data.size is not None:
-            patient.size = validated_data.size
 
-        # Optionally update the entire tree.
-        if validated_data.tree is not None:
-            from models.tables import Node
-            try:
-                # Convert the incoming JSON to a Node instance.
-                new_tree = Node(**validated_data.tree)
-                patient.tree = new_tree
-                patient.tree_hash = Utils.compute_tree_hash(new_tree)
-            except Exception as e:
-                logging.error(f"Error updating patient tree: {e}")
-                return error_response("Invalid tree structure provided.", 400)
+        try:
+            new_tree = create_node_from_dict(
+                validated_data.tree.model_dump(by_alias=True, exclude_none=True)
+            )
+            patient.tree = new_tree
+            patient.tree_hash = Utils.compute_tree_hash(new_tree)
+        except Exception as e:
+            logging.error(f"Error updating patient tree: {e}")
+            return error_response("Invalid tree structure provided.", 400)
         # Replace the entire document using a full document replacement.
         from mongoengine.connection import get_db
         db = get_db()

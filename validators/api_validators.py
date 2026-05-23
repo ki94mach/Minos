@@ -674,22 +674,11 @@ class PatientCreate(BaseModel):
         return self
 
 class PatientUpdate(BaseModel):
-    size: Optional[float] = Field(None, gt=0.0)
-    tree: Optional[PatientNode] = None
-
-    @field_validator('size', mode='after')
-    @classmethod
-    def validate_optional_size(
-        cls, v: Optional[float]
-        ) -> Optional[float]:
-
-        if v is not None:
-            return validate_size(v)
-        return v
+    tree: PatientNode
 
     @model_validator(mode="after")
     def validate_tree_update(self) -> "PatientUpdate":
-        if self.tree and self.tree.parent_id is not None:
+        if self.tree.parent_id is not None:
             raise ValueError("Root node must not have a parent_id")
         return self
 
