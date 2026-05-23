@@ -16,6 +16,7 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { API_ENDPOINTS } from "../api/endpoints";
+import { clearAccessToken } from "../auth/accessToken";
 import {
     useMinosAuthPages,
     redirectToSsoLogout,
@@ -33,6 +34,7 @@ const Navbar: React.FC = () => {
 
     const handleLogout = async () => {
         if (!showMinosAuth) {
+            clearAccessToken();
             redirectToSsoLogout();
             return;
         }

@@ -1,4 +1,5 @@
 import api from "../api";
+import { resolveDefaultRootCharacteristic } from "../config/defaultCharacteristic";
 import { API_ENDPOINTS } from "./endpoints";
 
 export type CharacteristicNodeData = {
@@ -24,6 +25,7 @@ export async function createPatient(payload: { node: PatientTreeNodePayload }) {
 }
 
 export async function createPatientTree() {
+  const rootChar = await resolveDefaultRootCharacteristic();
   try {
     return await createPatient({
       node: {
@@ -32,9 +34,9 @@ export async function createPatientTree() {
         size: 90000000,
         parent_id: null,
         characteristic_data: {
-          _id: "67d01f7b9e8a82122fb0331b",
-          char_type: "Population",
-          name: "Iran",
+          _id: rootChar._id,
+          char_type: rootChar.char_type,
+          name: rootChar.name,
         },
         children: [],
       },

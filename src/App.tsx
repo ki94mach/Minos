@@ -8,6 +8,7 @@ import Patients from "./pages/Patients";
 import Treatments from "./pages/Treatments";
 import FollowUps from "./pages/Follow-Ups";
 import Navbar from "./components/Navbar";
+import ProtectedRoute from "./components/ProtectedRoute";
 import SsoRedirect from "./components/SsoRedirect";
 import Login from "./pages/Login/Login";
 import Register from "./pages/Login/Register";
@@ -40,12 +41,54 @@ const App: React.FC = () => {
       {!shouldHideNavbar && <Navbar />}
       <Routes>
         <Route path="/" element={<RootRedirect />} />
-        <Route path="/home" element={<Home />} />
-        <Route path="/characteristics" element={<Characteristics />} />
-        <Route path="/drugs" element={<Drugs />} />
-        <Route path="/patients/:rootId?" element={<Patients />} />
-        <Route path="/treatments" element={<Treatments />} />
-        <Route path="/follow-ups" element={<FollowUps />} />
+        <Route
+          path="/home"
+          element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/characteristics"
+          element={
+            <ProtectedRoute>
+              <Characteristics />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/drugs"
+          element={
+            <ProtectedRoute>
+              <Drugs />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patients/:rootId?"
+          element={
+            <ProtectedRoute>
+              <Patients />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/treatments"
+          element={
+            <ProtectedRoute>
+              <Treatments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/follow-ups"
+          element={
+            <ProtectedRoute>
+              <FollowUps />
+            </ProtectedRoute>
+          }
+        />
 
         {showMinosAuth ? (
           <>

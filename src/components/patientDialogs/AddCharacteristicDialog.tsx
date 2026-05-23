@@ -3,12 +3,14 @@ import CharacteristicForm from "../CharacteristicForm";
 import type { OneChar } from "../EditCharacteristicForm";
 import type { Node } from "reactflow";
 import { createPatient } from "../../api/patients";
+import { resolveDefaultRootCharacteristic } from "../../config/defaultCharacteristic";
 
 type Props = {
   open: boolean;
   onClose: () => void;
   parentNode: Node;
-  isIranRightClick: boolean;
+  /** True when adding from overview root (e.g. Population / Iran). */
+  isOverviewRootClick: boolean;
   allChars: OneChar[];
   onSaved: () => void;
 };
@@ -17,7 +19,7 @@ export default function AddCharacteristicDialog({
   open,
   onClose,
   parentNode,
-  isIranRightClick,
+  isOverviewRootClick,
   allChars,
   onSaved,
 }: Props) {
@@ -40,7 +42,7 @@ export default function AddCharacteristicDialog({
           onSaved={async ({ characteristicId, rate }) => {
             onClose();
 
-            if (isIranRightClick) {
+            if (isOverviewRootClick) {
               const charObj = allChars.find((c) => c._id === characteristicId);
               if (!charObj) {
                 alert("Characteristic not found");
@@ -49,6 +51,7 @@ export default function AddCharacteristicDialog({
 
               const size = Math.round(parentSize * rate);
               try {
+                const rootChar = await resolveDefaultRootCharacteristic();
                 await createPatient({
                   node: {
                     node_type: "characteristic",
@@ -56,9 +59,9 @@ export default function AddCharacteristicDialog({
                     size: parentSize,
                     parent_id: null,
                     characteristic_data: {
-                      _id: "67d01f7b9e8a82122fb0331b",
-                      char_type: "Population",
-                      name: "Iran",
+                      _id: rootChar._id,
+                      char_type: rootChar.char_type,
+                      name: rootChar.name,
                     },
                     children: [
                       {

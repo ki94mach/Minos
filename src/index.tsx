@@ -3,8 +3,11 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import api from "./api";
+import { captureAccessTokenFromUrl } from "./auth/accessToken";
 import { useMinosAuthPages } from "./auth/ssoConfig";
 import "./styles/index.css";
+
+captureAccessTokenFromUrl();
 
 if (useMinosAuthPages()) {
   (async function bootstrapCsrf() {

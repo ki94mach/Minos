@@ -41,6 +41,7 @@ import {
 } from "../utils/patientTreeUtils";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
+import { resolveDefaultRootCharacteristic } from "../config/defaultCharacteristic";
 
 /* -------------------------------------------------------------------------- */
 /*                                helpers                                     */
@@ -103,7 +104,10 @@ const Patients: React.FC = () => {
   const [allTreatments, setAllTreatments] = useState<TreatmentOption[]>([]);
   const [editTreatModalData, setEditTreatModalData] = useState<EditTreatModalData|null>(null);
   const [rawPatients, setRawPatients] = useState<any[]>([]);
-  const [isIranRightClick, setIsIranRightClick] = useState(false);
+  const [defaultRootCharName, setDefaultRootCharName] = useState<string | null>(
+    null
+  );
+  const [isOverviewRootClick, setIsOverviewRootClick] = useState(false);
 
   const handleNodeContext = useCallback((e: React.MouseEvent, nodeId: string) => {
     e.preventDefault();
@@ -267,13 +271,21 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
     const parent = nodes.find((n) => n.id === parentId);
     if (!parent) return;
 
-    const isIran = parent.data?.label === "Iran";
-    setIsIranRightClick(isIran);
+    const isOverviewRoot =
+      defaultRootCharName !== null &&
+      parent.data?.label === defaultRootCharName;
+    setIsOverviewRootClick(isOverviewRoot);
     setAddingParentId(parentId);
     setIsChoosingType(true);
   }
   
   /* ----------------------------- effects ---------------------------------- */
+
+  useEffect(() => {
+    resolveDefaultRootCharacteristic()
+      .then((c) => setDefaultRootCharName(c.name))
+      .catch((err) => console.error("Default root characteristic:", err));
+  }, []);
 
   useEffect(() => {
     const handleError = (e: ErrorEvent) => {
@@ -908,10 +920,10 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           onClose={() => {
             setAddingParentId(null);
             setNewNodeType(null);
-            setIsIranRightClick(false);
+            setIsOverviewRootClick(false);
           }}
           parentNode={parentNode!}
-          isIranRightClick={isIranRightClick}
+          isOverviewRootClick={isOverviewRootClick}
           allChars={allCharacteristics}
           onSaved={drawPatientNodes}
         />
