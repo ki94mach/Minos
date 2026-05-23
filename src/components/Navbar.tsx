@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate  } from "react-router-dom";
-import api from "../api";
+import { Link } from "react-router-dom";
 import {
     AppBar,
     Toolbar,
@@ -15,12 +14,8 @@ import {
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import LogoutIcon from "@mui/icons-material/Logout";
-import { API_ENDPOINTS } from "../api/endpoints";
-import { clearAccessToken } from "../auth/accessToken";
-import {
-    useMinosAuthPages,
-    redirectToSsoLogout,
-} from "../auth/ssoConfig";
+import { performLogout } from "../auth/logout";
+import { useMinosAuthPages } from "../auth/ssoConfig";
 
 const Navbar: React.FC = () => {
     const showMinosAuth = useMinosAuthPages();
@@ -30,24 +25,8 @@ const Navbar: React.FC = () => {
         setDrawerOpen(open);
     };
 
-    const navigate = useNavigate();
-
-    const handleLogout = async () => {
-        if (!showMinosAuth) {
-            clearAccessToken();
-            redirectToSsoLogout();
-            return;
-        }
-        try {
-            await api.get(API_ENDPOINTS.LOGOUT, {
-                withCredentials: true,
-                validateStatus: (status) => status >= 200 && status < 400,
-            });
-        } catch (error) {
-            console.error("Logout error:", error);
-        } finally {
-            navigate("/auth/login");
-        }
+    const handleLogout = () => {
+        void performLogout();
     };
 
     const menuItems = [
@@ -91,7 +70,7 @@ const Navbar: React.FC = () => {
                         <ListItem 
                                 component={Link} 
                                 to="#" 
-                                onClick={(e: any) => {
+                                onClick={(e: React.MouseEvent) => {
                                     e.preventDefault(); 
                                     handleLogout();
                                 }}>

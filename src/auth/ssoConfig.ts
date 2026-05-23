@@ -39,11 +39,15 @@ export function redirectToSsoLogin(): void {
   );
 }
 
+/** IdP end-session (F8). Uses REACT_APP_SSO_LOGOUT_URL, else login URL. */
 export function redirectToSsoLogout(): void {
   const url = getSsoLogoutUrl();
   if (url) {
     window.location.assign(url);
     return;
   }
+  console.warn(
+    "REACT_APP_SSO_LOGOUT_URL is not set; falling back to SSO login URL."
+  );
   redirectToSsoLogin();
 }
