@@ -31,7 +31,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "node scripts/verify-production-env.js && react-scripts build",
+    "build:local": "node scripts/build-local.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

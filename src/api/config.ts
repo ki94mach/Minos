@@ -23,3 +23,13 @@ export function getApiBaseUrl(): string {
 }
 
 export const API_BASE_URL = getApiBaseUrl();
+
+if (
+  process.env.NODE_ENV === "production" &&
+  /localhost|127\.0\.0\.1/.test(API_BASE_URL)
+) {
+  console.error(
+    "[Minos] Production bundle is using a localhost API URL. " +
+      "Rebuild with REACT_APP_API_URL set in .env.production (see docs/DEVELOPMENT.md F10)."
+  );
+}
