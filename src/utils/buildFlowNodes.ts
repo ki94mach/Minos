@@ -136,7 +136,9 @@ export function buildFlowNodes(
         type: node.node_type,
         docId: node._id?.$oid || node._id,
         parentDocId: node.parent_id?._id?.$oid || node.parent_id || null,
-        charType: node.characteristic_data?.type,
+        charType:
+          node.characteristic_data?.type ??
+          node.characteristic_data?.char_type,
         size: nodeSize,
         rate: node.rate ?? 1,
         drugs:
@@ -171,21 +173,26 @@ export function buildFlowNodes(
     }
   }
 
+  function getEmbeddedCharType(n: any): string | undefined {
+    return n.characteristic_data?.type ?? n.characteristic_data?.char_type;
+  }
+
   function containsPrimaryIndication(node: any): boolean {
-    if (node.characteristic_data?.type === "Primary Indication") return true;
+    if (getEmbeddedCharType(node) === "Primary Indication") return true;
     return (node.children || []).some(containsPrimaryIndication);
   }
 
   function shouldRenderNode(node: any, isOverviewMode: boolean): boolean {
     if (!isOverviewMode) return true;
-    const isPrimary = node.characteristic_data?.type === "Primary Indication";
-    const hasPrimaryDescendant = containsPrimaryIndication(node);
-
-    return isPrimary || hasPrimaryDescendant;
+    const charType = getEmbeddedCharType(node);
+    // Overview centers on Population roots (e.g. Iran) plus Primary Indication branches.
+    if (charType === "Population") return true;
+    if (charType === "Primary Indication") return true;
+    return containsPrimaryIndication(node);
   }
 
   if (!shouldRenderNode(node, isOverviewMode)) return;
-  const isPrimary = node.characteristic_data?.type === "Primary Indication";
+  const isPrimary = getEmbeddedCharType(node) === "Primary Indication";
   if (!(isOverviewMode && isPrimary)) {
     const kids = (node.children || []).filter((child: any) =>
       shouldRenderNode(child, isOverviewMode)

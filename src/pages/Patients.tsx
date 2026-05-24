@@ -41,6 +41,7 @@ import {
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
 import { resolveDefaultRootCharacteristic } from "../config/defaultCharacteristic";
+import CreatePatientTreeDialog from "../components/patientDialogs/CreatePatientTreeDialog";
 
 type PatientsLocationState = {
   treeId?: string;
@@ -107,6 +108,8 @@ const Patients: React.FC = () => {
     null
   );
   const [isOverviewRootClick, setIsOverviewRootClick] = useState(false);
+  const [overviewEmptyHint, setOverviewEmptyHint] = useState<string | null>(null);
+  const [createPatientDialogOpen, setCreatePatientDialogOpen] = useState(false);
 
   const handleNodeContext = useCallback((e: React.MouseEvent, nodeId: string) => {
     e.preventDefault();
@@ -394,10 +397,15 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         const parsedPatients = asApiList<any>(res.data);
 
         if (parsedPatients.length === 0) {
+          setOverviewEmptyHint(
+            "No patient trees yet. Click below to choose a Population and set the root size."
+          );
           setNodes([]);
           setEdges([]);
           return;
         }
+
+        setOverviewEmptyHint(null);
 
         // Choose either all roots (overview) or the single drilled‐in root:
         // const roots = selectedRootId
@@ -690,6 +698,23 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       <Typography variant="h3" align="center" className="mb-8">
         Patient Map
       </Typography>
+      {isOverview && overviewEmptyHint && (
+        <Box textAlign="center" sx={{ mb: 2 }}>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>
+            {overviewEmptyHint}
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => setCreatePatientDialogOpen(true)}>
+            Create patient tree
+          </Button>
+        </Box>
+      )}
+      <CreatePatientTreeDialog
+        open={createPatientDialogOpen}
+        onClose={() => setCreatePatientDialogOpen(false)}
+        onCreated={() => drawPatientNodes()}
+      />
       {rootId && (
         <Button
           variant="contained"

@@ -45,6 +45,10 @@ export async function resolveDefaultRootCharacteristic(): Promise<DefaultRootCha
     const name = getDefaultCharName();
     match = chars.find((c) => c.type === type && c.name === name);
   }
+  // Fall back to any Population when the default name (e.g. Iran) was not used.
+  if (!match) {
+    match = chars.find((c) => c.type === getDefaultCharType());
+  }
 
   if (!match) {
     throw new Error(
