@@ -51,9 +51,8 @@ export function buildFlowNodes(
   const nodeId = uniqueCharId;
 
   // ──────────────────────────────────────────────────
-  // B) If we’re NOT in overview (i.e. we drilled in), and have seen this unique ID,
-  //    then we only want to add its edge + recurse children (to merge grandchildren).
-  if (!isOverviewMode && visited.has(uniqueCharId)) {
+  // B) If we have already rendered this catalog id, merge edges and recurse children only.
+  if (visited.has(uniqueCharId)) {
     // 1) Add parent→this node edge if needed
     if (parentId) {
       const edgeId = `${parentId}->${nodeId}`;

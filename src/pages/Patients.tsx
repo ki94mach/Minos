@@ -39,7 +39,6 @@ import {
 } from "../utils/patientTreeUtils";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
-import { resolveDefaultRootCharacteristic } from "../config/defaultCharacteristic";
 import CreatePatientTreeDialog from "../components/patientDialogs/CreatePatientTreeDialog";
 
 type PatientsLocationState = {
@@ -103,10 +102,6 @@ const Patients: React.FC = () => {
   const [editCharModalData, setEditCharModalData] = useState<EditCharModalData | null>(null);
   const [allTreatments, setAllTreatments] = useState<TreatmentOption[]>([]);
   const [editTreatModalData, setEditTreatModalData] = useState<EditTreatModalData|null>(null);
-  const [defaultRootCharName, setDefaultRootCharName] = useState<string | null>(
-    null
-  );
-  const [isOverviewRootClick, setIsOverviewRootClick] = useState(false);
   const [overviewEmptyHint, setOverviewEmptyHint] = useState<string | null>(null);
   const [createPatientDialogOpen, setCreatePatientDialogOpen] = useState(false);
 
@@ -265,21 +260,11 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
     const parent = nodes.find((n) => n.id === parentId);
     if (!parent) return;
 
-    const isOverviewRoot =
-      defaultRootCharName !== null &&
-      parent.data?.label === defaultRootCharName;
-    setIsOverviewRootClick(isOverviewRoot);
     setAddingParentId(parentId);
     setIsChoosingType(true);
   }
   
   /* ----------------------------- effects ---------------------------------- */
-
-  useEffect(() => {
-    resolveDefaultRootCharacteristic()
-      .then((c) => setDefaultRootCharName(c.name))
-      .catch((err) => console.error("Default root characteristic:", err));
-  }, []);
 
   useEffect(() => {
     const handleError = (e: ErrorEvent) => {
@@ -628,36 +613,25 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           // (e) collect all
           finalNodes = allFlowNodes
         }
-          setNodes(finalNodes)
-          console.log("✅ Final Nodes:", finalNodes);
-          setEdges(edges)
-
-        const depthMap = new Map<string, number>();
-        const assignDepth = (nodeId: string, depth: number) => {
-          if (depthMap.has(nodeId) && depthMap.get(nodeId)! <= depth) {
-            return;
-          }
-          depthMap.set(nodeId, depth);
-          const kids = childrenByParent.get(nodeId) || [];
-          for (const childId of kids) {
-            assignDepth(childId, depth + 1);
-          }
-        };
+          setNodes(finalNodes);
+          setEdges(edges);
 
         if (selectedRootId) {
-          assignDepth(selectedRootId, 0);
-        } else {
-          roots.forEach((rootNode: any) => {
-            const uniqueRootId =
-              rootNode.characteristic_data?._id?.$oid ||
-              rootNode.treatment_data?._id?.$oid ||
-              rootNode._id?.$oid ||
-              rootNode._id;
-            assignDepth(uniqueRootId, 0);
-          });
-        }
+          const depthMap = new Map<string, number>();
+          const assignDepth = (nodeId: string, depth: number) => {
+            if (depthMap.has(nodeId) && depthMap.get(nodeId)! <= depth) {
+              return;
+            }
+            depthMap.set(nodeId, depth);
+            const kids = childrenByParent.get(nodeId) || [];
+            for (const childId of kids) {
+              assignDepth(childId, depth + 1);
+            }
+          };
 
-        const nodesByDepth = new Map<number, string[]>();
+          assignDepth(selectedRootId, 0);
+
+          const nodesByDepth = new Map<number, string[]>();
           depthMap.forEach((depth, nodeId) => {
             if (!nodesByDepth.has(depth)) {
               nodesByDepth.set(depth, []);
@@ -666,7 +640,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           });
 
           nodesByDepth.forEach((nodeIdsAtDepth, depth) => {
-            const offsetForCentering = ((nodeIdsAtDepth.length - 1) / 2) * H_SPACING;
+            const offsetForCentering =
+              ((nodeIdsAtDepth.length - 1) / 2) * H_SPACING;
             nodeIdsAtDepth.forEach((nodeId, idx) => {
               const flowNode = nodesById.get(nodeId);
               if (!flowNode) return;
@@ -676,6 +651,9 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
               };
             });
           });
+
+          setNodes(Array.from(nodesById.values()));
+        }
       } catch (err) {
         console.error("Error drawing patients:", err);
         alert("Failed to draw patients.");
@@ -890,11 +868,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           onClose={() => {
             setAddingParentId(null);
             setNewNodeType(null);
-            setIsOverviewRootClick(false);
           }}
           parentNode={parentNode!}
-          isOverviewRootClick={isOverviewRootClick}
-          allChars={allCharacteristics}
           onSaved={drawPatientNodes}
         />
       )}
