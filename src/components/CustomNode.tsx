@@ -29,6 +29,7 @@ const CustomNode = (
       : theme.palette.divider;
 
   const isOverviewMode = nodeData.isOverviewMode === true;
+  const canDrillDown = nodeData.canDrillDown === true;
   const nodeFill = nodeData.color || theme.palette.background.paper;
   const overviewTextColor =
     isOverviewMode && nodeData.color
@@ -50,7 +51,7 @@ const CustomNode = (
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        cursor: "pointer",
+        cursor: canDrillDown ? "pointer" : "default",
         textAlign: "center",
         padding: "4px",
         boxSizing: "border-box",
@@ -70,7 +71,7 @@ const CustomNode = (
         boxShadow: baseShadow,
         textAlign: "center",
         minWidth: "150px",
-        cursor: "pointer",
+        cursor: canDrillDown ? "pointer" : "default",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -200,7 +201,7 @@ const CustomNode = (
           (e.currentTarget as HTMLDivElement).style.boxShadow = baseShadow;
         }}
         onClick={() => {
-          if (!isEditing) nodeData.onClick?.();
+          if (!isEditing && nodeData.onClick) nodeData.onClick();
         }}
         onDoubleClick={(e) => {
           e.preventDefault();

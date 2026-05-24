@@ -41,6 +41,7 @@ import AddFollowupDialog from "../components/patientDialogs/AddFollowupDialog";
 import { buildFlowNodes } from "../utils/buildFlowNodes";
 import {
   getUniqueCharId,
+  getEmbeddedCharType,
   findNodeById,
   calculateSizeFromTree,
   hashColor,
@@ -382,6 +383,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   );
 
   const onNodeClick = (_: any, node: any) => {
+    if (!node.data.canDrillDown) return;
+
     const clickedId = node.data.catalogId ?? node.id;
     const whichTree = node.data.treeId;
           if (!whichTree) {
@@ -424,6 +427,22 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         }
 
         setOverviewEmptyHint(null);
+
+        if (selectedRootId) {
+          const drillPatient = parsedPatients.find((p: any) =>
+            findNodeById(p.tree, selectedRootId)
+          );
+          const drillTarget = drillPatient
+            ? findNodeById(drillPatient.tree, selectedRootId)
+            : null;
+          if (
+            drillTarget &&
+            getEmbeddedCharType(drillTarget) !== "Primary Indication"
+          ) {
+            navigate("/patients", { replace: true });
+            return;
+          }
+        }
 
         // Choose either all roots (overview) or the single drilled‐in root:
         // const roots = selectedRootId
@@ -565,6 +584,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             (rootNode.children || []).length,
             hashColor(getUniqueCharId(rootNode)),
             patientId,
+            null,
             {
               selectedRootId,
               isOverviewMode,

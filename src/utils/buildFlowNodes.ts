@@ -2,6 +2,10 @@ import Decimal from "decimal.js";
 import { makePatientTreeEdge } from "./flowLayoutUtils";
 import { Edge } from "reactflow";
 import { NavigateFunction } from "react-router-dom";
+import {
+  canDrillDownPatientNode,
+  getEmbeddedCharType,
+} from "./patientTreeUtils";
 
 export function buildFlowNodes(
   node: any,
@@ -12,6 +16,7 @@ export function buildFlowNodes(
   siblingsCount: number,
   inheritedColor: string,
   treeId: string,
+  parentCharType: string | null = null,
   deps: {
     selectedRootId: string | null;
     isOverviewMode: boolean;
@@ -69,6 +74,7 @@ export function buildFlowNodes(
     }
 
     const kids = node.children || [];
+    const thisCharType = getEmbeddedCharType(node) ?? null;
     kids.forEach((child: any, i: number) =>
       buildFlowNodes(
         child,
@@ -79,6 +85,7 @@ export function buildFlowNodes(
         kids.length,
         inheritedColor,
         treeId,
+        thisCharType,
         deps
       )
     );
@@ -114,6 +121,12 @@ export function buildFlowNodes(
     rawSize = new Decimal(parentSize).times(nodeRate);
   }
   const nodeSize = rawSize.toNumber();
+  const charType = getEmbeddedCharType(node);
+  const canDrillDown = canDrillDownPatientNode(
+    node,
+    isOverviewMode,
+    parentCharType
+  );
 
   // ──────────────────────────────────────────────────
   // F) Create the React-Flow node object once:
@@ -132,9 +145,7 @@ export function buildFlowNodes(
         docId: node._id?.$oid || node._id,
         catalogId,
         parentDocId: node.parent_id?._id?.$oid || node.parent_id || null,
-        charType:
-          node.characteristic_data?.type ??
-          node.characteristic_data?.char_type,
+        charType,
         size: nodeSize,
         rate: node.rate ?? 1,
         drugs:
@@ -146,10 +157,13 @@ export function buildFlowNodes(
         treeId: isOverviewMode ? treeIdMap.get(catalogId) : treeId,
         isOverview: isOverviewMode,
         isTreeRoot: parentId === null && depth === 0,
-        onClick: () =>
-          navigate(`/patients/${catalogId}`, {
-            state: { color: hashColor(catalogId), treeId: treeId },
-          }),
+        canDrillDown,
+        onClick: canDrillDown
+          ? () =>
+              navigate(`/patients/${catalogId}`, {
+                state: { color: hashColor(catalogId), treeId: treeId },
+              })
+          : undefined,
       },
     });
   }
@@ -162,10 +176,6 @@ export function buildFlowNodes(
       edges.push(makePatientTreeEdge(parentId, flowNodeId, edgeId));
       edgeSet.add(edgeId);
     }
-  }
-
-  function getEmbeddedCharType(n: any): string | undefined {
-    return n.characteristic_data?.type ?? n.characteristic_data?.char_type;
   }
 
   function containsPrimaryIndication(node: any): boolean {
@@ -198,6 +208,7 @@ export function buildFlowNodes(
         kids.length,
         inheritedColor,
         treeId,
+        charType ?? null,
         deps
       )
     );

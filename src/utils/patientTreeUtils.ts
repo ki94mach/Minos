@@ -2,6 +2,23 @@ import Decimal from "decimal.js";
 import dagre from "dagre";
 import { hashNodeColor } from "../theme/theme";
 
+export function getEmbeddedCharType(node: any): string | undefined {
+  return node.characteristic_data?.type ?? node.characteristic_data?.char_type;
+}
+
+/** Overview drill-down: only Primary Indication nodes directly under a Population root. */
+export function canDrillDownPatientNode(
+  node: any,
+  isOverviewMode: boolean,
+  parentCharType: string | null | undefined
+): boolean {
+  if (!isOverviewMode) return false;
+  return (
+    getEmbeddedCharType(node) === "Primary Indication" &&
+    parentCharType === "Population"
+  );
+}
+
 export function getUniqueCharId(node: any): string {
   return (
     node.characteristic_data?._id?.$oid ||
