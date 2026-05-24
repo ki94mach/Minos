@@ -4,7 +4,11 @@ import dagre from "dagre";
 export function getUniqueCharId(node: any): string {
   return (
     node.characteristic_data?._id?.$oid ||
+    node.characteristic_data?._id ||
     node.treatment_data?._id?.$oid ||
+    node.treatment_data?._id ||
+    node.followup_data?._id?.$oid ||
+    node.followup_data?._id ||
     node._id?.$oid ||
     node._id
   );

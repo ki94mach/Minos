@@ -181,19 +181,18 @@ def validate_and_transform_followup_embedded(followup_data: dict) -> dict:
     if not followup:
         raise ValueError(f"Followup with _id {followup_id} not found.")
     
-    if 'name' in followup_data:
-        followup_data['name'] = followup_data['name'].strip()
-    
     if 'overall_survival' in followup_data:
         overall_survival = followup_data['overall_survival']
         if not isinstance(overall_survival, (int, float)) or not (0 <= overall_survival <= 1):
             raise ValueError("Overall survival must be a number between 0 and 1")
-    
-    if followup_data.get('name') != followup.name:
-        raise ValueError("Name does not match the database record")
-    if followup_data.get('overall_survival') != followup.overall_survival:
-        raise ValueError("Overall survival does not match the database record")
-    
+        if float(overall_survival) != float(followup.overall_survival):
+            raise ValueError("Overall survival does not match the database record")
+
+    if 'name' in followup_data:
+        payload_name = followup_data['name'].strip()
+        if payload_name != followup.name:
+            raise ValueError("Name does not match the database record")
+
     return followup_data
 
 def validate_and_transform_alternative(alternative_data: dict) -> dict:

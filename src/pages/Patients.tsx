@@ -849,7 +849,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             </Button>
             <Button
               variant="outlined"
-              disabled={parentType === "characteristic"}
+              disabled={parentType !== "treatment"}
               onClick={() => {
                 setNewNodeType("followup");
                 setIsChoosingType(false);

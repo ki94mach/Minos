@@ -576,7 +576,18 @@ def create_node_from_dict(node_dict, parent_id=None):
     elif new_node.node_type == 'followup':
         followup_data = node_dict.get('followup_data')
         if followup_data:
-            new_node.followup_data = FollowupEmbedded(**followup_data)
+            followup_id = followup_data.get('_id')
+            if not followup_id:
+                raise ValueError("followup_data must include '_id'")
+            master = FollowupDriver.find(id=ObjectId(followup_id)).first()
+            if not master:
+                raise ValueError(f"Followup with _id {followup_id} not found")
+            new_node.followup_data = FollowupEmbedded(
+                _id=ObjectId(master.id),
+                patient_id=master.patient_id,
+                node_parent_id=master.parent_id,
+                overall_survival=master.overall_survival,
+            )
 
     # Recursively process any children.
     for child_dict in node_dict.get('children', []):
@@ -675,6 +686,10 @@ def add_node(validated_data, patient_id):
             parent_node = find_node(patient_tree.tree, str(parent_node_id))
             if not parent_node:
                 return error_response('Parent node not found', 404)
+            if new_node.node_type == 'followup' and parent_node.node_type != 'treatment':
+                return error_response(
+                    'Follow-up nodes must be added under a treatment node', 400
+                )
             parent_node.children.append(new_node)
         else:
             patient_tree.tree.children.append(new_node)

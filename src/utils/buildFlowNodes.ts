@@ -45,7 +45,11 @@ export function buildFlowNodes(
   //    THAT ensures all “Iran” occurrences collapse into the same React-Flow node.
   const uniqueCharId =
     node.characteristic_data?._id?.$oid ||
+    node.characteristic_data?._id ||
     node.treatment_data?._id?.$oid ||
+    node.treatment_data?._id ||
+    node.followup_data?._id?.$oid ||
+    node.followup_data?._id ||
     node._id?.$oid ||
     node._id;
   const nodeId = uniqueCharId;
@@ -131,7 +135,9 @@ export function buildFlowNodes(
       type: "custom",
       data: {
         label:
-          node.characteristic_data?.name || node.treatment_data?.name || "Node",
+          node.characteristic_data?.name ||
+          node.treatment_data?.name ||
+          (node.node_type === "followup" ? "Follow-up" : "Node"),
         type: node.node_type,
         docId: node._id?.$oid || node._id,
         parentDocId: node.parent_id?._id?.$oid || node.parent_id || null,

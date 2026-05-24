@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Stack, TextField, Button } from "@mui/material";
 import api from "../api";
-import Cookies from "js-cookie";
 import { API_ENDPOINTS } from "../api/endpoints";
 
 export default function FollowupForm({
@@ -21,57 +20,51 @@ export default function FollowupForm({
   const [overallSurvival, setOverallSurvival] = useState(0.5);
   const [busy, setBusy] = useState(false);
 
-  function authHeaders() {
-    const csrf = Cookies.get("csrf_token") ?? "";
-    return {
-      withCredentials: true,
-      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
-    };
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
 
-    try {
-      // Step 1: Create the follow-up and get its ID
-      const createResp = await api.post(
-        API_ENDPOINTS.FOLLOWUPS,
-        {
-          name: name,
-          overall_survival: overallSurvival,
-          patient_id: patientId,
-          parent_id: parentId,
-        },
-        authHeaders()
-      );
+    let followupId: string | null = null;
 
-      const followupId = createResp.data.id;
+    try {
+      const createResp = await api.post(API_ENDPOINTS.FOLLOWUPS, {
+        name,
+        overall_survival: overallSurvival,
+        patient_id: patientId,
+        parent_id: parentId,
+      });
+
+      followupId = createResp.data.id as string;
       const size = Math.round(parentSize * overallSurvival);
 
-      // Step 2: Add the follow-up node to the patient tree
-      await api.post(
-        API_ENDPOINTS.ADD_NODE(patientId),
-        {
-          parent_node_id: parentId,
-          node: {
-            node_type: "followup",
-            rate: overallSurvival,
-            size,
-            followup_data: {
-              _id: followupId,
-              name,
-              overall_survival: overallSurvival,
-            },
+      await api.post(API_ENDPOINTS.ADD_NODE(patientId), {
+        parent_node_id: parentId,
+        node: {
+          node_type: "followup",
+          rate: overallSurvival,
+          size,
+          followup_data: {
+            _id: followupId,
+            overall_survival: overallSurvival,
           },
         },
-        authHeaders()
-      );
+      });
 
       onSaved();
-    } catch (err) {
+    } catch (err: unknown) {
+      if (followupId) {
+        try {
+          await api.delete(API_ENDPOINTS.FOLLOWUP_DETAIL(followupId));
+        } catch {
+          // Best-effort rollback if add_node failed after followup was created.
+        }
+      }
       console.error("Error creating follow-up node:", err);
-      alert("Follow-up creation failed.");
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      alert(
+        axiosErr.response?.data?.error ??
+          "Follow-up creation failed. If you retried, use a different name or delete the existing follow-up in the catalog."
+      );
     } finally {
       setBusy(false);
     }
