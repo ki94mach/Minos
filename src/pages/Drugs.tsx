@@ -1,228 +1,229 @@
-import React, {useEffect, useState} from "react";
-import { TextField, Button, Typography, Container, Card, CardContent, Select, MenuItem, FormControl, InputLabel, Box, IconButton } from "@mui/material";
+import React, { useEffect, useState } from "react";
+import {
+  TextField,
+  Button,
+  Typography,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Box,
+  Stack,
+} from "@mui/material";
 import api from "../api";
-import BackButton from "../components/BackButton";
 import Cookies from "js-cookie";
-import { Edit, Delete } from "@mui/icons-material";
+import { Save, Add } from "@mui/icons-material";
+import CatalogPageLayout from "../components/catalog/CatalogPageLayout";
+import CatalogListItem from "../components/catalog/CatalogListItem";
+import { catalogEmptyStateSx, catalogFormActionsSx } from "../components/catalog/catalogPageStyles";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
 
-
 interface Drug {
-    _id: string;
-    name: string;
-    strength: number;
-    unit: string;
+  _id: string;
+  name: string;
+  strength: number;
+  unit: string;
 }
 
 const Drugs: React.FC = () => {
-    const [name, setName] = useState("");
-    const [strength, setStrength] = useState<number | "">("");
-    const [unit, setUnit] = useState("mg");
-    const [drugs, setDrugs] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [editingId, setEditingId] = useState<string>("");
-    const [searchTerm, setSearchTerm] = useState("");
-    const [, setErrors] = useState("");
+  const [name, setName] = useState("");
+  const [strength, setStrength] = useState<number | "">("");
+  const [unit, setUnit] = useState("mg");
+  const [drugs, setDrugs] = useState<Drug[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [errors, setErrors] = useState("");
+  const isEditing = Boolean(editingId);
 
+  const cancelEdit = () => {
+    setEditingId("");
+    setName("");
+    setStrength("");
+    setUnit("mg");
+  };
 
-    useEffect(() => {
-        fetchDrugs();
-    }, []);
+  useEffect(() => {
+    fetchDrugs();
+  }, []);
 
-    const fetchDrugs = async () => {
-        setLoading(true);
-        try {
-            const response = await api.get(API_ENDPOINTS.DRUGS);
-            setDrugs(asApiList<Drug>(response.data));
+  const fetchDrugs = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get(API_ENDPOINTS.DRUGS);
+      setDrugs(asApiList<Drug>(response.data));
+    } catch (error) {
+      console.error("Error fetching drugs:", error);
+      alert("Error loading drugs.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        } catch (error) {
-            console.error("Error fetching drugs:", error);
-            alert("Error loading drugs.");
-        } finally {
-            setLoading(false);
-        }
-    };
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (strength === "") {
-            alert("Please enter a valid strength value");
-            return;
-        }
-    
-        try {
-            const csrfToken = Cookies.get("csrf_token");
-    
-            const config = {
-                withCredentials: true,
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": csrfToken || "", 
-                },
-            };
-    
-            if (editingId) {                
-                await api.put(
-                  API_ENDPOINTS.DRUG_DETAIL(editingId),
-                  { name, strength: Number(strength), unit },
-                  config
-                );
-                setEditingId("");
-                alert("Drug updated successfully!");
-              } else {
-                await api.post(
-                  API_ENDPOINTS.DRUGS,
-                  { name, strength: Number(strength), unit },
-                  config
-                );
-                alert("Drug added successfully!");
-              }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (strength === "") {
+      alert("Please enter a valid strength value");
+      return;
+    }
 
-            setName("");
-            setStrength("");
-            setUnit("mg");
-            setErrors("");
-            fetchDrugs();
-        } catch (error: any) {
-            console.error("Error adding drug:", error);
-            const errorMessage = error.response?.data?.error || "Error adding drug.";
-            setErrors(errorMessage); 
-            alert(errorMessage);
-        }
-    };
-    
-    const handleEdit = (drug: Drug) => {
-        setEditingId(drug._id);
-        setName(drug.name);
-        setStrength(drug.strength);
-        setUnit(drug.unit);
-      };
-    
-      const handleDelete = async (id: string) => {
-        try {
-          const csrfToken = Cookies.get("csrf_token");
-    
-          await api.delete(API_ENDPOINTS.DRUG_DETAIL(id), {
-            withCredentials: true,
-            headers: {
-              "Content-Type": "application/json",
-              "X-CSRFToken": csrfToken || "",
-            },
-          });
-          setErrors("");
-          fetchDrugs();
-          alert("Drug deleted successfully!");
-        } catch (error: any) {
-          console.error("Error deleting drug:", error);
-          const errorMessage = error.response?.data?.error || "Error deleting drug.";
-          setErrors(errorMessage);
-          alert(errorMessage);
-          
-        }
+    try {
+      const csrfToken = Cookies.get("csrf_token");
+      const config = {
+        withCredentials: true,
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrfToken || "",
+        },
       };
 
-    return (
-        <Container maxWidth="md" sx={{ mt: 5 }}>
-            <BackButton />
-            <Typography variant="h4" gutterBottom>Drugs Management</Typography>
+      if (editingId) {
+        await api.put(
+          API_ENDPOINTS.DRUG_DETAIL(editingId),
+          { name, strength: Number(strength), unit },
+          config
+        );
+        setEditingId("");
+        alert("Drug updated successfully!");
+      } else {
+        await api.post(
+          API_ENDPOINTS.DRUGS,
+          { name, strength: Number(strength), unit },
+          config
+        );
+        alert("Drug added successfully!");
+      }
 
-            <Card sx={{ mb: 4 }}>
-                <CardContent>
-                    <Typography variant="h5" gutterBottom>Add New Drug</Typography>
-                    <form onSubmit={handleSubmit}>
-                        <TextField
-                            fullWidth
-                            label="Drug Name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                            sx={{ mb: 2 }}
-                        />
-                        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                            <TextField
-                                fullWidth
-                                label="Strength"
-                                type="number"
-                                value={strength}
-                                onChange={(e) => setStrength(e.target.value ? Number(e.target.value) : "")}
-                                required
-                            />
-                            <FormControl sx={{ minWidth: 120 }}>
-                                <InputLabel id="unit-label">Unit</InputLabel>
-                                <Select
-                                    labelId="unit-label"
-                                    value={unit}
-                                    label="Unit"
-                                    onChange={(e) => setUnit(e.target.value)}
-                                >
-                                    <MenuItem value="mg">mg</MenuItem>
-                                    <MenuItem value="g">g</MenuItem>
-                                    <MenuItem value="ml">ml</MenuItem>
-                                    <MenuItem value="mcg">mcg</MenuItem>
-                                    <MenuItem value="%">%</MenuItem>
-                                </Select>
-                            </FormControl>
-                        </Box>
-                        <Button variant="contained" type="submit" fullWidth>Add Drug</Button>
-                    </form>
-                </CardContent>
-            </Card>
+      setName("");
+      setStrength("");
+      setUnit("mg");
+      setErrors("");
+      fetchDrugs();
+    } catch (error: any) {
+      console.error("Error adding drug:", error);
+      const errorMessage = error.response?.data?.error || "Error adding drug.";
+      setErrors(errorMessage);
+      alert(errorMessage);
+    }
+  };
 
-            <Card>
-        <CardContent>
-          <TextField
+  const handleEdit = (drug: Drug) => {
+    setEditingId(drug._id);
+    setName(drug.name);
+    setStrength(drug.strength);
+    setUnit(drug.unit);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const csrfToken = Cookies.get("csrf_token");
+      await api.delete(API_ENDPOINTS.DRUG_DETAIL(id), {
+        withCredentials: true,
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrfToken || "",
+        },
+      });
+      setErrors("");
+      fetchDrugs();
+      alert("Drug deleted successfully!");
+    } catch (error: any) {
+      console.error("Error deleting drug:", error);
+      const errorMessage = error.response?.data?.error || "Error deleting drug.";
+      setErrors(errorMessage);
+      alert(errorMessage);
+    }
+  };
+
+  const filtered = drugs.filter((drug) =>
+    drug.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <CatalogPageLayout
+      title="Drugs"
+      formTitle={isEditing ? "Edit drug" : "Add drug"}
+      searchPlaceholder="Search drugs"
+      searchValue={searchTerm}
+      onSearchChange={setSearchTerm}
+      listLabel="Catalog"
+      error={errors || null}
+      listEmpty={
+        <Typography variant="body2" sx={catalogEmptyStateSx}>
+          {loading ? "Loading…" : "No drugs yet."}
+        </Typography>
+      }
+      form={
+        <form onSubmit={handleSubmit}>
+          <Stack spacing={2}>
+            <TextField
               fullWidth
-              label="Search Drugs"
-              variant="outlined"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{ mb: 2 }}
-          />
-          <Typography variant="h5" gutterBottom>
-            Existing Drugs
-          </Typography>
-          {loading ? (
-            <Typography>Loading drugs...</Typography>
-          ) : drugs.length > 0 ? (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              {drugs
-                .filter((drug) =>
-                  drug.name.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-              .map((drug) => (
-                <Card
-                  key={drug._id}
-                  variant="outlined"
-                  sx={{ p: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                >
-                  <Typography>
-                    {drug.name} - {drug.strength} {drug.unit}
-                  </Typography>
-                  <Box>
-                    <IconButton onClick={() => handleEdit(drug)}>
-                      <Edit />
-                    </IconButton>
-                    <IconButton onClick={() => handleDelete(drug._id)}>
-                      <Delete />
-                    </IconButton>
-                  </Box>
-                </Card>
-              ))}
+              size="small"
+              label="Drug name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <Box sx={{ display: "flex", gap: 2 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Strength"
+                type="number"
+                value={strength}
+                onChange={(e) =>
+                  setStrength(e.target.value ? Number(e.target.value) : "")
+                }
+                required
+              />
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel id="unit-label">Unit</InputLabel>
+                <Select
+                  labelId="unit-label"
+                  value={unit}
+                  label="Unit"
+                  onChange={(e) => setUnit(e.target.value)}>
+                  <MenuItem value="mg">mg</MenuItem>
+                  <MenuItem value="g">g</MenuItem>
+                  <MenuItem value="ml">ml</MenuItem>
+                  <MenuItem value="mcg">mcg</MenuItem>
+                  <MenuItem value="%">%</MenuItem>
+                </Select>
+              </FormControl>
             </Box>
-          ) : (
-            <Typography>No drugs found.</Typography>
-          )}
-        </CardContent>
-      </Card>
-      {/* {errors && (
-      <Typography color="error" sx={{ mt: 2 }}>
-          {errors}
-      </Typography>
-  )} */}
-        </Container>
-    );
-    
-  
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              sx={catalogFormActionsSx}>
+              {isEditing && (
+                <Button variant="outlined" fullWidth onClick={cancelEdit}>
+                  Cancel
+                </Button>
+              )}
+              <Button
+                variant="contained"
+                type="submit"
+                fullWidth
+                startIcon={isEditing ? <Save /> : <Add />}>
+                {isEditing ? "Save changes" : "Add drug"}
+              </Button>
+            </Stack>
+          </Stack>
+        </form>
+      }>
+      {filtered.map((drug) => (
+        <CatalogListItem
+          key={drug._id}
+          selected={editingId === drug._id}
+          primary={drug.name}
+          secondary={`${drug.strength} ${drug.unit}`}
+          onEdit={() => handleEdit(drug)}
+          onDelete={() => handleDelete(drug._id)}
+        />
+      ))}
+    </CatalogPageLayout>
+  );
 };
 
 export default Drugs;

@@ -1,169 +1,173 @@
 import React, { useState, useEffect } from "react";
-import { TextField, Button, Typography, Container, Card, CardContent, List, ListItem, ListItemText, IconButton, DialogTitle, Dialog } from "@mui/material";
-import { Edit, Delete } from "@mui/icons-material";
+import { TextField, Button, Stack, Typography } from "@mui/material";
+import { Save, Add } from "@mui/icons-material";
 import api from "../api";
-import BackButton from "../components/BackButton";
+import CatalogPageLayout from "../components/catalog/CatalogPageLayout";
+import CatalogListItem from "../components/catalog/CatalogListItem";
+import { catalogEmptyStateSx, catalogFormActionsSx } from "../components/catalog/catalogPageStyles";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
 
 interface Characteristic {
-    _id: string;
-    type: string;
-    name: string;
+  _id: string;
+  type: string;
+  name: string;
 }
 
 const Characteristics: React.FC = () => {
-    const [type, setType] = useState("");
-    const [name, setName] = useState("");
-    const [characteristics, setCharacteristics] = useState<Characteristic[]>([]);
-    const [editingId, setEditingId] = useState("");
-    const [errors, setErrors] = useState("");
-    const [searchTerm, setSearchTerm] = useState("");
-    const [editChar, setEditChar] = useState<Characteristic | null>(null);
+  const [type, setType] = useState("");
+  const [name, setName] = useState("");
+  const [characteristics, setCharacteristics] = useState<Characteristic[]>([]);
+  const [editingId, setEditingId] = useState("");
+  const [errors, setErrors] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const isEditing = Boolean(editingId);
 
-    useEffect(() => {
-        fetchCharacteristics();
-    }, []);
+  const cancelEdit = () => {
+    setEditingId("");
+    setType("");
+    setName("");
+  };
 
-    const fetchCharacteristics = async () => {
-        try {
-            const response = await api.get(API_ENDPOINTS.CHARACTERISTICS);
-            setCharacteristics(asApiList<Characteristic>(response.data));
-        } catch (error) {
-            console.error("Error fetching characteristics:", error);
-            setErrors("Error fetching characteristics.");
-        }
-    };
+  useEffect(() => {
+    fetchCharacteristics();
+  }, []);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-    
-        try {
-            if (editingId) {
-                await api.put(
-                  API_ENDPOINTS.CHARACTERISTIC_DETAIL(editingId),
-                  { type, name }
-                );
-                setEditingId("");
-            } else {
-                await api.post(API_ENDPOINTS.CHARACTERISTICS, { type, name });
-            }
-    
-            setType("");
-            setName("");
-            setErrors("");
-            fetchCharacteristics();
-            alert("Characteristic saved successfully!");
-        } catch (error: any) {
-            console.error("Submit Error:", error);
-        
-            const message = error.response?.data?.error || "Error saving characteristic.";
-            setErrors(message);
-            alert(message);
-        }
-    };
-    
-    
-    const handleEdit = (char: Characteristic) => {
-        setType(char.type);
-        setName(char.name);
-        setEditingId(char._id);
-        setEditChar(char);
-    };
+  const fetchCharacteristics = async () => {
+    try {
+      const response = await api.get(API_ENDPOINTS.CHARACTERISTICS);
+      setCharacteristics(asApiList<Characteristic>(response.data));
+    } catch (error) {
+      console.error("Error fetching characteristics:", error);
+      setErrors("Error fetching characteristics.");
+    }
+  };
 
-    const handleDelete = async (char_id: string) => {
-        try {
-            await api.delete(API_ENDPOINTS.CHARACTERISTIC_DETAIL(char_id));
-            setErrors("");
-            fetchCharacteristics();
-            alert("Characteristic deleted successfully!");
-        } catch (error: any) {
-            console.error("Delete Error:", error);
-        
-            const message = error.response?.data?.error || "Error deleting characteristic.";
-            setErrors(message);
-            alert(message);
-        }
-    };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const wasEditing = Boolean(editingId);
 
-    return (
-        <Container maxWidth="sm" sx={{ mt: 5 }}>
-            <BackButton />
-            <Card>
-                <CardContent>
-                    <Typography variant="h4" gutterBottom>Characteristics</Typography>
-                    <form onSubmit={handleSubmit}>
-                        <TextField
-                            fullWidth
-                            label="Type"
-                            value={type}
-                            onChange={(e) => setType(e.target.value)}
-                            required
-                            sx={{ mb: 2 }}
-                        />
-                        <TextField
-                            fullWidth
-                            label="Name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                            sx={{ mb: 2 }}
-                        />
-                        <Button variant="contained" type="submit" fullWidth>Add Characteristic</Button>
-                    </form>
-                    {errors && <Typography color="error">{errors}</Typography>}
-                    <List sx={{ bgcolor: "background.default", borderRadius: 2, p: 1 }}>
-                        <TextField
-                            fullWidth
-                            label="Search Characteristics"
-                            variant="outlined"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            sx={{ mb: 2 }}
-                        />
-                        {characteristics
-                            .filter((char: Characteristic) =>
-                                char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                char.type.toLowerCase().includes(searchTerm.toLowerCase())
-                            )
-                        .map((char: Characteristic) => (
-                            <ListItem key={char._id} sx={{ borderBottom: 1, borderColor: "divider", py: 1 }} secondaryAction={
-                                <>
-                                    
-                                    <IconButton edge="end" aria-label="edit" onClick={() => handleEdit(char)}>
-                                        <Edit />
-                                    </IconButton>
-                                    <IconButton edge="end" aria-label="delete" onClick={() => handleDelete(char._id)}>
-                                        <Delete />
-                                    </IconButton>
-                                </>
-                            }>
-                                <ListItemText
-                                    primary={<Typography>{char.name}</Typography>}
-                                    secondary={<Typography color="text.secondary">{char.type}</Typography>}
-                                />
-                            </ListItem>
-                        ))}
-                    </List>
-                </CardContent>
-            </Card>
+    try {
+      if (editingId) {
+        await api.put(API_ENDPOINTS.CHARACTERISTIC_DETAIL(editingId), {
+          type,
+          name,
+        });
+      } else {
+        await api.post(API_ENDPOINTS.CHARACTERISTICS, { type, name });
+      }
 
-            {editChar && (
-        <Dialog open onClose={() => setEditChar(null)}>
-          <DialogTitle>Edit characteristic</DialogTitle>
-          {/* <DialogContent>
-            <CharacteristicForm
-              initial={editChar}
-              onSaved={() => { setEditChar(null); fetchCharacteristics(); }}
+      setEditingId("");
+      setType("");
+      setName("");
+      setErrors("");
+      fetchCharacteristics();
+      alert(
+        wasEditing
+          ? "Characteristic updated successfully!"
+          : "Characteristic added successfully!"
+      );
+    } catch (error: any) {
+      console.error("Submit Error:", error);
+      const message =
+        error.response?.data?.error || "Error saving characteristic.";
+      setErrors(message);
+      alert(message);
+    }
+  };
+
+  const handleEdit = (char: Characteristic) => {
+    setType(char.type);
+    setName(char.name);
+    setEditingId(char._id);
+  };
+
+  const handleDelete = async (char_id: string) => {
+    try {
+      await api.delete(API_ENDPOINTS.CHARACTERISTIC_DETAIL(char_id));
+      setErrors("");
+      fetchCharacteristics();
+      alert("Characteristic deleted successfully!");
+    } catch (error: any) {
+      console.error("Delete Error:", error);
+      const message =
+        error.response?.data?.error || "Error deleting characteristic.";
+      setErrors(message);
+      alert(message);
+    }
+  };
+
+  const filtered = characteristics.filter(
+    (char) =>
+      char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      char.type.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <CatalogPageLayout
+      title="Characteristics"
+      formTitle={isEditing ? "Edit characteristic" : "Add characteristic"}
+      searchPlaceholder="Search"
+      searchValue={searchTerm}
+      onSearchChange={setSearchTerm}
+      listLabel="Catalog"
+      error={errors || null}
+      listEmpty={
+        <Typography variant="body2" sx={catalogEmptyStateSx}>
+          No characteristics yet.
+        </Typography>
+      }
+      form={
+        <form onSubmit={handleSubmit}>
+          <Stack spacing={2}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Type"
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              required
             />
-          </DialogContent> */}
-        </Dialog>
-      )}
-        </Container>
-
-        
-    );
-   
+            <TextField
+              fullWidth
+              size="small"
+              label="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              sx={catalogFormActionsSx}>
+              {isEditing && (
+                <Button variant="outlined" fullWidth onClick={cancelEdit}>
+                  Cancel
+                </Button>
+              )}
+              <Button
+                variant="contained"
+                type="submit"
+                fullWidth
+                startIcon={isEditing ? <Save /> : <Add />}>
+                {isEditing ? "Save changes" : "Add characteristic"}
+              </Button>
+            </Stack>
+          </Stack>
+        </form>
+      }>
+      {filtered.map((char) => (
+        <CatalogListItem
+          key={char._id}
+          selected={editingId === char._id}
+          primary={char.name}
+          secondary={char.type}
+          onEdit={() => handleEdit(char)}
+          onDelete={() => handleDelete(char._id)}
+        />
+      ))}
+    </CatalogPageLayout>
+  );
 };
 
 export default Characteristics;

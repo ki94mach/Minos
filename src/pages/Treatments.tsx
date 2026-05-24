@@ -1,13 +1,29 @@
 import React, { useState, useEffect } from "react";
 import {
-    Container, Typography, Card, CardContent, TextField, Button, Divider,
-    FormControl, InputLabel, Select, MenuItem, Box, IconButton, List,
-    ListItem, ListItemText, Grid, Paper, Autocomplete
+  Typography,
+  TextField,
+  Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Box,
+  List,
+  Grid,
+  Autocomplete,
+  Stack,
 } from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
 import api from "../api";
-import BackButton from "../components/BackButton";
-import { Edit, Delete } from "@mui/icons-material";
+import { Save, Add } from "@mui/icons-material";
+import CatalogPageLayout from "../components/catalog/CatalogPageLayout";
+import CatalogListItem from "../components/catalog/CatalogListItem";
+import CatalogFormListRow from "../components/catalog/CatalogFormListRow";
+import {
+  catalogEmptyStateSx,
+  catalogFormActionsSx,
+  catalogFormSectionTitleSx,
+  catalogNestedListSx,
+} from "../components/catalog/catalogPageStyles";
 import Cookies from "js-cookie";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
@@ -227,8 +243,19 @@ const Treatments: React.FC = () => {
       
     const resetForm = () => {
         setName("");
+        setTreatmentType("Treatment");
         setRegimenDrugs([]);
         setAlternatives([]);
+        setAlternativeRegimenDrugs([]);
+        setSelectedDrugId("");
+        setSelectedRegimenId("");
+    };
+
+    const isEditing = Boolean(editingTreatmentId);
+
+    const cancelEdit = () => {
+        setEditingTreatmentId(null);
+        resetForm();
     };
 
     const handleEdit = (treatment: Treatment) => {
@@ -293,128 +320,134 @@ const Treatments: React.FC = () => {
       };
       
 
+    const filteredTreatments = treatments.filter(
+      (treatment) =>
+        treatment.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        treatment.type.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     return (
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <BackButton />
-        <Typography variant="h4" gutterBottom>
-          Treatments
-        </Typography>
-
-        <Card sx={{ mb: 4 }}>
-          <CardContent>
-            <Typography variant="h6">Add Treatment</Typography>
-            <form onSubmit={handleSubmit}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={8}>
-                  <TextField
-                    fullWidth
-                    label="Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <FormControl fullWidth required>
-                    <InputLabel>Type</InputLabel>
-                    <Select
-                      value={treatmentType}
-                      onChange={(e) => setTreatmentType(e.target.value)}
-                      label="Type">
-                      <MenuItem value="Treatment">Treatment</MenuItem>
-                      <MenuItem value="Regimen">Regimen</MenuItem>
-                      <MenuItem value="Alternative">Alternative</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
+      <CatalogPageLayout
+        title="Treatments"
+        formTitle={isEditing ? "Edit treatment" : "Add treatment"}
+        searchPlaceholder="Search treatments"
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        listLabel="Catalog"
+        error={errors || null}
+        listEmpty={
+          <Typography variant="body2" sx={catalogEmptyStateSx}>
+            No treatments yet.
+          </Typography>
+        }
+        form={
+          <form onSubmit={handleSubmit}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={8}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
               </Grid>
+              <Grid item xs={12} sm={4}>
+                <FormControl fullWidth required size="small">
+                  <InputLabel>Type</InputLabel>
+                  <Select
+                    value={treatmentType}
+                    onChange={(e) => setTreatmentType(e.target.value)}
+                    label="Type">
+                    <MenuItem value="Treatment">Treatment</MenuItem>
+                    <MenuItem value="Regimen">Regimen</MenuItem>
+                    <MenuItem value="Alternative">Alternative</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
 
-              {treatmentType === "Treatment" && (
-                <Box mt={3}>
-                  <Typography variant="body1" color="textSecondary">
-                    Basic treatment. No regimen or alternatives required.
-                  </Typography>
-                </Box>
-              )}
+            {treatmentType === "Treatment" && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                Basic treatment — no regimen or alternatives required.
+              </Typography>
+            )}
 
-              {/* Regimen Section */}
-              {treatmentType === "Regimen" && (
-                <Box mt={3}>
-                  <Typography variant="subtitle1">Regimen Drugs</Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <Autocomplete
-                        fullWidth
-                        options={drugs}
-                        getOptionLabel={(option) =>
-                          `${option.name} - ${option.strength} ${option.unit}`
-                        }
-                        value={
-                          drugs.find((d) => d._id === selectedDrugId) || null
-                        }
-                        onChange={(event, newValue) =>
-                          setSelectedDrugId(newValue ? newValue._id : "")
-                        }
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            label="Search Drug"
-                            variant="outlined"
-                          />
-                        )}
-                      />
-                    </Grid>
-                    <Grid item xs={4}>
-                      <TextField
-                        type="number"
-                        fullWidth
-                        label="Annual Consumption"
-                        value={annualConsumption}
-                        onChange={(e) =>
-                          setAnnualConsumption(Number(e.target.value))
-                        }
-                      />
-                    </Grid>
-                    <Grid item xs={2}>
-                      <Button
-                        variant="contained"
-                        onClick={() => addDrug(false)}
-                        fullWidth>
-                        Add
-                      </Button>
-                    </Grid>
+            {treatmentType === "Regimen" && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={catalogFormSectionTitleSx}>
+                  Regimen drugs
+                </Typography>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={6}>
+                    <Autocomplete
+                      size="small"
+                      fullWidth
+                      options={drugs}
+                      getOptionLabel={(option) =>
+                        `${option.name} - ${option.strength} ${option.unit}`
+                      }
+                      value={
+                        drugs.find((d) => d._id === selectedDrugId) || null
+                      }
+                      onChange={(_event, newValue) =>
+                        setSelectedDrugId(newValue ? newValue._id : "")
+                      }
+                      renderInput={(params) => (
+                        <TextField {...params} label="Drug" size="small" />
+                      )}
+                    />
                   </Grid>
-                  <List>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      type="number"
+                      fullWidth
+                      size="small"
+                      label="Annual consumption"
+                      value={annualConsumption}
+                      onChange={(e) =>
+                        setAnnualConsumption(Number(e.target.value))
+                      }
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={2}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => addDrug(false)}
+                      fullWidth>
+                      Add drug
+                    </Button>
+                  </Grid>
+                </Grid>
+                {regimenDrugs.length > 0 && (
+                  <List disablePadding sx={catalogNestedListSx}>
                     {regimenDrugs.map((item, i) => (
-                      <ListItem
+                      <CatalogFormListRow
                         key={i}
-                        secondaryAction={
-                          <IconButton
-                            onClick={() =>
-                              setRegimenDrugs(
-                                regimenDrugs.filter((_, idx) => idx !== i)
-                              )
-                            }>
-                            <DeleteIcon />
-                          </IconButton>
-                        }>
-                        <ListItemText
-                          primary={`${item.drug.name} - ${item.drug.strength} ${item.drug.unit}`}
-                          secondary={`Annual Con: ${item.annual_patient_con}`}
-                        />
-                      </ListItem>
+                        primary={`${item.drug.name} — ${item.drug.strength} ${item.drug.unit}`}
+                        secondary={`Annual consumption: ${item.annual_patient_con}`}
+                        onRemove={() =>
+                          setRegimenDrugs(
+                            regimenDrugs.filter((_, idx) => idx !== i)
+                          )
+                        }
+                      />
                     ))}
                   </List>
-                </Box>
-              )}
+                )}
+              </Box>
+            )}
 
-              {/* Alternative Section */}
-              {treatmentType === "Alternative" && (
-                <Box mt={3}>
-                  <Typography variant="subtitle1">
-                    Add Alternative Regimen
-                  </Typography>
+            {treatmentType === "Alternative" && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={catalogFormSectionTitleSx}>
+                  Alternatives
+                </Typography>
+                <Stack spacing={2}>
                   <Autocomplete
+                    size="small"
                     fullWidth
                     options={regimenOptions}
                     getOptionLabel={(option) => option.name}
@@ -422,186 +455,88 @@ const Treatments: React.FC = () => {
                       regimenOptions.find((r) => r._id === selectedRegimenId) ||
                       null
                     }
-                    onChange={(event, newValue) =>
+                    onChange={(_event, newValue) =>
                       setSelectedRegimenId(newValue ? newValue._id : "")
                     }
                     renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Search Regimen"
-                        variant="outlined"
-                      />
+                      <TextField {...params} label="Regimen" size="small" />
                     )}
-                    sx={{ mb: 2 }}
                   />
-                  <Grid container spacing={2}></Grid>
-                  <List>
-                    {alternativeRegimenDrugs.map((item, i) => (
-                      <ListItem
+                  <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                    <TextField
+                      type="number"
+                      size="small"
+                      label="Ratio (0–1)"
+                      value={alternativeRatio}
+                      onChange={(e) =>
+                        setAlternativeRatio(Number(e.target.value))
+                      }
+                      inputProps={{ min: 0, max: 1, step: "any" }}
+                      sx={{ minWidth: 140, flex: 1 }}
+                    />
+                    <Button variant="outlined" size="small" onClick={addAlternative}>
+                      Add alternative
+                    </Button>
+                  </Box>
+                </Stack>
+                {alternatives.length > 0 && (
+                  <List disablePadding sx={catalogNestedListSx}>
+                    {alternatives.map((alt, i) => (
+                      <CatalogFormListRow
                         key={i}
-                        secondaryAction={
-                          <IconButton
-                            onClick={() =>
-                              setAlternativeRegimenDrugs(
-                                alternativeRegimenDrugs.filter(
-                                  (_, idx) => idx !== i
-                                )
-                              )
-                            }>
-                            <DeleteIcon />
-                          </IconButton>
-                        }>
-                        <ListItemText
-                          primary={`${item.drug.name} - ${item.drug.strength} ${item.drug.unit}`}
-                          secondary={`Annual Con: ${item.annual_patient_con}`}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                  <TextField
-                    type="number"
-                    fullWidth
-                    label="Ratio (0-1)"
-                    value={alternativeRatio}
-                    onChange={(e) =>
-                      setAlternativeRatio(Number(e.target.value))
-                    }
-                    inputProps={{ min: 0, max: 1, step: "any" }}
-                    sx={{ mt: 2 }}
-                  />
-                  <Button
-                    variant="outlined"
-                    onClick={addAlternative}
-                    sx={{ mt: 2 }}>
-                    Add Alternative
-                  </Button>
-                  <Divider sx={{ mt: 3, mb: 1 }} />
-                  <Typography variant="subtitle2">
-                    Current Alternatives:
-                  </Typography>
-                  {alternatives.map((alt, i) => (
-                    <Paper key={i} sx={{ p: 2, mb: 2 }}>
-                      <Grid container spacing={1} alignItems="center">
-                        <Grid item xs={8}>
-                          <Typography variant="body2">
-                            <strong>{alt.name}</strong>
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={4}>
-                          <TextField
-                            fullWidth
-                            type="number"
-                            label="Ratio"
-                            value={alt.ratio}
-                            onChange={(e) => {
-                              const updated = [...alternatives];
-                              let val = parseFloat(e.target.value);
-                              if (isNaN(val)) val = 0;
-                              if (val > 1) val = 1;
-                              if (val < 0) val = 0;
-                              updated[i].ratio = val;
-                              setAlternatives(updated);
-                            }}
-                            inputProps={{ min: 0, max: 1, step: "any" }}
-                            size="small"
-                          />
-                        </Grid>
-                      </Grid>
-
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() =>
+                        primary={alt.name}
+                        secondary={`Ratio: ${alt.ratio}`}
+                        onRemove={() =>
                           setAlternatives(
                             alternatives.filter((_, idx) => idx !== i)
                           )
-                        }>
-                        Remove
-                      </Button>
-                    </Paper>
-                  ))}
-                </Box>
-              )}
-
-              <Box sx={{ mt: 3, textAlign: "right" }}>
-                <Button type="submit" variant="contained">
-                  Submit
-                </Button>
-              </Box>
-            </form>
-            {errors && (
-              <Typography color="error" sx={{ mt: 2 }}>
-                {errors}
-              </Typography>
-            )}
-          </CardContent>
-        </Card>
-        {treatments.length > 0 && (
-          <Card sx={{ mb: 4 }}>
-            <CardContent>
-              <TextField
-                fullWidth
-                label="Search Treatment"
-                variant="outlined"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                sx={{ mb: 2 }}
-              />
-              <Typography variant="h6" gutterBottom>
-                Available Treatments
-              </Typography>
-              <List>
-                {treatments
-                  .filter(
-                    (treatment) =>
-                      treatment.name
-                        .toLowerCase()
-                        .includes(searchTerm.toLowerCase()) ||
-                      treatment.type
-                        .toLowerCase()
-                        .includes(searchTerm.toLowerCase())
-                  )
-                  .map((treatment) => (
-                    <ListItem
-                      key={treatment._id}
-                      secondaryAction={
-                        <Box>
-                          <IconButton
-                            edge="end"
-                            aria-label="edit"
-                            onClick={() => handleEdit(treatment)}>
-                            <Edit />
-                          </IconButton>
-                          <IconButton
-                            edge="end"
-                            aria-label="delete"
-                            onClick={() => handleDelete(treatment._id)}>
-                            <Delete />
-                          </IconButton>
-                        </Box>
-                      }
-                      sx={{ borderBottom: "1px solid #eee" }}>
-                      <ListItemText
-                        primary={`${treatment.name} (${treatment.type})`}
-                        secondary={
-                          treatment.regimen
-                            ? `Drugs: ${treatment.regimen.drugs
-                                .map((d) => d.drug.name)
-                                .join(", ")}`
-                            : treatment.alternatives
-                            ? `Alternatives: ${treatment.alternatives
-                                .map((a) => a.name)
-                                .join(", ")}`
-                            : "Basic treatment"
                         }
                       />
-                    </ListItem>
-                  ))}
-              </List>
-            </CardContent>
-          </Card>
-        )}
-      </Container>
+                    ))}
+                  </List>
+                )}
+              </Box>
+            )}
+
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              sx={{ ...catalogFormActionsSx, justifyContent: "flex-end" }}>
+              {isEditing && (
+                <Button variant="outlined" onClick={cancelEdit}>
+                  Cancel
+                </Button>
+              )}
+              <Button
+                type="submit"
+                variant="contained"
+                startIcon={isEditing ? <Save /> : <Add />}>
+                {isEditing ? "Save changes" : "Add treatment"}
+              </Button>
+            </Stack>
+          </form>
+        }>
+        {filteredTreatments.map((treatment) => (
+          <CatalogListItem
+            key={treatment._id}
+            selected={editingTreatmentId === treatment._id}
+            primary={`${treatment.name} (${treatment.type})`}
+            secondary={
+              treatment.regimen
+                ? `Drugs: ${treatment.regimen.drugs
+                    .map((d) => d.drug.name)
+                    .join(", ")}`
+                : treatment.alternatives
+                ? `Alternatives: ${treatment.alternatives
+                    .map((a) => a.name)
+                    .join(", ")}`
+                : "Basic treatment"
+            }
+            onEdit={() => handleEdit(treatment)}
+            onDelete={() => handleDelete(treatment._id)}
+          />
+        ))}
+      </CatalogPageLayout>
     );
 };
 
