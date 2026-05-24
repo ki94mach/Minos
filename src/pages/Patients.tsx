@@ -7,6 +7,7 @@ import ReactFlow, {
   Edge,
   Background,
   Controls,
+  ReactFlowInstance,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import {
@@ -120,17 +121,34 @@ const Patients: React.FC = () => {
   const [overviewEmptyHint, setOverviewEmptyHint] = useState<string | null>(null);
   const [createPatientDialogOpen, setCreatePatientDialogOpen] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const reactFlowRef = useRef<ReactFlowInstance | null>(null);
   const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
+
+  const patientTreeFitViewOptions = useMemo(
+    () => ({
+      padding: 0.2,
+      includeHiddenNodes: false,
+      duration: 400,
+    }),
+    []
+  );
+
+  const fitPatientTreeView = useCallback(() => {
+    reactFlowRef.current?.fitView(patientTreeFitViewOptions);
+  }, [patientTreeFitViewOptions]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
       const active = document.fullscreenElement === canvasRef.current;
       setIsCanvasFullscreen(active);
       window.dispatchEvent(new Event("resize"));
+      if (active) {
+        setTimeout(() => fitPatientTreeView(), 100);
+      }
     };
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, []);
+  }, [fitPatientTreeView]);
 
   const toggleCanvasFullscreen = useCallback(async () => {
     const el = canvasRef.current;
@@ -754,6 +772,9 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         <ReactFlow
           nodes={debouncedNodes}
           edges={debouncedEdges}
+          onInit={(instance) => {
+            reactFlowRef.current = instance;
+          }}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
@@ -761,11 +782,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           fitView
           nodeTypes={nodeTypes}
           proOptions={{ hideAttribution: true }}
-          fitViewOptions={{
-            padding: 0.2,
-            includeHiddenNodes: false,
-            duration: 400,
-          }}
+          fitViewOptions={patientTreeFitViewOptions}
           minZoom={0.1}
           maxZoom={2}
           defaultViewport={{ x: 0, y: 0, zoom: 1 }}>
