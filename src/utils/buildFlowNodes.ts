@@ -149,6 +149,7 @@ export function buildFlowNodes(
         isOverviewMode: isOverviewMode,
         treeId: treeIdMap.get(nodeId),
         isOverview: isOverviewMode,
+        isTreeRoot: parentId === null && depth === 0,
         onClick: () =>
           navigate(`/patients/${nodeId}`, {
             state: { color: hashColor(uniqueCharId), treeId: treeId },

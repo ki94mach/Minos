@@ -6,6 +6,7 @@ export const API_ENDPOINTS = {
   CHANGE_PASSWORD: "/auth/change-password",
   REGISTER: "/auth/register",
   PATIENTS: "/api/patients",
+  PATIENT_DETAIL: (id: string) => `/api/patients/${id}`,
   CHARACTERISTICS: "/api/characteristics",
   CHARACTERISTIC_DETAIL: (id: string) => `/api/characteristics/${id}`,
   TREATMENTS: "/api/treatments",

@@ -909,6 +909,11 @@ def delete_node(patient_id, node_id):
             node.children = new_children
             return removed
 
+        # Deleting the embedded root removes the entire patient tree document.
+        if str(patient_tree.tree.id) == str(node_id):
+            PatientDriver.delete(patient_id)
+            return jsonify({'message': 'Patient tree deleted'}), 200
+
         # Remove the target node from the tree starting at the root.
         removed = remove_node(patient_tree.tree, node_id)
         if not removed:

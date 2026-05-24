@@ -21,7 +21,6 @@ import {
 import api from "../api";
 import BackButton from "../components/BackButton";
 import CustomNode from "../components/CustomNode";
-import Cookies from "js-cookie";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Decimal from "decimal.js";
 import { TreatmentOption } from "../components/TreatmentForm";
@@ -220,53 +219,47 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
  
 
   /* ───────────── remove one node + its edges ───────────── */
-  function deleteNode(nodeId: string) {
+  async function deleteNode(nodeId: string) {
     const node = nodes.find((n: any) => n.id === nodeId);
     if (!node) return;
-  
-    if (!window.confirm("Delete this node?")) return;
 
     const nodeDocId = node.data.docId;
     const patientTreeId = node.data.treeId;
+    const isTreeRoot = node.data.isTreeRoot === true;
 
     if (!patientTreeId) {
       alert("Missing patient tree ID.");
       return;
     }
-  
-    const endpoint = API_ENDPOINTS.DELETE_NODE(patientTreeId, nodeDocId);
-  
-    const csrf = Cookies.get("csrf_token") ?? "";
-    const cfg  = {
-      withCredentials: true,
-      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
-    };
-  
-    api
-      .delete(endpoint, cfg)
-      .then(() => {
-        // remove from React-Flow state
-        // setNodes((ns) => ns.filter((n) => n.id !== nodeId));
-        // setEdges((es) => es.filter((e) => e.source !== nodeId && e.target !== nodeId));
-        drawPatientNodes();
-        alert("Node deleted.");
-      })
-      // .then(async () => {
-      //   alert("Node deleted.");
 
-      //   setNodes((prev) => prev.filter((n) => n.id !== nodeId));
-      //   setEdges((prev) => prev.filter((e) => e.source !== nodeId && e.target !== nodeId));
+    const confirmMsg = isTreeRoot
+      ? "Delete this entire patient tree? You can create a new one afterward."
+      : "Delete this node?";
+    if (!window.confirm(confirmMsg)) return;
 
-      //   await new Promise((res) => setTimeout(res, 300));
-      //   await drawPatientNodes();  // now it's safe
-      // })
-
-      .catch((err) => {
-        const msg = err.response?.data?.error ?? "Error deleting node.";
-        alert(msg);
-        console.error(err);
-      });
-  }  
+    try {
+      if (isTreeRoot) {
+        await api.delete(API_ENDPOINTS.PATIENT_DETAIL(patientTreeId));
+      } else {
+        if (!nodeDocId) {
+          alert("Missing node ID.");
+          return;
+        }
+        await api.delete(
+          API_ENDPOINTS.DELETE_NODE(patientTreeId, nodeDocId)
+        );
+      }
+      await drawPatientNodes();
+      alert(isTreeRoot ? "Patient tree deleted." : "Node deleted.");
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.error ??
+        err.response?.data?.message ??
+        "Error deleting.";
+      alert(msg);
+      console.error(err);
+    }
+  }
   
   function addNode(parentId: string) {
     const parent = nodes.find((n) => n.id === parentId);
@@ -800,7 +793,9 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
               deleteNode(ctx.nodeId);
               setCtx(null);
             }}>
-            Delete
+            {nodes.find((n) => n.id === ctx?.nodeId)?.data?.isTreeRoot
+              ? "Delete patient tree"
+              : "Delete node"}
           </MenuItem>
 
           <MenuItem
