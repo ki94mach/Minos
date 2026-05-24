@@ -15,6 +15,11 @@ export function getUniqueCharId(node: any): string {
   );
 }
 
+function nodeDocId(node: any): string | undefined {
+  const id = node._id?.$oid || node._id;
+  return id != null ? String(id) : undefined;
+}
+
 export function findNodeById(node: any, id: string): any | null {
   const thisId = getUniqueCharId(node);
   if (thisId === id) return node;
@@ -46,9 +51,10 @@ export function calculateSizeFromTree(
 ): Decimal | null {
   // (1) We now pass around a `Decimal` object instead of a plain number
   const dfs = (node: any, acc: Decimal): Decimal | null => {
-    const nodeId = getUniqueCharId(node);
+    const catalogId = getUniqueCharId(node);
+    const docId = nodeDocId(node);
 
-    if (nodeId === targetId) {
+    if (targetId === catalogId || (docId != null && targetId === docId)) {
       return acc;
     }
 

@@ -41,10 +41,8 @@ export function buildFlowNodes(
 
   if (depth > depthLimit) return;
 
-  // ──────────────────────────────────────────────────
-  // A) Use the *characteristic_data._id* (or treatment_data._id) as one shared nodeId.
-  //    THAT ensures all “Iran” occurrences collapse into the same React-Flow node.
-  const uniqueCharId =
+  // Catalog id (characteristic/treatment/followup reference) — shared across trees in overview.
+  const catalogId =
     node.characteristic_data?._id?.$oid ||
     node.characteristic_data?._id ||
     node.treatment_data?._id?.$oid ||
@@ -53,20 +51,22 @@ export function buildFlowNodes(
     node.followup_data?._id ||
     node._id?.$oid ||
     node._id;
-  const nodeId = uniqueCharId;
+
+  // Overview: one React-Flow node per catalog entity. Drill-down: one node per tree instance.
+  const flowNodeId = isOverviewMode
+    ? catalogId
+    : node._id?.$oid || node._id;
 
   // ──────────────────────────────────────────────────
-  // B) If we have already rendered this catalog id, merge edges and recurse children only.
-  if (visited.has(uniqueCharId)) {
-    // 1) Add parent→this node edge if needed
+  // Overview only: merge duplicate catalog ids (e.g. same Population across patients).
+  if (isOverviewMode && visited.has(catalogId)) {
     if (parentId) {
-      const edgeId = `${parentId}->${nodeId}`;
+      const edgeId = `${parentId}->${flowNodeId}`;
       if (!edgeSet.has(edgeId)) {
-        edges.push(makePatientTreeEdge(parentId, nodeId, edgeId));
+        edges.push(makePatientTreeEdge(parentId, flowNodeId, edgeId));
         edgeSet.add(edgeId);
       }
     }
-    // 2) Recurse into children so we collect grandchildren under this single node
 
     const kids = node.children || [];
     kids.forEach((child: any, i: number) =>
@@ -74,7 +74,7 @@ export function buildFlowNodes(
         child,
         depth + 1,
         i,
-        nodeId,
+        flowNodeId,
         new Decimal(parentSize).times(node.rate ?? 1),
         kids.length,
         inheritedColor,
@@ -82,17 +82,15 @@ export function buildFlowNodes(
         deps
       )
     );
-    // 3) Bail out (don’t re‐create or re‐position this node)
     return;
   }
 
-  // ──────────────────────────────────────────────────
-  // C) First time we see this uniqueCharId (or we are in overview). Mark “visited”:
-  visited.add(uniqueCharId);
+  if (isOverviewMode) {
+    visited.add(catalogId);
+  }
 
-  // ──────────────────────────────────────────────────
-  // D) If we’re drilling in on a specific root, and this is depth=0 but NOT that root, skip.
-  if (selectedRootId && depth === 0 && nodeId !== selectedRootId) {
+  // Drill-in URL uses catalog id; skip unrelated roots at depth 0.
+  if (selectedRootId && depth === 0 && catalogId !== selectedRootId) {
     return;
   }
 
@@ -100,10 +98,6 @@ export function buildFlowNodes(
   // E) Compute “rawSize” based on whether this is a top‐level root or a descendant:
 
   const nodeRate = node.rate ?? 1;
-  // if (rootId && depth === 0 && nodeId !== rootId) return;
-  if (selectedRootId && depth === 0 && nodeId !== selectedRootId) {
-    return;
-  }
 
   let rawSize: Decimal;
   if (depth === 0 && selectedRootId) {
@@ -123,10 +117,10 @@ export function buildFlowNodes(
 
   // ──────────────────────────────────────────────────
   // F) Create the React-Flow node object once:
-  const isNewNode = !nodesById.has(nodeId);
+  const isNewNode = !nodesById.has(flowNodeId);
   if (isNewNode) {
-    nodesById.set(nodeId, {
-      id: nodeId,
+    nodesById.set(flowNodeId, {
+      id: flowNodeId,
       position: { x: 0, y: 0 }, // we will re‐position later
       type: "custom",
       data: {
@@ -136,6 +130,7 @@ export function buildFlowNodes(
           (node.node_type === "followup" ? "Follow-up" : "Node"),
         type: node.node_type,
         docId: node._id?.$oid || node._id,
+        catalogId,
         parentDocId: node.parent_id?._id?.$oid || node.parent_id || null,
         charType:
           node.characteristic_data?.type ??
@@ -146,14 +141,14 @@ export function buildFlowNodes(
           node.treatment_data?.regimen?.drugs?.map((d: any) => d.drug) || [],
         regimen: node.treatment_data?.regimen || null,
         alternatives: node.treatment_data?.alternatives || [],
-        color: hashColor(uniqueCharId),
+        color: hashColor(catalogId),
         isOverviewMode: isOverviewMode,
-        treeId: treeIdMap.get(nodeId),
+        treeId: isOverviewMode ? treeIdMap.get(catalogId) : treeId,
         isOverview: isOverviewMode,
         isTreeRoot: parentId === null && depth === 0,
         onClick: () =>
-          navigate(`/patients/${nodeId}`, {
-            state: { color: hashColor(uniqueCharId), treeId: treeId },
+          navigate(`/patients/${catalogId}`, {
+            state: { color: hashColor(catalogId), treeId: treeId },
           }),
       },
     });
@@ -162,9 +157,9 @@ export function buildFlowNodes(
   // ──────────────────────────────────────────────────
   // G) Always add an edge parent→this node if needed:
   if (parentId) {
-    const edgeId = `${parentId}->${nodeId}`;
+    const edgeId = `${parentId}->${flowNodeId}`;
     if (!edgeSet.has(edgeId)) {
-      edges.push(makePatientTreeEdge(parentId, nodeId, edgeId));
+      edges.push(makePatientTreeEdge(parentId, flowNodeId, edgeId));
       edgeSet.add(edgeId);
     }
   }
@@ -198,7 +193,7 @@ export function buildFlowNodes(
         child,
         depth + 1,
         i,
-        nodeId,
+        flowNodeId,
         rawSize,
         kids.length,
         inheritedColor,

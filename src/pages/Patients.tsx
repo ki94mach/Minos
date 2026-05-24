@@ -226,7 +226,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           // const existingParentId: string = foundNode.parent_id?._id?.$oid || foundNode.parent_id;
           setEditCharModalData({
             nodeId: realNodeId,
-            currentCharId: uniqueCharOrTreatId,
+            currentCharId: getUniqueCharId(foundNode),
             currentType: existingType,
             currentName: existingName,
             currentRate: existingRate,
@@ -240,7 +240,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
           setEditTreatModalData({
             nodeId: realNodeId,
-            currentTreatId: uniqueCharOrTreatId,
+            currentTreatId: getUniqueCharId(foundNode),
             currentRate: existingRate,
             patientId: realPatientId,
           });
@@ -382,7 +382,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   );
 
   const onNodeClick = (_: any, node: any) => {
-    const clickedId = node.id;
+    const clickedId = node.data.catalogId ?? node.id;
     const whichTree = node.data.treeId;
           if (!whichTree) {
             // If somehow treeId was missing, you could fetch patients and do findNodeById to recover it.
@@ -489,8 +489,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         const edgeSet = new Set<string>();
         
         /* ──────────────────────────────────────────────────
-         * 2) DFS function: MERGE duplicate “Iran” by using
-         *    characteristic_data._id as the single nodeId.
+         * 2) DFS: overview merges by catalog id; drill-down uses
+         *    each tree node’s document _id so duplicates stay distinct.
          * ────────────────────────────────────────────────── */
         
 
