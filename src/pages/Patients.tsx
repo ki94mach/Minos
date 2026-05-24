@@ -337,54 +337,9 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   }, [selectedRootId]);
     
   
-  // fetch patients list for the list‑view (grid at top of page)
+  // fetch characteristics for edit/add dialogs (overview mode)
   useEffect(() => {
     if (!selectedRootId) {
-      const fetchPatients = async () => {
-        try {
-          const { data } = await api.get(API_ENDPOINTS.PATIENTS);
-          const parsedPatients = asApiList<any>(data);
-
-          const formattedNodes = parsedPatients.map((patient: any, index: number) => {
-            const nodeType = patient.node.node_type;
-            const base = {
-              id: String(patient._id),
-              position: { x: index * 200, y: 100 },
-              type: "custom" as const,
-            };
-  
-            if (nodeType === "treatment") {
-              const treatment = patient.node.treatment_data;
-              const drugs = treatment.regimen?.drugs?.map((d: any) => d.drug) || [];
-              return {
-                ...base,
-                data: {
-                  label: treatment.name,
-                  number: index + 1,
-                  type: nodeType,
-                  drugs,
-                },
-              };
-            }
-  
-            return {
-              ...base,
-              data: {
-                label: patient.node.characteristic_data.name,
-                number: index + 1,
-                type: nodeType,
-              },
-            };
-          });
-  
-          requestAnimationFrame(() => {
-            setNodes(formattedNodes);
-          });
-        } catch (err) {
-          console.error("Error fetching patients:", err);
-        }
-      };
-  
       const fetchCharacteristics = async () => {
         try {
           const { data } = await api.get(API_ENDPOINTS.CHARACTERISTICS);
@@ -393,8 +348,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           console.error("Error fetching characteristics:", err);
         }
       };
-  
-      fetchPatients();
+
       fetchCharacteristics();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- overview list fetch when not drilled in
@@ -438,6 +392,12 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         const res = await api.get(API_ENDPOINTS.PATIENTS);
 
         const parsedPatients = asApiList<any>(res.data);
+
+        if (parsedPatients.length === 0) {
+          setNodes([]);
+          setEdges([]);
+          return;
+        }
 
         // Choose either all roots (overview) or the single drilled‐in root:
         // const roots = selectedRootId
@@ -486,6 +446,12 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           // Overview: show every patient’s full top‐level tree
           roots = parsedPatients.map((p: any) => p.tree);
         }
+
+        if (roots.length === 0 || roots.every((r) => r == null)) {
+          setNodes([]);
+          setEdges([]);
+          return;
+        }
     
         /* ──────────────────────────────────────────────────
          * 1) Set up global DFS registries for this draw
@@ -518,7 +484,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         // 3) Kick off DFS for each root
         roots.forEach((rootNode: any, idx: number) => {     
           const patientId =
-            parsedPatients[idx]._id.$oid || parsedPatients[idx]._id;     
+            parsedPatients[idx]?._id?.$oid || parsedPatients[idx]?._id;     
           if (!rootNode) {
             console.warn(`⚠️ rootNode at index ${idx} is undefined`);
             return;
@@ -639,21 +605,24 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           const rootUniqueId = getUniqueCharId(roots[0])
 
           // (b) position the root in the center
-          const rootNode = nodesById.get(rootUniqueId)!
-          rootNode.position = center
+          const rootNode = nodesById.get(rootUniqueId)
+          if (rootNode) {
+            rootNode.position = center
 
-          // (c) grab its immediate children
-          const firstRing = childrenByParent.get(rootUniqueId) || []
+            // (c) grab its immediate children
+            const firstRing = childrenByParent.get(rootUniqueId) || []
 
-          // (d) place them evenly around the circle
-          firstRing.forEach((childId, i) => {
-            const angle = (2 * Math.PI * i) / firstRing.length
-            const n = nodesById.get(childId)!
-            n.position = {
-              x: center.x + R * Math.cos(angle),
-              y: center.y + R * Math.sin(angle),
-            }
-          })
+            // (d) place them evenly around the circle
+            firstRing.forEach((childId, i) => {
+              const angle = (2 * Math.PI * i) / firstRing.length
+              const n = nodesById.get(childId)
+              if (!n) return
+              n.position = {
+                x: center.x + R * Math.cos(angle),
+                y: center.y + R * Math.sin(angle),
+              }
+            })
+          }
 
           // (e) collect all
           finalNodes = allFlowNodes

@@ -134,7 +134,7 @@ export function buildFlowNodes(
         label:
           node.characteristic_data?.name || node.treatment_data?.name || "Node",
         type: node.node_type,
-        docId: node._id.$oid || node._id,
+        docId: node._id?.$oid || node._id,
         parentDocId: node.parent_id?._id?.$oid || node.parent_id || null,
         charType: node.characteristic_data?.type,
         size: nodeSize,
