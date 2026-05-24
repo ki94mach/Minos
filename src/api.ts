@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance } from "axios";
-import Cookies from "js-cookie";
 import { getAccessToken } from "./auth/accessToken";
+import { ensureCsrfOnRequest } from "./auth/csrf";
 import { handleUnauthorizedApi } from "./auth/unauthorized";
 import { isMinosAuthEnabled } from "./auth/ssoConfig";
 import { API_BASE_URL } from "./api/config";
@@ -20,14 +20,18 @@ function createApiClient(): AxiosInstance {
       : {}),
   });
 
-  client.interceptors.request.use((config) => {
-    const accessToken = getAccessToken();
+  client.interceptors.request.use(async (config) => {
+    // Legacy Minos login uses session cookies + CSRF, not Bearer.
+    const accessToken = minosAuth ? null : getAccessToken();
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
-    } else if (minosAuth) {
-      const csrf = Cookies.get("csrf_token");
-      if (csrf) {
-        config.headers["X-CSRFToken"] = csrf;
+    }
+    // /api/* is CSRF-exempt; /auth/* still needs the token when using Minos login UI.
+    if (minosAuth) {
+      try {
+        await ensureCsrfOnRequest(config);
+      } catch {
+        // Non-fatal for /api; required for POST /auth/login, etc.
       }
     }
     return config;

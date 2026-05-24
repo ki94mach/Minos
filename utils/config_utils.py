@@ -120,11 +120,10 @@ def configure_security(app):
     app.config['WTF_CSRF_SSL_STRICT'] = cookie_secure_enabled()
     app.config['WTF_CSRF_METHODS'] = ['POST', 'PUT', 'PATCH', 'DELETE']
     app.config['WTF_CSRF_CHECK_DEFAULT'] = True
+    app.config['WTF_CSRF_HEADERS'] = ['X-CSRFToken', 'X-CSRF-Token']
     
     # Initialize CSRF protection
     csrf.init_app(app)
-
-    from routes.api import api_blueprint
 
 def configure_email(app):
     """Configure email settings."""
@@ -210,6 +209,11 @@ def register_routes(app, api_blueprint, auth_blueprint):
     # Register blueprints
     app.register_blueprint(api_blueprint, url_prefix='/api')
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
+
+    # JSON /api uses Bearer SSO or AUTH_DISABLED dev bypass — not cookie form posts.
+    # CSRF stays enabled on /auth/* (login, register). See docs/DEV_SMOKE.md.
+    csrf.exempt(api_blueprint)
+    logging.info("CSRF protection exempted for /api/* blueprint")
 
 def register_error_handlers(app):
     """Register error handlers."""

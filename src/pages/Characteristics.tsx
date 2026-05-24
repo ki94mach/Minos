@@ -3,7 +3,6 @@ import { TextField, Button, Typography, Container, Card, CardContent, List, List
 import { Edit, Delete } from "@mui/icons-material";
 import api from "../api";
 import BackButton from "../components/BackButton";
-import Cookies from "js-cookie";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
 
@@ -40,29 +39,14 @@ const Characteristics: React.FC = () => {
         e.preventDefault();
     
         try {
-            const csrfToken = Cookies.get("csrf_token");
-    
-            const config = {
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": csrfToken || "", 
-                },
-                withCredentials: true, 
-            };
-    
             if (editingId) {
                 await api.put(
                   API_ENDPOINTS.CHARACTERISTIC_DETAIL(editingId),
-                  { type, name },
-                  config
+                  { type, name }
                 );
                 setEditingId("");
             } else {
-                await api.post(
-                  API_ENDPOINTS.CHARACTERISTICS,
-                  { type, name },
-                  config
-                );
+                await api.post(API_ENDPOINTS.CHARACTERISTICS, { type, name });
             }
     
             setType("");
@@ -89,15 +73,7 @@ const Characteristics: React.FC = () => {
 
     const handleDelete = async (char_id: string) => {
         try {
-            const csrfToken = Cookies.get("csrf_token");
-
-            await api.delete(API_ENDPOINTS.CHARACTERISTIC_DETAIL(char_id), {
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": csrfToken || "",
-            },
-            withCredentials: true,
-        });
+            await api.delete(API_ENDPOINTS.CHARACTERISTIC_DETAIL(char_id));
             setErrors("");
             fetchCharacteristics();
             alert("Characteristic deleted successfully!");

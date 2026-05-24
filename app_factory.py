@@ -19,7 +19,8 @@ from utils.config_utils import (
     configure_database,
     register_routes,
     register_error_handlers,
-    configure_security_headers
+    configure_security_headers,
+    csrf,
 )
 from utils.sso_auth import register_dev_auth_bypass, validate_auth_disabled_config
 
@@ -61,6 +62,8 @@ def create_app():
     
     # Register routes and error handlers
     register_routes(app, api_blueprint, auth_blueprint)
+    # Ensure /api/* skips CSRF (JSON API + AUTH_DISABLED dev — see docs/DEV_SMOKE.md)
+    csrf.exempt(api_blueprint)
     register_error_handlers(app)
     configure_security_headers(app)
     validate_auth_disabled_config()

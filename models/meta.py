@@ -49,11 +49,9 @@ def check_mongo_health() -> tuple[bool, dict[str, Any]]:
     }
 
     try:
-        client = get_db().client
-        # Honor MONGO_HEALTH_TIMEOUT_MS via a short server selection window on this check.
-        timeout_ms = int(os.environ.get("MONGO_HEALTH_TIMEOUT_MS", "5000"))
-        client = client.with_options(serverSelectionTimeoutMS=timeout_ms)
-        client.admin.command("ping")
+        # PyMongo 4.x: MongoClient.with_options is a DB name, not a method — ping via admin.
+        db = get_db()
+        db.client.admin.command("ping")
         details["mongo"] = "ok"
         return True, details
     except Exception as exc:

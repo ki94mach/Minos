@@ -1,9 +1,10 @@
 import React, { useEffect , useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { TextField, Button, Typography, Box, Link } from "@mui/material";
-import Cookies from "js-cookie";
 import api from "../../api";
 import { API_ENDPOINTS } from "../../api/endpoints";
+import { clearAccessToken } from "../../auth/accessToken";
+import { refreshCsrfToken, setCsrfCookie } from "../../auth/csrf";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ const Login: React.FC = () => {
           /<input[^>]*name="csrf_token"[^>]*value="([^"]+)"[^>]*>/
         );
         if (match && match[1]) {
-          Cookies.set("csrf_token", match[1]); 
+          setCsrfCookie(match[1]);
         } else {
           console.error("CSRF token not found in response HTML.");
         }
@@ -36,10 +37,7 @@ const Login: React.FC = () => {
     e.preventDefault();
     setMessage("");
 
-    const { data } = await api.get("/auth/csrf-token");
-    const fresh = data.csrf_token;
-    Cookies.set("csrf_token", fresh);
-  
+    const fresh = await refreshCsrfToken();
 
     try {
       await api.post(
@@ -54,6 +52,8 @@ const Login: React.FC = () => {
         }
       );
 
+      clearAccessToken();
+      await refreshCsrfToken();
       navigate("/home");
     } catch (error: any) {
       const errMsg = error.response?.data?.error || "An error occurred. Please try again.";

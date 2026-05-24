@@ -11,6 +11,15 @@ load_dotenv()
 
 app = create_app()
 
+# Visible on startup so you know CSRF exempt is loaded (restart API after pulling changes).
+from routes.api import api_blueprint as _api_bp
+from utils.config_utils import csrf as _csrf
+
+if _api_bp in _csrf._exempt_blueprints:
+    print("Minos API: /api/* is exempt from CSRF (restart was successful)")
+else:
+    print("WARNING: /api/* CSRF exempt missing — POST /api/* will return 400")
+
 if __name__ == "__main__":
     if os.environ.get("FLASK_ENV") == "production":
         raise SystemExit(
