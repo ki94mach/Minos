@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import ReactFlow, {
   addEdge,
   useEdgesState,
@@ -21,7 +21,11 @@ import {
   DialogContent,
   useTheme,
   Chip,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import { canvasBackground, treeTokens } from "../theme/theme";
 import api from "../api";
 import BackButton from "../components/BackButton";
@@ -114,6 +118,32 @@ const Patients: React.FC = () => {
   const [editTreatModalData, setEditTreatModalData] = useState<EditTreatModalData|null>(null);
   const [overviewEmptyHint, setOverviewEmptyHint] = useState<string | null>(null);
   const [createPatientDialogOpen, setCreatePatientDialogOpen] = useState(false);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      const active = document.fullscreenElement === canvasRef.current;
+      setIsCanvasFullscreen(active);
+      window.dispatchEvent(new Event("resize"));
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  const toggleCanvasFullscreen = useCallback(async () => {
+    const el = canvasRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement === el) {
+        await document.exitFullscreen();
+      } else {
+        await el.requestFullscreen();
+      }
+    } catch (err) {
+      console.error("Fullscreen toggle failed:", err);
+    }
+  }, []);
 
   const handleNodeContext = useCallback((e: React.MouseEvent, nodeId: string) => {
     e.preventDefault();
@@ -659,17 +689,48 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
       {/* ===== React Flow Canvas ===== */}
       <Box
+        ref={canvasRef}
+        className="patient-tree-canvas"
         sx={{
           width: "100%",
-          height: { xs: 480, md: 640 },
-          borderRadius: 3,
-          border: `1px solid ${theme.palette.divider}`,
+          height: isCanvasFullscreen ? "100vh" : { xs: 480, md: 640 },
+          borderRadius: isCanvasFullscreen ? 0 : 3,
+          border: isCanvasFullscreen ? "none" : `1px solid ${theme.palette.divider}`,
           background: mapColor,
           transition: "background 0.5s ease",
           overflow: "hidden",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.35)",
+          boxShadow: isCanvasFullscreen ? "none" : "0 8px 32px rgba(0, 0, 0, 0.35)",
           position: "relative",
+          "&:fullscreen": {
+            width: "100vw",
+            height: "100vh",
+            borderRadius: 0,
+            border: "none",
+          },
         }}>
+        <Tooltip title={isCanvasFullscreen ? "Exit full screen" : "Full screen"}>
+          <IconButton
+            onClick={() => void toggleCanvasFullscreen()}
+            aria-label={isCanvasFullscreen ? "Exit full screen" : "Full screen"}
+            size="small"
+            sx={{
+              position: "absolute",
+              top: 12,
+              right: 12,
+              zIndex: 10,
+              bgcolor: "background.paper",
+              border: 1,
+              borderColor: "divider",
+              boxShadow: 1,
+              "&:hover": { bgcolor: "action.hover" },
+            }}>
+            {isCanvasFullscreen ? (
+              <FullscreenExitIcon fontSize="small" />
+            ) : (
+              <FullscreenIcon fontSize="small" />
+            )}
+          </IconButton>
+        </Tooltip>
         <ReactFlow
           nodes={debouncedNodes}
           edges={debouncedEdges}
