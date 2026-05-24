@@ -1,4 +1,5 @@
 import Decimal from "decimal.js";
+import { treeTokens } from "../theme/theme";
 import { Edge } from "reactflow";
 import { NavigateFunction } from "react-router-dom";
 
@@ -65,7 +66,7 @@ export function buildFlowNodes(
                      source: parentId,
                      target: nodeId,
                      type: "default",
-                     style: { stroke: "#000000", strokeWidth: 0.75 },
+                     style: { stroke: treeTokens.edgeStroke, strokeWidth: treeTokens.edgeStrokeWidth },
                    });
         edgeSet.add(edgeId);
       }
@@ -173,7 +174,7 @@ export function buildFlowNodes(
         source: parentId,
         target: nodeId,
         type: "default",
-        style: { stroke: "#000000", strokeWidth: 0.75 },
+        style: { stroke: treeTokens.edgeStroke, strokeWidth: treeTokens.edgeStrokeWidth },
       });
       edgeSet.add(edgeId);
     }

@@ -112,7 +112,7 @@ const Characteristics: React.FC = () => {
                         <Button variant="contained" type="submit" fullWidth>Add Characteristic</Button>
                     </form>
                     {errors && <Typography color="error">{errors}</Typography>}
-                    <List sx={{ backgroundColor: "#f0f0f0"}}>
+                    <List sx={{ bgcolor: "background.default", borderRadius: 2, p: 1 }}>
                         <TextField
                             fullWidth
                             label="Search Characteristics"
@@ -127,7 +127,7 @@ const Characteristics: React.FC = () => {
                                 char.type.toLowerCase().includes(searchTerm.toLowerCase())
                             )
                         .map((char: Characteristic) => (
-                            <ListItem key={char._id} sx={{ borderBottom: '1px solid #ccc', py: 1 }} secondaryAction={
+                            <ListItem key={char._id} sx={{ borderBottom: 1, borderColor: "divider", py: 1 }} secondaryAction={
                                 <>
                                     
                                     <IconButton edge="end" aria-label="edit" onClick={() => handleEdit(char)}>
@@ -139,8 +139,8 @@ const Characteristics: React.FC = () => {
                                 </>
                             }>
                                 <ListItemText
-                                    primary={<Typography sx={{ color: "#000" }}>{char.name}</Typography>}
-                                    secondary={<Typography sx={{ color: "#555" }}>{char.type}</Typography>}
+                                    primary={<Typography>{char.name}</Typography>}
+                                    secondary={<Typography color="text.secondary">{char.type}</Typography>}
                                 />
                             </ListItem>
                         ))}

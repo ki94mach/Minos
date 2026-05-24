@@ -5,6 +5,8 @@ import ReactFlow, {
   useNodesState,
   Connection,
   Edge,
+  Background,
+  Controls,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import {
@@ -17,7 +19,10 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  useTheme,
+  Chip,
 } from "@mui/material";
+import { canvasBackground, treeTokens } from "../theme/theme";
 import api from "../api";
 import BackButton from "../components/BackButton";
 import CustomNode from "../components/CustomNode";
@@ -70,6 +75,7 @@ interface EditTreatModalData {
 /* -------------------------------------------------------------------------- */
 // const Patients: React.FC<PatientsProps> = ({ rootId = null }) => {
 const Patients: React.FC = () => {
+  const theme = useTheme();
     // ─────────────── Suppress ResizeObserver warning ───────────────
     // useEffect(() => {
     //   const observerErrorHandler = () => {
@@ -134,7 +140,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   const navState = (location.state ?? {}) as PatientsLocationState;
   const patientTreeId = navState.treeId as string;
 
-  const mapColor = navState.color || "#ffffff"; // default to white
+  const mapColor = canvasBackground(navState.color);
 
   const parentNode = nodes.find(n => n.id === addingParentId);
   const parentType = parentNode?.data.type; // e.g. "characteristic" | "treatment" | "followup"
@@ -664,9 +670,9 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   /*                                  UI                                    */
   /* ---------------------------------------------------------------------- */
   return (
-    <Container maxWidth="md" className="py-8">
+    <Container maxWidth="md" sx={{ py: 4 }}>
       <BackButton />
-      <Typography variant="h3" align="center" className="mb-8">
+      <Typography variant="h3" align="center" sx={{ mb: 4 }}>
         Patient Map
       </Typography>
       {isOverview && overviewEmptyHint && (
@@ -697,38 +703,40 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
       {/* Legend */}
       {!isOverview && (
-        <Box display="flex" gap={2} alignItems="center" mb={1}>
-          <Box display="flex" alignItems="center">
-            <Box
-              width={16}
-              height={16}
-              bgcolor="#2196f3"
-              borderRadius={1}
-              mr={1}
-            />
-            <Typography variant="body2">Characteristic</Typography>
-          </Box>
-          <Box display="flex" alignItems="center">
-            <Box
-              width={16}
-              height={16}
-              bgcolor="#4caf50"
-              borderRadius={1}
-              mr={1}
-            />
-            <Typography variant="body2">Treatment</Typography>
-          </Box>
+        <Box display="flex" gap={1.5} alignItems="center" mb={2}>
+          <Chip
+            size="small"
+            label="Characteristic"
+            sx={{
+              bgcolor: "transparent",
+              border: `1px solid ${treeTokens.characteristic}`,
+              color: treeTokens.characteristic,
+            }}
+          />
+          <Chip
+            size="small"
+            label="Treatment"
+            sx={{
+              bgcolor: "transparent",
+              border: `1px solid ${treeTokens.treatment}`,
+              color: treeTokens.treatment,
+            }}
+          />
         </Box>
       )}
 
       {/* ===== React Flow Canvas ===== */}
-      <div
-        style={{
+      <Box
+        sx={{
           width: "100%",
-          height: 600,
-          border: "1px solid #ddd",
-          backgroundColor: mapColor,
-          transition: "background-color 0.5s ease",
+          height: { xs: 480, md: 640 },
+          borderRadius: 3,
+          border: `1px solid ${theme.palette.divider}`,
+          background: mapColor,
+          transition: "background 0.5s ease",
+          overflow: "hidden",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.35)",
+          position: "relative",
         }}>
         <ReactFlow
           nodes={debouncedNodes}
@@ -747,7 +755,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           minZoom={0.1}
           maxZoom={2}
           defaultViewport={{ x: 0, y: 0, zoom: 1 }}>
-          {/* <Background  variant="none" gap={12} size={1}  /> */}
+          <Background color="#334155" gap={20} size={1} />
+          <Controls showInteractive={false} />
         </ReactFlow>
 
         {/* Context menu (right‐click) */}
@@ -818,7 +827,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         )}
 
         {/* ─── end “Edit Treatment” ─── */}
-      </div>
+      </Box>
       {/* ─── end ReactFlow container ─── */}
 
       {/* ===== “Pick Node Type” dialog ===== */}

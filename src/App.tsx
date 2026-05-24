@@ -7,7 +7,7 @@ import Drugs from "./pages/Drugs";
 import Patients from "./pages/Patients";
 import Treatments from "./pages/Treatments";
 import FollowUps from "./pages/Follow-Ups";
-import Navbar from "./components/Navbar";
+import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SsoRedirect from "./components/SsoRedirect";
 import Login from "./pages/Login/Login";
@@ -36,9 +36,7 @@ const App: React.FC = () => {
   const shouldHideNavbar =
     showMinosAuth && minosAuthRoutes.includes(location.pathname);
 
-  return (
-    <>
-      {!shouldHideNavbar && <Navbar />}
+  const routes = (
       <Routes>
         <Route path="/" element={<RootRedirect />} />
         <Route
@@ -102,8 +100,13 @@ const App: React.FC = () => {
           <Route path="/auth/*" element={<SsoRedirect />} />
         )}
       </Routes>
-    </>
   );
+
+  if (shouldHideNavbar) {
+    return routes;
+  }
+
+  return <AppLayout>{routes}</AppLayout>;
 };
 
 export default App;

@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
 import dagre from "dagre";
+import { hashNodeColor } from "../theme/theme";
 
 export function getUniqueCharId(node: any): string {
   return (
@@ -74,20 +75,7 @@ export function calculateSizeFromTree(
 }
 
 export function hashColor(str: string): string {
-  let h = 0,
-    s = 0,
-    l = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (h << 5) - h + str.charCodeAt(i);
-    s = (s << 3) - s + str.charCodeAt(i);
-    l = (l << 2) - l + str.charCodeAt(i);
-  }
-
-  const hue = Math.abs(h % 360); // 0–359
-  const sat = 65 + (Math.abs(s) % 20); // 65–84%
-  const light = 80 + (Math.abs(l) % 10); // 80–89%
-
-  return `hsl(${hue}, ${sat}%, ${light}%)`;
+  return hashNodeColor(str);
 } 
 
 const NODE_WIDTH = 180;

@@ -1,9 +1,39 @@
-html, body{
-    padding: 0 !important;
-    margin: 0 !important;
-    box-sizing: border-box;
-}
+html,
 body {
-    background-color: #f5f5f5;
-    font-family: "Arial", sans-serif;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+body {
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* React Flow — dark theme controls */
+.react-flow__controls {
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.react-flow__controls-button {
+  background: #1a2332 !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;
+  fill: #cbd5e1 !important;
+}
+
+.react-flow__controls-button:hover {
+  background: #243044 !important;
+}
+
+.react-flow__edge-path {
+  stroke-linecap: round;
 }

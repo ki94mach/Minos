@@ -159,7 +159,7 @@ const PasswordManager: React.FC = () => {
 
   return (
     <Container maxWidth="sm">
-      <Box mt={10} p={3} boxShadow={3} bgcolor="#fff" borderRadius={2}>
+      <Box mt={10} p={3} boxShadow={3} bgcolor="background.paper" borderRadius={2} border={1} borderColor="divider">
         <Typography variant="h4" gutterBottom textAlign="center">
           {mode === "forgot"
             ? "Forgot Password"

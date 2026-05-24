@@ -67,9 +67,10 @@ const Login: React.FC = () => {
         width: 300,
         margin: "100px auto",
         padding: 3,
-        background: "#fff",
-        border: "1px solid #ddd",
-        borderRadius: "5px",
+        bgcolor: "background.paper",
+        border: 1,
+        borderColor: "divider",
+        borderRadius: 2,
         textAlign: "center",
       }}
     >
