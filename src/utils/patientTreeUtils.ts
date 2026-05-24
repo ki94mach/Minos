@@ -78,31 +78,37 @@ export function hashColor(str: string): string {
   return hashNodeColor(str);
 } 
 
-const NODE_WIDTH = 180;
-const NODE_HEIGHT = 60;
-
 export function applyDagreLayout(nodes: any[], edges: any[]) {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", ranksep: 50, nodesep: 20 });
+  g.setGraph({
+    rankdir: "TB",
+    ranksep: 90,
+    nodesep: 70,
+    edgesep: 24,
+    ranker: "network-simplex",
+  });
 
-  // 1) register nodes & edges
-  nodes.forEach((n) =>
-    g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
-  );
+  nodes.forEach((n) => {
+    const isOverview = n.data?.isOverviewMode === true;
+    const width = isOverview ? 120 : 190;
+    const height = isOverview ? 120 : 88;
+    g.setNode(n.id, { width, height });
+  });
   edges.forEach((e) => g.setEdge(e.source, e.target));
 
-  // 2) run layout
   dagre.layout(g);
 
-  // 3) read back positions
   return nodes.map((n) => {
     const { x, y } = g.node(n.id);
+    const isOverview = n.data?.isOverviewMode === true;
+    const width = isOverview ? 120 : 190;
+    const height = isOverview ? 120 : 88;
     return {
       ...n,
       position: {
-        x: x - NODE_WIDTH / 2,
-        y: y - NODE_HEIGHT / 2,
+        x: x - width / 2,
+        y: y - height / 2,
       },
     };
   });

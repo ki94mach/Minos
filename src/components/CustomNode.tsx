@@ -114,6 +114,17 @@ const CustomNode = (
     }
   };
 
+  const handleStyle: React.CSSProperties = {
+    opacity: 0,
+    width: 1,
+    height: 1,
+    minWidth: 0,
+    minHeight: 0,
+    border: "none",
+    background: "transparent",
+    pointerEvents: "none",
+  };
+
   const inputStyle: React.CSSProperties = {
     width: "80%",
     marginBottom: "5px",
@@ -227,12 +238,50 @@ const CustomNode = (
         <Handle
           type="target"
           position={Position.Top}
-          style={{ background: borderColor, border: "none", width: 8, height: 8 }}
+          id="target-top"
+          style={handleStyle}
+        />
+        <Handle
+          type="target"
+          position={Position.Right}
+          id="target-right"
+          style={handleStyle}
+        />
+        <Handle
+          type="target"
+          position={Position.Bottom}
+          id="target-bottom"
+          style={handleStyle}
+        />
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="target-left"
+          style={handleStyle}
+        />
+        <Handle
+          type="source"
+          position={Position.Top}
+          id="source-top"
+          style={handleStyle}
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="source-right"
+          style={handleStyle}
         />
         <Handle
           type="source"
           position={Position.Bottom}
-          style={{ background: borderColor, border: "none", width: 8, height: 8 }}
+          id="source-bottom"
+          style={handleStyle}
+        />
+        <Handle
+          type="source"
+          position={Position.Left}
+          id="source-left"
+          style={handleStyle}
         />
       </div>
     </Tooltip>

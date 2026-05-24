@@ -1,5 +1,5 @@
 import Decimal from "decimal.js";
-import { treeTokens } from "../theme/theme";
+import { makePatientTreeEdge } from "./flowLayoutUtils";
 import { Edge } from "reactflow";
 import { NavigateFunction } from "react-router-dom";
 
@@ -62,12 +62,7 @@ export function buildFlowNodes(
     if (parentId) {
       const edgeId = `${parentId}->${nodeId}`;
       if (!edgeSet.has(edgeId)) {
-        edges.push({ id: edgeId,
-                     source: parentId,
-                     target: nodeId,
-                     type: "default",
-                     style: { stroke: treeTokens.edgeStroke, strokeWidth: treeTokens.edgeStrokeWidth },
-                   });
+        edges.push(makePatientTreeEdge(parentId, nodeId, edgeId));
         edgeSet.add(edgeId);
       }
     }
@@ -169,13 +164,7 @@ export function buildFlowNodes(
   if (parentId) {
     const edgeId = `${parentId}->${nodeId}`;
     if (!edgeSet.has(edgeId)) {
-      edges.push({
-        id: edgeId,
-        source: parentId,
-        target: nodeId,
-        type: "default",
-        style: { stroke: treeTokens.edgeStroke, strokeWidth: treeTokens.edgeStrokeWidth },
-      });
+      edges.push(makePatientTreeEdge(parentId, nodeId, edgeId));
       edgeSet.add(edgeId);
     }
   }

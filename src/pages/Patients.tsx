@@ -44,6 +44,10 @@ import {
 } from "../utils/patientTreeUtils";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
+import {
+  assignEdgeHandles,
+  applyRadialOverviewLayout,
+} from "../utils/flowLayoutUtils";
 import CreatePatientTreeDialog from "../components/patientDialogs/CreatePatientTreeDialog";
 
 type PatientsLocationState = {
@@ -450,8 +454,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
          * ────────────────────────────────────────────────── */
         const isOverviewMode = selectedRootId === null;
         const visited = new Set<string>();
-        const H_SPACING = 200;
-        const V_SPACING = 150;
         const nodesById = new Map<string, any>();
         const edges: Edge[] = [];
         const edgeSet = new Set<string>();
@@ -551,7 +553,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         });
 
         let finalNodes = Array.from(nodesById.values()).map((node) => {
-          // Get real patient ID from map
           const fallbackTreeId = treeIdMap.get(node.id) || truePatientId;
 
           return {
@@ -564,102 +565,27 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           };
         });
 
-        setNodes(finalNodes);
-        
-
-    
-        // ──────────────────────────────────────────────────
-        // 4) AFTER DFS completes, do a “re‐layout” pass so that no two children of the same parent overlap:
-        const childrenByParent = new Map<string, string[]>();
-         // Build a mapping: parentId → [ childId, childId, … ]
-         edges.forEach((edge) => {
-          const p = edge.source;
-          const c = edge.target;
-          if (!childrenByParent.has(p)) {
-            childrenByParent.set(p, []);
-          }
-          childrenByParent.get(p)!.push(c);
-        });        
-
-        const allFlowNodes = Array.from(nodesById.values())
-        // finalNodes: typeof allFlowNodes
-
         if (selectedRootId) {
-          // • DRILL MODE → top‐to‐bottom dagre layout
-          finalNodes = applyDagreLayout(allFlowNodes, edges)
+          finalNodes = applyDagreLayout(finalNodes, edges);
         } else {
-          // • OVERVIEW MODE → radial around the ‘Iran’ root
-          const center = { x: 400, y: 250 }
-          const R = 400
-        
-          // (a) figure out which node is the root
-          //     assume your first element in `roots` is the “Iran” node
-          const rootUniqueId = getUniqueCharId(roots[0])
-
-          // (b) position the root in the center
-          const rootNode = nodesById.get(rootUniqueId)
-          if (rootNode) {
-            rootNode.position = center
-
-            // (c) grab its immediate children
-            const firstRing = childrenByParent.get(rootUniqueId) || []
-
-            // (d) place them evenly around the circle
-            firstRing.forEach((childId, i) => {
-              const angle = (2 * Math.PI * i) / firstRing.length
-              const n = nodesById.get(childId)
-              if (!n) return
-              n.position = {
-                x: center.x + R * Math.cos(angle),
-                y: center.y + R * Math.sin(angle),
-              }
-            })
-          }
-
-          // (e) collect all
-          finalNodes = allFlowNodes
-        }
-          setNodes(finalNodes);
-          setEdges(edges);
-
-        if (selectedRootId) {
-          const depthMap = new Map<string, number>();
-          const assignDepth = (nodeId: string, depth: number) => {
-            if (depthMap.has(nodeId) && depthMap.get(nodeId)! <= depth) {
-              return;
-            }
-            depthMap.set(nodeId, depth);
-            const kids = childrenByParent.get(nodeId) || [];
-            for (const childId of kids) {
-              assignDepth(childId, depth + 1);
-            }
-          };
-
-          assignDepth(selectedRootId, 0);
-
-          const nodesByDepth = new Map<number, string[]>();
-          depthMap.forEach((depth, nodeId) => {
-            if (!nodesByDepth.has(depth)) {
-              nodesByDepth.set(depth, []);
-            }
-            nodesByDepth.get(depth)!.push(nodeId);
+          let offsetX = 360;
+          roots.forEach((rootNode: any) => {
+            const rootUniqueId = getUniqueCharId(rootNode);
+            const { nodes: laidOut, clusterRadius } = applyRadialOverviewLayout(
+              finalNodes,
+              edges,
+              rootUniqueId,
+              { x: offsetX, y: 320 },
+              200
+            );
+            finalNodes = laidOut;
+            offsetX += clusterRadius * 2 + 120;
           });
-
-          nodesByDepth.forEach((nodeIdsAtDepth, depth) => {
-            const offsetForCentering =
-              ((nodeIdsAtDepth.length - 1) / 2) * H_SPACING;
-            nodeIdsAtDepth.forEach((nodeId, idx) => {
-              const flowNode = nodesById.get(nodeId);
-              if (!flowNode) return;
-              flowNode.position = {
-                x: idx * H_SPACING - offsetForCentering,
-                y: depth * V_SPACING,
-              };
-            });
-          });
-
-          setNodes(Array.from(nodesById.values()));
         }
+
+        const routedEdges = assignEdgeHandles(finalNodes, edges);
+        setNodes(finalNodes);
+        setEdges(routedEdges);
       } catch (err) {
         console.error("Error drawing patients:", err);
         alert("Failed to draw patients.");
@@ -749,8 +675,9 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           nodeTypes={nodeTypes}
           proOptions={{ hideAttribution: true }}
           fitViewOptions={{
-            padding: 0.1,
+            padding: 0.2,
             includeHiddenNodes: false,
+            duration: 400,
           }}
           minZoom={0.1}
           maxZoom={2}
