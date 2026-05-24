@@ -598,20 +598,26 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <BackButton />
-      <Typography variant="h3" align="center" sx={{ mb: 4 }}>
-        Patient Map
-      </Typography>
-      {isOverview && overviewEmptyHint && (
-        <Box textAlign="center" sx={{ mb: 2 }}>
-          <Typography color="text.secondary" sx={{ mb: 2 }}>
-            {overviewEmptyHint}
-          </Typography>
-          <Button
-            variant="contained"
-            onClick={() => setCreatePatientDialogOpen(true)}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 2,
+          mb: overviewEmptyHint ? 2 : 4,
+        }}>
+        <Typography variant="h3">Patient Map</Typography>
+        {isOverview && (
+          <Button variant="contained" onClick={() => setCreatePatientDialogOpen(true)}>
             Create patient tree
           </Button>
-        </Box>
+        )}
+      </Box>
+      {isOverview && overviewEmptyHint && (
+        <Typography color="text.secondary" sx={{ mb: 4 }}>
+          {overviewEmptyHint}
+        </Typography>
       )}
       <CreatePatientTreeDialog
         open={createPatientDialogOpen}
