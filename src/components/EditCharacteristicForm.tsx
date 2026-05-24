@@ -44,7 +44,7 @@ const EditCharacteristicForm: React.FC<EditCharacteristicFormProps> = ({
   onCancel,
   onSave,
 }) => {
-  const { nodeId, patientId, currentCharId, currentType, currentName, currentRate, parentId } = editData;
+  const { nodeId, patientId, currentCharId, currentType, currentName, currentRate } = editData;
 
   // Local state for the dropdown and rate:
   const [selectedCharId, setSelectedCharId] = useState<string>(currentCharId);

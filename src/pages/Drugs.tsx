@@ -23,7 +23,7 @@ const Drugs: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState<string>("");
     const [searchTerm, setSearchTerm] = useState("");
-    const [errors, setErrors] = useState("");
+    const [, setErrors] = useState("");
 
 
     useEffect(() => {

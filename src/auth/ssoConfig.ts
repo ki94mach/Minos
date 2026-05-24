@@ -10,7 +10,7 @@ export function isProductionBuild(): boolean {
 }
 
 /** True when Minos login/register/password routes are available. */
-export function useMinosAuthPages(): boolean {
+export function isMinosAuthEnabled(): boolean {
   const flag = process.env.REACT_APP_USE_MINOS_AUTH?.trim().toLowerCase();
   if (flag === "true") return true;
   if (flag === "false") return false;

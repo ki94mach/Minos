@@ -15,10 +15,10 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { performLogout } from "../auth/logout";
-import { useMinosAuthPages } from "../auth/ssoConfig";
+import { isMinosAuthEnabled } from "../auth/ssoConfig";
 
 const Navbar: React.FC = () => {
-    const showMinosAuth = useMinosAuthPages();
+    const showMinosAuth = isMinosAuthEnabled();
     const [drawerOpen, setDrawerOpen] = useState(false);
 
     const toggleDrawer = (open: boolean) => () => {

@@ -22,8 +22,7 @@ import api from "../api";
 import BackButton from "../components/BackButton";
 import CustomNode from "../components/CustomNode";
 import Cookies from "js-cookie";
-import { useNavigate, useParams } from "react-router-dom";
-import { useLocation } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Decimal from "decimal.js";
 import { TreatmentOption } from "../components/TreatmentForm";
 import EditCharacteristicDialog from "../components/patientDialogs/EditCharacteristicDialog";
@@ -42,6 +41,11 @@ import {
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
 import { resolveDefaultRootCharacteristic } from "../config/defaultCharacteristic";
+
+type PatientsLocationState = {
+  treeId?: string;
+  color?: string;
+};
 
 /* -------------------------------------------------------------------------- */
 /*                                helpers                                     */
@@ -89,13 +93,9 @@ const Patients: React.FC = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  const [charTypes, setCharTypes] = useState<string[]>([]);
-  const [charNames, setCharNames] = useState<string[]>([]);
   const [allCharacteristics, setAllCharacteristics] = useState<
     { _id: string; type: string; name: string }[]
   >([]);
-  const [selectedCharType, setSelectedCharType] = useState<string>("");
-  const [selectedCharName, setSelectedCharName] = useState<string>("");
 
   const [debouncedNodes, setDebouncedNodes] = useState<any[]>([]);
   const [debouncedEdges, setDebouncedEdges] = useState<any[]>([]);
@@ -103,7 +103,6 @@ const Patients: React.FC = () => {
   const [editCharModalData, setEditCharModalData] = useState<EditCharModalData | null>(null);
   const [allTreatments, setAllTreatments] = useState<TreatmentOption[]>([]);
   const [editTreatModalData, setEditTreatModalData] = useState<EditTreatModalData|null>(null);
-  const [rawPatients, setRawPatients] = useState<any[]>([]);
   const [defaultRootCharName, setDefaultRootCharName] = useState<string | null>(
     null
   );
@@ -135,10 +134,10 @@ const [isChoosingType, setIsChoosingType] = useState(false);
 const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" | "followup" | null >(null);
 
   const location = useLocation();
-  const patientId = location.state?.treeId || "";
-  const patientTreeId = location.state?.treeId as string; 
-  
-  const mapColor = location.state?.color || "#ffffff"; // default to white
+  const navState = (location.state ?? {}) as PatientsLocationState;
+  const patientTreeId = navState.treeId as string;
+
+  const mapColor = navState.color || "#ffffff"; // default to white
 
   const parentNode = nodes.find(n => n.id === addingParentId);
   const parentType = parentNode?.data.type; // e.g. "characteristic" | "treatment" | "followup"
@@ -198,7 +197,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             parentId: existingParentId,
           });
         } else if (n.data.type === "treatment") {
-          const treatData = foundNode.treatment_data || {};
           const existingRate = foundNode.rate ?? 0;
           const realNodeId = foundNode._id?.$oid || foundNode._id;
           const realPatientId = patientDoc._id?.$oid || patientDoc._id;
@@ -323,6 +321,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
   useEffect(() => {
        drawPatientNodes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload graph when route root changes
     }, [selectedRootId]);
 
   useEffect(() => {
@@ -332,11 +331,9 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
   useEffect(() => {
     api.get(API_ENDPOINTS.PATIENTS)
-      .then((r) => {
-        setRawPatients(asApiList(r.data));
-        drawPatientNodes();
-      })
+      .then(() => drawPatientNodes())
       .catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial patient graph load
   }, [selectedRootId]);
     
   
@@ -391,12 +388,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       const fetchCharacteristics = async () => {
         try {
           const { data } = await api.get(API_ENDPOINTS.CHARACTERISTICS);
-          const parsed = asApiList<any>(data);
-
-          setAllCharacteristics(parsed);
-          const uniqueTypes = Array.from(new Set<string>(parsed.map((char: any) => char.type)));
-          setCharTypes(uniqueTypes);
-          if (uniqueTypes.length > 0) setSelectedCharType(uniqueTypes[0]);
+          setAllCharacteristics(asApiList<any>(data));
         } catch (err) {
           console.error("Error fetching characteristics:", err);
         }
@@ -405,18 +397,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       fetchPatients();
       fetchCharacteristics();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- overview list fetch when not drilled in
   }, [selectedRootId]);
-  
-
-  // update names list when the type changes
-  useEffect(() => {
-    if (!selectedCharType) return;
-    const filteredNames = allCharacteristics
-      .filter((c) => c.type === selectedCharType)
-      .map((c) => c.name);
-    setCharNames(filteredNames);
-    setSelectedCharName("");
-  }, [selectedCharType, allCharacteristics]);
 
   /* --------------------- react‑flow edge connect -------------------------- */
   const onConnect = useCallback(
@@ -464,7 +446,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         //       .filter((n: any) => n != null)
         //   : parsedPatients.map((p: any) => p.tree);
 
-        const drillTreeId = location.state?.treeId as string | undefined;
+        const drillTreeId = navState.treeId as string | undefined;
 
         let roots: any[] = [];
         let truePatientId: string | undefined;
@@ -630,7 +612,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
     
         // ──────────────────────────────────────────────────
         // 4) AFTER DFS completes, do a “re‐layout” pass so that no two children of the same parent overlap:
-        const R = 120; // radius (in px) for drawing children around parent
         const childrenByParent = new Map<string, string[]>();
          // Build a mapping: parentId → [ childId, childId, … ]
          edges.forEach((edge) => {

@@ -2,7 +2,7 @@ import api from "../api";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { clearAccessToken } from "./accessToken";
 import { resetAuthRedirectFlag } from "./unauthorized";
-import { redirectToSsoLogout, useMinosAuthPages } from "./ssoConfig";
+import { redirectToSsoLogout, isMinosAuthEnabled } from "./ssoConfig";
 
 /**
  * End session (F8).
@@ -13,7 +13,7 @@ export async function performLogout(): Promise<void> {
   clearAccessToken();
   resetAuthRedirectFlag();
 
-  if (!useMinosAuthPages()) {
+  if (!isMinosAuthEnabled()) {
     redirectToSsoLogout();
     return;
   }

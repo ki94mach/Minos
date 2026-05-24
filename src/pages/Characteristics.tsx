@@ -16,7 +16,7 @@ interface Characteristic {
 const Characteristics: React.FC = () => {
     const [type, setType] = useState("");
     const [name, setName] = useState("");
-    const [characteristics, setCharacteristics] = useState([]);
+    const [characteristics, setCharacteristics] = useState<Characteristic[]>([]);
     const [editingId, setEditingId] = useState("");
     const [errors, setErrors] = useState("");
     const [searchTerm, setSearchTerm] = useState("");

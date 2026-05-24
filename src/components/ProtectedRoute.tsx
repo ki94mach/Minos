@@ -5,7 +5,7 @@ import { verifyApiAuth } from "../auth/session";
 import {
   getSsoLoginUrl,
   redirectToSsoLogin,
-  useMinosAuthPages,
+  isMinosAuthEnabled,
 } from "../auth/ssoConfig";
 
 type AuthState = "loading" | "authenticated" | "unauthenticated";
@@ -20,7 +20,7 @@ type ProtectedRouteProps = {
  * - SSO prod: redirect to REACT_APP_SSO_LOGIN_URL
  */
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const useMinosAuth = useMinosAuthPages();
+  const minosAuth = isMinosAuthEnabled();
   const [authState, setAuthState] = useState<AuthState>("loading");
 
   useEffect(() => {
@@ -39,10 +39,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (authState === "unauthenticated" && !useMinosAuth) {
+    if (authState === "unauthenticated" && !minosAuth) {
       redirectToSsoLogin();
     }
-  }, [authState, useMinosAuth]);
+  }, [authState, minosAuth]);
 
   if (authState === "loading") {
     return (
@@ -63,7 +63,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   if (authState === "unauthenticated") {
-    if (useMinosAuth) {
+    if (minosAuth) {
       return <Navigate to="/auth/login" replace />;
     }
 

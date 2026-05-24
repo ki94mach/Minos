@@ -58,7 +58,6 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
   const [selectedId, setSelectedId] = useState(initial?._id || "");
   const [rate, setRate] = useState<number>(initial?.rate ?? 1);
   const [busy, setBusy] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
 
   // Fetch available characteristics for dropdown
   useEffect(() => {

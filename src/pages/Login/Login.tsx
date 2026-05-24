@@ -1,5 +1,4 @@
 import React, { useEffect , useState } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { TextField, Button, Typography, Box, Link } from "@mui/material";
 import Cookies from "js-cookie";
@@ -11,8 +10,6 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState(""); 
-  const [csrfToken, setCsrfToken] = useState("");
-
   useEffect(() => {
     api
       .get(API_ENDPOINTS.LOGIN, {
@@ -25,9 +22,7 @@ const Login: React.FC = () => {
           /<input[^>]*name="csrf_token"[^>]*value="([^"]+)"[^>]*>/
         );
         if (match && match[1]) {
-          const token = match[1];
-          setCsrfToken(token);
-          Cookies.set("csrf_token", token); 
+          Cookies.set("csrf_token", match[1]); 
         } else {
           console.error("CSRF token not found in response HTML.");
         }
@@ -47,7 +42,7 @@ const Login: React.FC = () => {
   
 
     try {
-      const response = await api.post(
+      await api.post(
         API_ENDPOINTS.LOGIN,
         { email, password, csrf_token: fresh  },
         {

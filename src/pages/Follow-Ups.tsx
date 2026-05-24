@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from "react";
-import { TextField, Button, Typography, Container, Card, CardContent, Select, MenuItem, FormControl, InputLabel, Box, Grid, TableContainer, TableCell, Table, TableHead, TableRow, TableBody, Paper } from "@mui/material";
+import { TextField, Button, Typography, Container, Card, CardContent, Grid, TableContainer, TableCell, Table, TableHead, TableRow, TableBody, Paper } from "@mui/material";
 import api from "../api";
 import BackButton from "../components/BackButton";
 import { API_ENDPOINTS } from "../api/endpoints";
@@ -27,7 +27,7 @@ const FollowUps: React.FC = () => {
     const handleCreateFollowup = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const response = await api.post(API_ENDPOINTS.FOLLOWUPS, {
+            await api.post(API_ENDPOINTS.FOLLOWUPS, {
               name,
               overall_survival: parseFloat(overallSurvival),
               patient_id: patientId,

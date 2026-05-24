@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { Stack, TextField, Button } from "@mui/material";
 import api from "../api";
 import Cookies from "js-cookie";
@@ -20,8 +20,6 @@ export default function FollowupForm({
   const [name, setName] = useState(`Follow Up: ${nodeName}`);
   const [overallSurvival, setOverallSurvival] = useState(0.5);
   const [busy, setBusy] = useState(false);
-
-  const size = useMemo(() => Math.round(parentSize * overallSurvival), [parentSize, overallSurvival]);
 
   function authHeaders() {
     const csrf = Cookies.get("csrf_token") ?? "";

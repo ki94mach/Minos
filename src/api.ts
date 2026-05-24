@@ -2,11 +2,11 @@ import axios, { type AxiosInstance } from "axios";
 import Cookies from "js-cookie";
 import { getAccessToken } from "./auth/accessToken";
 import { handleUnauthorizedApi } from "./auth/unauthorized";
-import { useMinosAuthPages } from "./auth/ssoConfig";
+import { isMinosAuthEnabled } from "./auth/ssoConfig";
 import { API_BASE_URL } from "./api/config";
 
 function createApiClient(): AxiosInstance {
-  const minosAuth = useMinosAuthPages();
+  const minosAuth = isMinosAuthEnabled();
 
   const client = axios.create({
     baseURL: API_BASE_URL,

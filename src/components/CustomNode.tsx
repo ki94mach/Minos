@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Handle, Position, useReactFlow, NodeProps } from "reactflow";
-import { useNavigate } from "react-router-dom";
 import { Tooltip } from "@mui/material";
 
 const CustomNode = (
@@ -10,7 +9,6 @@ const CustomNode = (
 ) => {
   const { id, data: nodeData, onContextMenu } = props;
   const [label, setLabel] = useState(nodeData.label);
-  const navigate = useNavigate();
   const { setNodes } = useReactFlow();
   const [isEditing, setIsEditing] = useState(false);
 
@@ -75,7 +73,7 @@ const CustomNode = (
     setTimeout(() => {
       fitView();
     }, 300);
-  }, [isOverviewMode]);
+  }, [isOverviewMode, fitView]);
   
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { clearAccessToken } from "./accessToken";
-import { redirectToSsoLogin, useMinosAuthPages } from "./ssoConfig";
+import { redirectToSsoLogin, isMinosAuthEnabled } from "./ssoConfig";
 
 let redirectInProgress = false;
 
@@ -16,7 +16,7 @@ export function handleUnauthorizedApi(): void {
     return;
   }
 
-  if (useMinosAuthPages()) {
+  if (isMinosAuthEnabled()) {
     if (window.location.pathname.startsWith("/auth/")) {
       return;
     }

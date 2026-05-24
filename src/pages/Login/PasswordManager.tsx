@@ -35,7 +35,7 @@ const PasswordManager: React.FC = () => {
     } else {
       setMode("forgot"); // default
     }
-  }, [token]);
+  }, [token, isResetMode]);
 
   const getCSRF = async () => {
     let url = "";

@@ -33,7 +33,6 @@ export function buildFlowNodes(
     nodesById,
     edges,
     hashColor,
-    getUniqueCharId,
     treeIdMap,
     navigate,
     depthLimit,
@@ -107,7 +106,6 @@ export function buildFlowNodes(
     return;
   }
 
-  const isRoot = parentId == null;
   let rawSize: Decimal;
   if (depth === 0 && selectedRootId) {
     rawSize = parentSize;

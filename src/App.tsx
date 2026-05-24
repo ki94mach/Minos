@@ -13,7 +13,7 @@ import SsoRedirect from "./components/SsoRedirect";
 import Login from "./pages/Login/Login";
 import Register from "./pages/Login/Register";
 import PasswordManager from "./pages/Login/PasswordManager";
-import { useMinosAuthPages } from "./auth/ssoConfig";
+import { isMinosAuthEnabled } from "./auth/ssoConfig";
 
 const minosAuthRoutes = [
   "/auth/login",
@@ -24,7 +24,7 @@ const minosAuthRoutes = [
 ];
 
 const RootRedirect: React.FC = () => {
-  if (useMinosAuthPages()) {
+  if (isMinosAuthEnabled()) {
     return <Navigate to="/auth/login" replace />;
   }
   return <Navigate to="/home" replace />;
@@ -32,7 +32,7 @@ const RootRedirect: React.FC = () => {
 
 const App: React.FC = () => {
   const location = useLocation();
-  const showMinosAuth = useMinosAuthPages();
+  const showMinosAuth = isMinosAuthEnabled();
   const shouldHideNavbar =
     showMinosAuth && minosAuthRoutes.includes(location.pathname);
 

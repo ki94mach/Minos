@@ -4,12 +4,12 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import api from "./api";
 import { captureAccessTokenFromUrl } from "./auth/accessToken";
-import { useMinosAuthPages } from "./auth/ssoConfig";
+import { isMinosAuthEnabled } from "./auth/ssoConfig";
 import "./styles/index.css";
 
 captureAccessTokenFromUrl();
 
-if (useMinosAuthPages()) {
+if (isMinosAuthEnabled()) {
   (async function bootstrapCsrf() {
     try {
       await api.get("/auth/csrf-token");
