@@ -498,6 +498,84 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
         str((treat_child_sync or {}).get("treatment_data")),
     )
 
+    treatment_node_id = str(treat_child_sync["_id"])
+    followup_os = 0.5
+    followup_name = catalog_name(f"{PREFIX}-Followup")
+    code, fu_master = request(
+        "POST",
+        "/api/followups",
+        {
+            "name": followup_name,
+            "overall_survival": followup_os,
+            "patient_id": patient_id,
+            "parent_id": treatment_node_id,
+        },
+    )
+    ok("create followup master for delete guard", code == 201, str(fu_master))
+    followup_master_id = (fu_master or {}).get("id") if isinstance(fu_master, dict) else None
+    ok("followup master id", bool(followup_master_id))
+
+    treat_size = float(treat_child_sync.get("size") or 250.0)
+    code, _ = request(
+        "POST",
+        f"/api/patients/{patient_id}/add_node",
+        {
+            "parent_node_id": treatment_node_id,
+            "node": {
+                "node_type": "followup",
+                "rate": followup_os,
+                "size": round(treat_size * followup_os),
+                "followup_data": {
+                    "_id": followup_master_id,
+                    "overall_survival": followup_os,
+                },
+            },
+        },
+    )
+    ok("add followup node under treatment", code == 200, str(_))
+
+    code, del_treat_blocked = request(
+        "DELETE",
+        f"/api/patients/{patient_id}/node/{treatment_node_id}",
+    )
+    ok(
+        "DELETE treatment blocked when followups would orphan",
+        code == 400,
+        str(del_treat_blocked),
+    )
+    ok(
+        "DELETE treatment followup parent error",
+        isinstance(del_treat_blocked, dict)
+        and "follow-up" in (del_treat_blocked.get("error") or "").lower()
+        and "treatment" in (del_treat_blocked.get("error") or "").lower(),
+        str(del_treat_blocked),
+    )
+
+    code, patients_after_blocked_del = request("GET", "/api/patients")
+    ok("GET patients after blocked treatment delete", code == 200)
+    patient_after_blocked = next(
+        (
+            p
+            for p in (patients_after_blocked_del or [])
+            if str(p.get("_id")) == str(patient_id)
+        ),
+        None,
+    )
+    treat_still = next(
+        (
+            c
+            for c in ((patient_after_blocked or {}).get("tree") or {}).get("children", [])
+            if c.get("node_type") == "treatment"
+        ),
+        None,
+    )
+    ok(
+        "treatment node still present after blocked delete",
+        treat_still is not None
+        and str(treat_still.get("_id")) == treatment_node_id,
+        str((patient_after_blocked or {}).get("tree")),
+    )
+
     code, treatments_after_sync = request("GET", "/api/treatments")
     master_after = next(
         (

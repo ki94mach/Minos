@@ -306,6 +306,26 @@ def validate_regimen_consistency(
         if not isinstance(apc, int) or apc <= 0:
             raise ValueError("annual_patient_con must be a positive integer")
 
+FOLLOWUP_PARENT_ERROR = (
+    "Follow-up nodes must be under a treatment node"
+)
+
+
+def validate_followup_treatment_parentage(root) -> None:
+    """
+    Ensure every followup node is a direct child of a treatment node.
+    Raises ValueError with FOLLOWUP_PARENT_ERROR when the rule is violated.
+    """
+    def walk(parent):
+        for child in getattr(parent, "children", []) or []:
+            if getattr(child, "node_type", None) == "followup":
+                if getattr(parent, "node_type", None) != "treatment":
+                    raise ValueError(FOLLOWUP_PARENT_ERROR)
+            walk(child)
+
+    walk(root)
+
+
 def find_node(node, target_id):
     """
     Recursively find a node with the given target_id in the tree.

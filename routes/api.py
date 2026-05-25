@@ -30,7 +30,7 @@ from utils.serialize import serialize_documents
 from utils.api_errors import error_response
 from utils.utils import Utils
 
-from utils.business_rules import find_node
+from utils.business_rules import find_node, validate_followup_treatment_parentage
 from utils.catalog_references import (
     find_characteristic_refs,
     find_drug_refs,
@@ -931,13 +931,11 @@ def add_node(validated_data, patient_id):
             parent_node = find_node(patient_tree.tree, str(parent_node_id))
             if not parent_node:
                 return error_response('Parent node not found', 404)
-            if new_node.node_type == 'followup' and parent_node.node_type != 'treatment':
-                return error_response(
-                    'Follow-up nodes must be added under a treatment node', 400
-                )
             parent_node.children.append(new_node)
         else:
             patient_tree.tree.children.append(new_node)
+
+        validate_followup_treatment_parentage(patient_tree.tree)
 
         patient_tree.tree_hash = Utils.compute_tree_hash(patient_tree.tree)
         def fix_tree_node(node):
@@ -1178,6 +1176,9 @@ def delete_node(patient_id, node_id):
         removed = remove_node(patient_tree.tree, node_id)
         if not removed:
             return error_response('Node not found in patient tree', 404)
+
+        validate_followup_treatment_parentage(patient_tree.tree)
+
         patient_tree.tree_hash = Utils.compute_tree_hash(patient_tree.tree)
 
         # Replace the entire document using full document replacement.
@@ -1187,6 +1188,9 @@ def delete_node(patient_id, node_id):
 
         return jsonify({'message': 'Node deleted successfully', 'tree_hash': patient_tree.tree_hash}), 200
 
+    except ValueError as ve:
+        logging.error(f"Validation error deleting node: {ve}")
+        return error_response(str(ve), 400)
     except Exception as e:
         logging.error(f"Error deleting node: {e}")
         return error_response("An unexpected error occurred while deleting the node.", 500)
