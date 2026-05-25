@@ -276,7 +276,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   }
  
 
-  /* ───────────── remove one node + its edges ───────────── */
+  /* ───────────── delete node (splice children to parent) or whole tree at root ───────────── */
   async function deleteNode(nodeId: string) {
     const node = nodes.find((n: any) => n.id === nodeId);
     if (!node) return;
@@ -292,7 +292,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
     const confirmMsg = isTreeRoot
       ? "Delete this entire patient tree? You can create a new one afterward."
-      : "Delete this node?";
+      : "Delete this node? Its child nodes will be moved to the parent. This does not remove child nodes or their branches.";
     if (!window.confirm(confirmMsg)) return;
 
     try {
