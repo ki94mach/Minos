@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Dev-path API smoke tests (no SSO) — maps to MVP T3–T6, T9–T11, partial T12,
-plus catalog reference endpoints (doc/CATALOG_SYNC.md).
+patient tree delete/splice coverage, plus catalog reference endpoints (doc/CATALOG_SYNC.md).
 
 Requires API running with AUTH_DISABLED=true (see doc/DEV_SMOKE.md).
 
@@ -80,6 +80,73 @@ def ok(name: str, cond: bool, detail: str = "") -> None:
         print(f"  OK  {name}")
     else:
         raise SmokeFailure(f"{name} failed{': ' + detail if detail else ''}")
+
+
+def _patient_row(patient_id: str) -> Optional[dict]:
+    code, patients = request("GET", "/api/patients")
+    if code != 200:
+        return None
+    return next(
+        (p for p in (patients or []) if str(p.get("_id")) == str(patient_id)),
+        None,
+    )
+
+
+def _find_tree_node(node: Any, node_id: str) -> Optional[dict]:
+    if not isinstance(node, dict):
+        return None
+    if str(node.get("_id")) == str(node_id):
+        return node
+    for child in node.get("children") or []:
+        found = _find_tree_node(child, node_id)
+        if found is not None:
+            return found
+    return None
+
+
+def _add_characteristic_child(
+    patient_id: str,
+    parent_node_id: str,
+    char_id: str,
+    char_name: str,
+    *,
+    rate: float,
+    size: float,
+) -> str:
+    code, body = request(
+        "POST",
+        f"/api/patients/{patient_id}/add_node",
+        {
+            "parent_node_id": parent_node_id,
+            "node": {
+                "node_type": "characteristic",
+                "rate": rate,
+                "size": size,
+                "characteristic_data": {
+                    "_id": char_id,
+                    "char_type": "Population",
+                    "name": char_name,
+                },
+            },
+        },
+    )
+    if code != 200:
+        raise SmokeFailure(
+            f"add characteristic child under {parent_node_id} failed: HTTP {code} {body!r}"
+        )
+    row = _patient_row(patient_id)
+    parent = _find_tree_node((row or {}).get("tree") or {}, parent_node_id)
+    if parent is None:
+        raise SmokeFailure(f"parent node {parent_node_id} missing after add_node")
+    for child in parent.get("children") or []:
+        if (
+            child.get("node_type") == "characteristic"
+            and float(child.get("rate", -1)) == rate
+        ):
+            return str(child["_id"])
+    raise SmokeFailure(
+        f"new characteristic child (rate={rate}) not found under {parent_node_id}"
+    )
 
 
 @dataclass
@@ -330,6 +397,7 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
     root_id = str(match["tree"]["_id"]) if match else None
     ok("T8 root node id", bool(root_id))
 
+    # Root delete: whole tree only via DELETE /api/patients/<id> (ADMIN), not node DELETE on root id.
     code, del_root_via_node = request(
         "DELETE",
         f"/api/patients/{patient_id}/node/{root_id}",
@@ -344,6 +412,16 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
         isinstance(del_root_via_node, dict)
         and "DELETE /api/patients" in (del_root_via_node.get("error") or ""),
         str(del_root_via_node),
+    )
+    code, patients_after_root_reject = request("GET", "/api/patients")
+    ok("patient still exists after rejected root node DELETE", code == 200)
+    ok(
+        "patient row unchanged after rejected root node DELETE",
+        any(
+            str(p.get("_id")) == str(patient_id)
+            for p in (patients_after_root_reject or [])
+        ),
+        str(patients_after_root_reject),
     )
 
     treatment_id = None
@@ -550,6 +628,7 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
     )
     ok("add followup node under treatment", code == 200, str(_))
 
+    # Delete treatment with follow-up child: invariant validation → 400, tree unchanged.
     code, del_treat_blocked = request(
         "DELETE",
         f"/api/patients/{patient_id}/node/{treatment_node_id}",
@@ -675,12 +754,70 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
     )
     ok("T10 update node", code == 200, str(upd))
 
-    # T11 — delete child node (splice children)
+    # T11 — delete leaf node (splice: no children to promote)
     code, del_resp = request(
         "DELETE",
         f"/api/patients/{patient_id}/node/{child_id}",
     )
-    ok("T11 delete node", code == 200, str(del_resp))
+    ok("T11 delete leaf node", code == 200, str(del_resp))
+    row_after_leaf = _patient_row(patient_id)
+    ok(
+        "T11 leaf removed from tree",
+        _find_tree_node((row_after_leaf or {}).get("tree") or {}, child_id) is None,
+        str((row_after_leaf or {}).get("tree")),
+    )
+
+    # Delete mid node with grandchildren: deep subtree stays nested under promoted child.
+    splice_mid_id = _add_characteristic_child(
+        patient_id, root_id, char_id, renamed, rate=0.11, size=110.0
+    )
+    splice_deep_id = _add_characteristic_child(
+        patient_id, splice_mid_id, char_id, renamed, rate=0.12, size=120.0
+    )
+    splice_leaf_id = _add_characteristic_child(
+        patient_id, splice_deep_id, char_id, renamed, rate=0.13, size=130.0
+    )
+    code, del_mid = request(
+        "DELETE",
+        f"/api/patients/{patient_id}/node/{splice_mid_id}",
+    )
+    ok("delete mid node splices grandchildren", code == 200, str(del_mid))
+    row_after_splice = _patient_row(patient_id)
+    tree_after_splice = (row_after_splice or {}).get("tree") or {}
+    ok(
+        "splice mid node removed",
+        _find_tree_node(tree_after_splice, splice_mid_id) is None,
+        str(tree_after_splice),
+    )
+    deep_after = _find_tree_node(tree_after_splice, splice_deep_id)
+    ok("splice deep node promoted under root", deep_after is not None)
+    root_child_ids = [
+        str(c.get("_id"))
+        for c in (tree_after_splice.get("children") or [])
+    ]
+    ok(
+        "splice deep is direct child of root",
+        splice_deep_id in root_child_ids,
+        str(root_child_ids),
+    )
+    ok(
+        "splice leaf still nested under deep",
+        _find_tree_node(deep_after or {}, splice_leaf_id) is not None,
+        str(deep_after),
+    )
+
+    unknown_node_id = "507f1f77bcf86cd799439099"
+    code, del_missing = request(
+        "DELETE",
+        f"/api/patients/{patient_id}/node/{unknown_node_id}",
+    )
+    ok("DELETE unknown node returns 404", code == 404, str(del_missing))
+    ok(
+        "DELETE unknown node error message",
+        isinstance(del_missing, dict)
+        and "not found" in (del_missing.get("error") or "").lower(),
+        str(del_missing),
+    )
 
     # DELETE blocked while referenced (409)
     code, del_char = request("DELETE", f"/api/characteristics/{char_id}")
@@ -712,6 +849,21 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
             and del_treat.get("references", {}).get("nodes", 0) >= 1,
             str(del_treat),
         )
+
+    # Root delete: DELETE /api/patients/<id> removes the whole tree (ADMIN).
+    code, del_patient = request("DELETE", f"/api/patients/{patient_id}")
+    ok("DELETE patient removes whole tree", code == 200, str(del_patient))
+    code, patients_gone = request("GET", "/api/patients")
+    ok("GET patients after whole-tree DELETE", code == 200)
+    ok(
+        "patient absent after DELETE /api/patients/<id>",
+        not any(
+            str(p.get("_id")) == str(patient_id) for p in (patients_gone or [])
+        ),
+        str(patients_gone),
+    )
+    if str(patient_id) in resources.patient_ids:
+        resources.patient_ids.remove(str(patient_id))
 
     print("\nAll dev API smoke checks passed.")
 
