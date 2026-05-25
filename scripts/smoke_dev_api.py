@@ -330,6 +330,22 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
     root_id = str(match["tree"]["_id"]) if match else None
     ok("T8 root node id", bool(root_id))
 
+    code, del_root_via_node = request(
+        "DELETE",
+        f"/api/patients/{patient_id}/node/{root_id}",
+    )
+    ok(
+        "DELETE root via node endpoint rejected",
+        code == 400,
+        str(del_root_via_node),
+    )
+    ok(
+        "DELETE root via node points to patient DELETE",
+        isinstance(del_root_via_node, dict)
+        and "DELETE /api/patients" in (del_root_via_node.get("error") or ""),
+        str(del_root_via_node),
+    )
+
     treatment_id = None
     drug_regimen = {
         "drugs": [

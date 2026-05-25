@@ -1127,9 +1127,11 @@ def delete_patient(patient_id):
 @sso_required
 def delete_node(patient_id, node_id):
     """
-    Deletes a single node from the PatientTree without discarding its children.
+    Deletes a single non-root node from the PatientTree without discarding its children.
     The children of the deleted node are spliced into the parent's children list,
     and their parent_id fields are updated accordingly.
+
+    To delete an entire patient tree, use DELETE /api/patients/<patient_id> (ADMIN).
 
     Expected URL parameters:
       - patient_id: The PatientTree document's id.
@@ -1137,10 +1139,10 @@ def delete_node(patient_id, node_id):
 
     This endpoint:
       1. Fetches the PatientTree document.
-      2. Recursively finds and removes the node with _id equal to node_id,
+      2. Rejects node_id equal to the embedded tree root (400).
+      3. Recursively finds and removes the node with _id equal to node_id,
          splicing its children into the parent's children list and updating their parent_id.
-      3. Recomputes the tree_hash based on the updated tree.
-      4. Replaces the entire PatientTree document in the database.
+      4. Validates follow-up parentage, recomputes tree_hash, and persists.
     """
     try:
         # Fetch the PatientTree document.
@@ -1167,10 +1169,12 @@ def delete_node(patient_id, node_id):
             node.children = new_children
             return removed
 
-        # Deleting the embedded root removes the entire patient tree document.
         if str(patient_tree.tree._id) == str(node_id):
-            PatientDriver.delete(patient_id)
-            return jsonify({'message': 'Patient tree deleted'}), 200
+            return error_response(
+                'Cannot delete the patient tree root via this endpoint; '
+                'use DELETE /api/patients/<patient_id> instead.',
+                400,
+            )
 
         # Remove the target node from the tree starting at the root.
         removed = remove_node(patient_tree.tree, node_id)
