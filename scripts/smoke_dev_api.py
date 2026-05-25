@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Dev-path API smoke tests (no SSO) — maps to MVP T3–T6, T9–T11, partial T12,
-patient tree delete/splice coverage, plus catalog reference endpoints (doc/CATALOG_SYNC.md).
+patient tree delete/splice and follow-up parentage guards (PUT/DELETE), plus catalog
+reference endpoints (doc/CATALOG_SYNC.md).
 
 Requires API running with AUTH_DISABLED=true (see doc/DEV_SMOKE.md).
 
@@ -627,6 +628,74 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
         },
     )
     ok("add followup node under treatment", code == 200, str(_))
+
+    row_with_fu = _patient_row(patient_id)
+    treat_before_put = _find_tree_node(
+        (row_with_fu or {}).get("tree") or {}, treatment_node_id
+    )
+    fu_under_treat = next(
+        (
+            c
+            for c in (treat_before_put or {}).get("children") or []
+            if c.get("node_type") == "followup"
+        ),
+        None,
+    )
+    ok("followup nested under treatment before PUT guard", fu_under_treat is not None)
+    followup_node_id = str(fu_under_treat["_id"])
+
+    # PUT root children with follow-up directly under characteristic → 400, tree unchanged.
+    code, upd_fu_blocked = request(
+        "PUT",
+        f"/api/patients/{patient_id}/node/{root_id}",
+        {
+            "children": [
+                {
+                    "_id": followup_node_id,
+                    "node_type": "followup",
+                    "rate": followup_os,
+                    "size": round(treat_size * followup_os),
+                    "parent_id": root_id,
+                    "followup_data": {
+                        "_id": followup_master_id,
+                        "overall_survival": followup_os,
+                    },
+                    "children": [],
+                }
+            ],
+        },
+    )
+    ok(
+        "PUT root children blocked when followup not under treatment",
+        code == 400,
+        str(upd_fu_blocked),
+    )
+    ok(
+        "PUT root followup parent error",
+        isinstance(upd_fu_blocked, dict)
+        and "follow-up" in (upd_fu_blocked.get("error") or "").lower()
+        and "treatment" in (upd_fu_blocked.get("error") or "").lower(),
+        str(upd_fu_blocked),
+    )
+
+    row_after_put_block = _patient_row(patient_id)
+    treat_after_put = _find_tree_node(
+        (row_after_put_block or {}).get("tree") or {}, treatment_node_id
+    )
+    fu_still_under_treat = next(
+        (
+            c
+            for c in (treat_after_put or {}).get("children") or []
+            if c.get("node_type") == "followup"
+        ),
+        None,
+    )
+    ok(
+        "followup still under treatment after blocked PUT",
+        fu_still_under_treat is not None
+        and str(fu_still_under_treat.get("_id")) == followup_node_id,
+        str((treat_after_put or {}).get("children")),
+    )
 
     # Delete treatment with follow-up child: invariant validation → 400, tree unchanged.
     code, del_treat_blocked = request(
