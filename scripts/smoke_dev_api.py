@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """
 Dev-path API smoke tests (no SSO) — maps to MVP T3–T6, T9–T11, partial T12,
-plus catalog reference endpoints (docs/CATALOG_SYNC.md).
+plus catalog reference endpoints (doc/CATALOG_SYNC.md).
 
-Requires API running with AUTH_DISABLED=true (see docs/DEV_SMOKE.md).
+Requires API running with AUTH_DISABLED=true (see doc/DEV_SMOKE.md).
 
 Usage:
   python scripts/smoke_dev_api.py
   SMOKE_API_URL=http://127.0.0.1:5000 python scripts/smoke_dev_api.py
+
+Cleanup:
+  Resources created during the run are deleted in a finally block (even on failure).
+  On start, removes leftover rows whose catalog names start with "Smoke-" (smoke runs).
+  Set SMOKE_PURGE_ORPHANS=false to skip orphan purge. DELETE requires ADMIN (default
+  with AUTH_DISABLED via DEV_MOCK_ROLE).
 """
 from __future__ import annotations
 
@@ -17,10 +23,25 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Optional
+
+# Project root on path so we share API name normalization with validators.
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from utils.business_rules import to_title_format as catalog_name
 
 BASE = os.environ.get("SMOKE_API_URL", "http://localhost:5000").rstrip("/")
 PREFIX = f"smoke-{int(time.time())}"
+SMOKE_NAME_PREFIX = catalog_name("smoke-")  # "Smoke-"
+PURGE_ORPHANS = os.environ.get("SMOKE_PURGE_ORPHANS", "true").lower() not in (
+    "0",
+    "false",
+    "no",
+)
 
 
 class SmokeFailure(Exception):
@@ -61,8 +82,118 @@ def ok(name: str, cond: bool, detail: str = "") -> None:
         raise SmokeFailure(f"{name} failed{': ' + detail if detail else ''}")
 
 
-def main() -> int:
-    print(f"Dev API smoke against {BASE}\n")
+@dataclass
+class SmokeRunResources:
+    characteristic_ids: list[str] = field(default_factory=list)
+    drug_ids: list[str] = field(default_factory=list)
+    treatment_ids: list[str] = field(default_factory=list)
+    patient_ids: list[str] = field(default_factory=list)
+
+
+def is_smoke_catalog_name(name: Any) -> bool:
+    return isinstance(name, str) and name.startswith(SMOKE_NAME_PREFIX)
+
+
+def tree_has_smoke_catalog_name(node: Any) -> bool:
+    if not isinstance(node, dict):
+        return False
+    char_data = node.get("characteristic_data") or {}
+    if is_smoke_catalog_name(char_data.get("name")):
+        return True
+    treat_data = node.get("treatment_data") or {}
+    if is_smoke_catalog_name(treat_data.get("name")):
+        return True
+    for child in node.get("children") or []:
+        if tree_has_smoke_catalog_name(child):
+            return True
+    return False
+
+
+def _cleanup_warn(label: str, resource_id: str, code: int, body: Any) -> None:
+    if code == 200:
+        print(f"  OK  cleanup {label} {resource_id}")
+        return
+    print(
+        f"  WARN cleanup {label} {resource_id}: HTTP {code} {body!r}",
+        file=sys.stderr,
+    )
+
+
+def cleanup_smoke_resources(resources: SmokeRunResources) -> None:
+    """Best-effort delete of resources created during this run (order matters)."""
+    if not any(
+        (
+            resources.patient_ids,
+            resources.treatment_ids,
+            resources.drug_ids,
+            resources.characteristic_ids,
+        )
+    ):
+        return
+    print("\nCleaning up smoke resources...")
+    for patient_id in resources.patient_ids:
+        code, body = request("DELETE", f"/api/patients/{patient_id}")
+        _cleanup_warn("patient", patient_id, code, body)
+    for treatment_id in resources.treatment_ids:
+        code, body = request("DELETE", f"/api/treatments/{treatment_id}")
+        _cleanup_warn("treatment", treatment_id, code, body)
+    for drug_id in resources.drug_ids:
+        code, body = request("DELETE", f"/api/drugs/{drug_id}")
+        _cleanup_warn("drug", drug_id, code, body)
+    for char_id in resources.characteristic_ids:
+        code, body = request("DELETE", f"/api/characteristics/{char_id}")
+        _cleanup_warn("characteristic", char_id, code, body)
+
+
+def purge_orphan_smoke_artifacts() -> None:
+    """Remove smoke-tagged rows left by earlier failed runs."""
+    print("Checking for leftover smoke artifacts...")
+    code, patients = request("GET", "/api/patients")
+    if code == 200 and isinstance(patients, list):
+        for patient in patients:
+            pid = patient.get("_id")
+            if pid is None:
+                continue
+            if tree_has_smoke_catalog_name(patient.get("tree")):
+                c, b = request("DELETE", f"/api/patients/{pid}")
+                _cleanup_warn("orphan patient", str(pid), c, b)
+
+    code, treatments = request("GET", "/api/treatments")
+    if code == 200 and isinstance(treatments, list):
+        for treatment in treatments:
+            tid = treatment.get("_id")
+            if tid is None:
+                continue
+            if is_smoke_catalog_name(treatment.get("name")):
+                c, b = request("DELETE", f"/api/treatments/{tid}")
+                _cleanup_warn("orphan treatment", str(tid), c, b)
+
+    code, drugs = request("GET", "/api/drugs")
+    if code == 200 and isinstance(drugs, list):
+        for drug in drugs:
+            did = drug.get("_id")
+            if did is None:
+                continue
+            if is_smoke_catalog_name(drug.get("name")):
+                c, b = request("DELETE", f"/api/drugs/{did}")
+                _cleanup_warn("orphan drug", str(did), c, b)
+
+    code, characteristics = request("GET", "/api/characteristics")
+    if code == 200 and isinstance(characteristics, list):
+        for characteristic in characteristics:
+            cid = characteristic.get("_id")
+            if cid is None:
+                continue
+            if is_smoke_catalog_name(characteristic.get("name")):
+                c, b = request("DELETE", f"/api/characteristics/{cid}")
+                _cleanup_warn("orphan characteristic", str(cid), c, b)
+
+
+def _run_smoke_tests(resources: SmokeRunResources) -> None:
+    pop_name = catalog_name(f"{PREFIX}-Pop")
+    pop_updated = catalog_name(f"{PREFIX}-Pop-Updated")
+    drug_name = catalog_name(f"{PREFIX}-Drug")
+    regimen_name = catalog_name(f"{PREFIX}-Regimen")
 
     # Health
     code, body = request("GET", "/health", auth=False)
@@ -76,32 +207,43 @@ def main() -> int:
     code, created = request(
         "POST",
         "/api/characteristics",
-        {"type": "Population", "name": f"{PREFIX}-Pop"},
+        {"type": "Population", "name": pop_name},
     )
     ok("T3 create characteristic", code == 201, str(created))
     char_id = (created or {}).get("id") if isinstance(created, dict) else None
     ok("T3 characteristic id", bool(char_id))
+    if char_id:
+        resources.characteristic_ids.append(str(char_id))
 
-    code, _ = request(
+    code, t3_put = request(
         "PUT",
         f"/api/characteristics/{char_id}",
-        {"type": "Population", "name": f"{PREFIX}-Pop-Updated"},
+        {"type": "Population", "name": pop_updated},
     )
-    ok("T3 update characteristic", code == 200, str(_))
+    ok("T3 update characteristic", code == 200, str(t3_put))
+    ok(
+        "T3 update before patient (no sync fan-out)",
+        isinstance(t3_put, dict)
+        and t3_put.get("patients_updated", -1) == 0
+        and t3_put.get("node_count", -1) == 0,
+        str(t3_put),
+    )
 
     # T4 — drug CRUD
     code, drug = request(
         "POST",
         "/api/drugs",
-        {"name": f"{PREFIX}-Drug", "strength": 100, "unit": "mg"},
+        {"name": drug_name, "strength": 100, "unit": "mg"},
     )
     ok("T4 create drug", code == 201, str(drug))
     drug_id = (drug or {}).get("id") if isinstance(drug, dict) else None
+    if drug_id:
+        resources.drug_ids.append(str(drug_id))
 
     code, _ = request(
         "PUT",
         f"/api/drugs/{drug_id}",
-        {"name": f"{PREFIX}-Drug", "strength": 120, "unit": "mg"},
+        {"name": drug_name, "strength": 120, "unit": "mg"},
     )
     ok("T4 update drug", code == 200, str(_))
 
@@ -118,7 +260,7 @@ def main() -> int:
                 "characteristic_data": {
                     "_id": char_id,
                     "char_type": "Population",
-                    "name": f"{PREFIX}-Pop-Updated",
+                    "name": pop_updated,
                 },
                 "children": [],
             }
@@ -127,8 +269,10 @@ def main() -> int:
     ok("T6 create patient", code == 201, str(patient_resp))
     patient_id = patient_resp.get("id") if isinstance(patient_resp, dict) else None
     ok("T6 patient id", bool(patient_id))
+    if patient_id:
+        resources.patient_ids.append(str(patient_id))
 
-    renamed = f"{PREFIX}-Pop-Renamed"
+    renamed = catalog_name(f"{PREFIX}-Pop-Renamed")
     code, sync_put = request(
         "PUT",
         f"/api/characteristics/{char_id}",
@@ -192,7 +336,7 @@ def main() -> int:
             {
                 "drug": {
                     "_id": drug_id,
-                    "name": f"{PREFIX}-Drug",
+                    "name": drug_name,
                     "strength": 120,
                     "unit": "mg",
                 },
@@ -204,7 +348,7 @@ def main() -> int:
         "POST",
         "/api/treatments",
         {
-            "name": f"{PREFIX}-Regimen",
+            "name": regimen_name,
             "type": "Regimen",
             "regimen": drug_regimen,
         },
@@ -212,6 +356,8 @@ def main() -> int:
     ok("catalog create treatment (drug regimen)", code == 201, str(treat_resp))
     treatment_id = (treat_resp or {}).get("id") if isinstance(treat_resp, dict) else None
     ok("catalog treatment id", bool(treatment_id))
+    if treatment_id:
+        resources.treatment_ids.append(str(treatment_id))
 
     code, _ = request(
         "POST",
@@ -224,7 +370,7 @@ def main() -> int:
                 "size": 250.0,
                 "treatment_data": {
                     "_id": treatment_id,
-                    "name": f"{PREFIX}-Regimen",
+                    "name": regimen_name,
                     "type": "Regimen",
                     "regimen": drug_regimen,
                 },
@@ -237,7 +383,7 @@ def main() -> int:
     code, drug_put = request(
         "PUT",
         f"/api/drugs/{drug_id}",
-        {"name": f"{PREFIX}-Drug", "strength": synced_strength, "unit": "mg"},
+        {"name": drug_name, "strength": synced_strength, "unit": "mg"},
     )
     ok("catalog drug propagate PUT", code == 200, str(drug_put))
     ok(
@@ -254,6 +400,17 @@ def main() -> int:
         "drug sync treatments_updated",
         isinstance(drug_put, dict) and drug_put.get("treatments_updated", 0) >= 1,
         str(drug_put),
+    )
+
+    code, drug_noop_put = request("PUT", f"/api/drugs/{drug_id}", {})
+    ok("catalog drug noop PUT", code == 200, str(drug_noop_put))
+    ok(
+        "drug noop PUT zero sync",
+        isinstance(drug_noop_put, dict)
+        and drug_noop_put.get("patients_updated", -1) == 0
+        and drug_noop_put.get("node_count", -1) == 0
+        and drug_noop_put.get("treatments_updated", -1) == 0,
+        str(drug_noop_put),
     )
 
     code, patients_drug_sync = request("GET", "/api/patients")
@@ -279,6 +436,11 @@ def main() -> int:
         patient_drug.get("strength") == synced_strength,
         str(patient_drug),
     )
+    ok(
+        "patient embedded drug name matches master",
+        patient_drug.get("name") == drug_name,
+        str(patient_drug),
+    )
 
     code, treatments_list = request("GET", "/api/treatments")
     ok("GET treatments after drug sync", code == 200)
@@ -297,11 +459,11 @@ def main() -> int:
 
     drug_regimen["drugs"][0]["drug"]["strength"] = synced_strength
 
-    renamed_treatment = f"{PREFIX}-Regimen-Renamed"
+    renamed_treatment = catalog_name(f"{PREFIX}-Regimen-Renamed")
     code, treat_put = request(
         "PUT",
         f"/api/treatments/{treatment_id}",
-        {"name": renamed_treatment},
+        {"name": renamed_treatment, "type": "Regimen"},
     )
     ok("catalog treatment propagate PUT", code == 200, str(treat_put))
     ok(
@@ -364,6 +526,20 @@ def main() -> int:
         str(drug_refs),
     )
 
+    code, treat_refs = request("GET", f"/api/treatments/{treatment_id}/references")
+    ok("catalog treatment references", code == 200, str(treat_refs))
+    ok(
+        "treatment references patient_count",
+        isinstance(treat_refs, dict) and treat_refs.get("patient_count", 0) >= 1,
+        str(treat_refs),
+    )
+    treat_patient_ids = (treat_refs or {}).get("patient_ids") or []
+    ok(
+        "treatment references lists patient",
+        str(patient_id) in [str(pid) for pid in treat_patient_ids],
+        str(treat_refs),
+    )
+
     # T9 — add child node
     code, add_resp = request(
         "POST",
@@ -377,7 +553,7 @@ def main() -> int:
                 "characteristic_data": {
                     "_id": char_id,
                     "char_type": "Population",
-                    "name": f"{PREFIX}-Pop-Updated",
+                    "name": renamed,
                 },
             },
         },
@@ -391,8 +567,11 @@ def main() -> int:
         None,
     )
     children = (match or {}).get("tree", {}).get("children", [])
-    ok("T9 child exists", len(children) >= 1)
-    child_id = str(children[0]["_id"])
+    char_children = [
+        c for c in children if c.get("node_type") == "characteristic"
+    ]
+    ok("T9 characteristic child exists", len(char_children) >= 1)
+    child_id = str(char_children[-1]["_id"])
 
     # T10 — update node rate
     code, upd = request(
@@ -440,19 +619,19 @@ def main() -> int:
             str(del_treat),
         )
 
-    # Cleanup: remove patient first so catalog DELETE can succeed
-    code, _ = request("DELETE", f"/api/patients/{patient_id}")
-    ok("cleanup patient", code == 200, str(_))
-    if treatment_id:
-        code, _ = request("DELETE", f"/api/treatments/{treatment_id}")
-        ok("cleanup treatment", code == 200, str(_))
-    code, _ = request("DELETE", f"/api/drugs/{drug_id}")
-    ok("cleanup drug", code == 200, str(_))
-    code, _ = request("DELETE", f"/api/characteristics/{char_id}")
-    ok("cleanup characteristic", code == 200, str(_))
-
     print("\nAll dev API smoke checks passed.")
-    print("Next: manual UI at http://localhost:3000/home (see docs/DEV_SMOKE.md)")
+
+
+def main() -> int:
+    print(f"Dev API smoke against {BASE}\n")
+    resources = SmokeRunResources()
+    if PURGE_ORPHANS:
+        purge_orphan_smoke_artifacts()
+    try:
+        _run_smoke_tests(resources)
+    finally:
+        cleanup_smoke_resources(resources)
+    print("Next: manual UI at http://localhost:3000/home (see doc/DEV_SMOKE.md)")
     return 0
 
 

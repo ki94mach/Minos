@@ -26,7 +26,7 @@ def validate_request(model: Type[T], location: str = 'json'):
                 else:
                     return error_response(f'Invalid location: {location}', 400)
 
-                if not data:
+                if data is None:
                     return error_response('No data provided', 400)
 
                 try:

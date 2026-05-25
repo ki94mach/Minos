@@ -1,10 +1,16 @@
 # utils/catalog_references.py
-"""Find catalog master id references across patients and treatments (docs/CATALOG_SYNC.md)."""
+"""Find catalog master id references across patients and treatments (doc/CATALOG_SYNC.md)."""
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, List
+
+_root = Path(__file__).resolve().parents[1]
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
 
 from bson import ObjectId
 
@@ -172,4 +178,10 @@ def _run_self_test() -> None:
 
 
 if __name__ == "__main__":
+    if __package__ is None:
+        print(
+            "Run from project root: PYTHONPATH=. python -m utils.catalog_references",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     _run_self_test()

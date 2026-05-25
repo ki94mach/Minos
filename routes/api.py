@@ -573,17 +573,18 @@ def update_treatment(validated_data, treatment_id):
         snapshot = treatment.to_mongo()
 
         def apply_master() -> None:
+            payload = validated_data.model_dump(by_alias=True, exclude_none=True)
             if validated_data.name is not None:
-                treatment.name = validated_data.name
+                treatment.name = payload["name"]
             if validated_data.type is not None:
-                treatment.type = validated_data.type
+                treatment.type = payload["type"]
             if validated_data.regimen is not None:
-                treatment.regimen = Regimen(**validated_data.regimen)
+                treatment.regimen = Regimen(**payload["regimen"])
                 treatment.alternatives = []
             elif validated_data.alternatives is not None:
                 treatment.alternatives = [
                     AlternativeTreatment(**alt)
-                    for alt in validated_data.alternatives
+                    for alt in payload["alternatives"]
                 ]
                 treatment.regimen = None
             hash_input = (
@@ -1169,7 +1170,7 @@ def delete_node(patient_id, node_id):
             return removed
 
         # Deleting the embedded root removes the entire patient tree document.
-        if str(patient_tree.tree.id) == str(node_id):
+        if str(patient_tree.tree._id) == str(node_id):
             PatientDriver.delete(patient_id)
             return jsonify({'message': 'Patient tree deleted'}), 200
 
