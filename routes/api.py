@@ -36,6 +36,7 @@ from utils.catalog_references import (
     find_drug_refs,
     find_treatment_refs,
 )
+from services.catalog_sync import sync_characteristic
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -102,12 +103,54 @@ def update_characteristic(validated_data, char_id):
         if validated_data.name is not None:
             updates['name'] = validated_data.name
 
-        if updates:
-            for key, value in updates.items():
-                setattr(char, key, value)
+        if not updates:
+            return jsonify({
+                'message': 'Characteristic updated',
+                'patients_updated': 0,
+                'node_count': 0,
+            }), 200
+
+        prev_name = char.name
+        prev_type = char.char_type
+        for key, value in updates.items():
+            setattr(char, key, value)
+        CharacteristicDriver.update(char)
+
+        try:
+            sync_result = sync_characteristic(
+                char_id,
+                name=char.name,
+                char_type=char.char_type,
+            )
+        except Exception as sync_exc:
+            logging.error(
+                "Characteristic patient sync failed, rolling back master: %s",
+                sync_exc,
+            )
+            char.name = prev_name
+            char.char_type = prev_type
             CharacteristicDriver.update(char)
-        
-        return jsonify({'message': 'Characteristic updated'}), 200
+            try:
+                sync_characteristic(
+                    char_id,
+                    name=prev_name,
+                    char_type=prev_type,
+                )
+            except Exception as revert_exc:
+                logging.error(
+                    "Failed to revert patient embeds after sync failure: %s",
+                    revert_exc,
+                )
+            return error_response(
+                "Characteristic was not updated: failed to sync patient trees.",
+                500,
+            )
+
+        return jsonify({
+            'message': 'Characteristic updated',
+            'patients_updated': sync_result.patients_updated,
+            'node_count': sync_result.nodes_updated,
+        }), 200
     except NotUniqueError:
         logging.error("Duplicate characteristic detected during update.")
         return error_response(

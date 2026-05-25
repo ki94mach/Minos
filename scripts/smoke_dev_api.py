@@ -128,6 +128,38 @@ def main() -> int:
     patient_id = patient_resp.get("id") if isinstance(patient_resp, dict) else None
     ok("T6 patient id", bool(patient_id))
 
+    renamed = f"{PREFIX}-Pop-Renamed"
+    code, sync_put = request(
+        "PUT",
+        f"/api/characteristics/{char_id}",
+        {"type": "Population", "name": renamed},
+    )
+    ok("catalog characteristic propagate PUT", code == 200, str(sync_put))
+    ok(
+        "catalog sync patients_updated",
+        isinstance(sync_put, dict) and sync_put.get("patients_updated", 0) >= 1,
+        str(sync_put),
+    )
+    ok(
+        "catalog sync node_count",
+        isinstance(sync_put, dict) and sync_put.get("node_count", 0) >= 1,
+        str(sync_put),
+    )
+
+    code, patients_after_sync = request("GET", "/api/patients")
+    ok("GET patients after characteristic sync", code == 200)
+    synced = next(
+        (p for p in (patients_after_sync or []) if str(p.get("_id")) == str(patient_id)),
+        None,
+    )
+    ok("patient found after sync", synced is not None)
+    root_char = ((synced or {}).get("tree") or {}).get("characteristic_data") or {}
+    ok(
+        "embedded characteristic name matches master",
+        root_char.get("name") == renamed,
+        str(root_char),
+    )
+
     code, char_refs = request("GET", f"/api/characteristics/{char_id}/references")
     ok("catalog char references", code == 200, str(char_refs))
     ok(
