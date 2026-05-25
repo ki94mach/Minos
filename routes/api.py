@@ -1003,8 +1003,12 @@ def update_patient(validated_data, patient_id):
             new_tree = create_node_from_dict(
                 validated_data.tree.model_dump(by_alias=True, exclude_none=True)
             )
+            validate_followup_treatment_parentage(new_tree)
             patient.tree = new_tree
             patient.tree_hash = Utils.compute_tree_hash(new_tree)
+        except ValueError as ve:
+            logging.error(f"Validation error updating patient tree: {ve}")
+            return error_response(str(ve), 400)
         except Exception as e:
             logging.error(f"Error updating patient tree: {e}")
             return error_response("Invalid tree structure provided.", 400)
@@ -1043,8 +1047,7 @@ def update_node(validated_data, patient_id, node_id):
       1. Fetches the PatientTree document.
       2. Recursively locates the node with _id equal to node_id.
       3. Updates the node's fields with the provided values.
-      4. Recomputes the tree_hash over the entire tree.
-      5. Persists via PatientDriver.update.
+      4. Validates follow-up parentage, recomputes tree_hash, and persists.
     """
     try:
         if not validated_data:
@@ -1053,15 +1056,6 @@ def update_node(validated_data, patient_id, node_id):
         patient_tree = PatientDriver.find(id=patient_id).first()
         if not patient_tree:
             return error_response('Patient not found.', 404)
-        # Recursive function to find the node with the given _id.
-        def find_node(node, target_id):
-            if str(node._id) == target_id:
-                return node
-            for child in node.children:
-                found = find_node(child, target_id)
-                if found:
-                    return found
-            return None
 
         target_node = find_node(patient_tree.tree, node_id)
         if not target_node:
@@ -1100,11 +1094,16 @@ def update_node(validated_data, patient_id, node_id):
                 for child in validated_data.children
             ]
 
+        validate_followup_treatment_parentage(patient_tree.tree)
+
         patient_tree.tree_hash = Utils.compute_tree_hash(patient_tree.tree)
         PatientDriver.update(patient_tree)
 
         return jsonify({'message': 'Node updated successfully', 'tree_hash': patient_tree.tree_hash}), 200
 
+    except ValueError as ve:
+        logging.error(f"Validation error updating node: {ve}")
+        return error_response(str(ve), 400)
     except Exception as e:
         logging.error(f"Error updating node: {e}")
         return error_response("An unexpected error occurred while updating the node.", 500)

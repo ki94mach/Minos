@@ -374,3 +374,87 @@ def find_node(node, target_id):
         if found:
             return found
     return None
+
+
+# ---------------------------------------------------------------------------
+# Self-test (PYTHONPATH=. python -m utils.business_rules)
+# ---------------------------------------------------------------------------
+
+class _TreeNode:
+    """Minimal embedded-node stand-in for offline tree helper tests."""
+
+    def __init__(self, node_id, node_type, children=None, parent_id=None):
+        self._id = node_id
+        self.node_type = node_type
+        self.children = list(children or [])
+        self.parent_id = parent_id
+
+
+def _run_self_test() -> None:
+    from bson import ObjectId
+
+    root_id = ObjectId()
+    mid_id = ObjectId()
+    leaf_id = ObjectId()
+    deep_id = ObjectId()
+    treat_id = ObjectId()
+    fu_id = ObjectId()
+
+    root = _TreeNode(root_id, "characteristic")
+    mid = _TreeNode(mid_id, "characteristic", parent_id=root_id)
+    leaf = _TreeNode(leaf_id, "characteristic", parent_id=mid_id)
+    deep = _TreeNode(deep_id, "characteristic", parent_id=mid_id)
+    mid.children = [deep, leaf]
+    root.children = [mid]
+
+    assert find_node(root, str(leaf_id)) is leaf
+    assert find_node(root, "507f1f77bcf86cd799439099") is None
+
+    assert remove_node(root, str(mid_id)) is True
+    assert find_node(root, str(mid_id)) is None
+    assert find_node(root, str(deep_id)) is deep
+    assert deep.parent_id == root_id
+    assert find_node(root, str(leaf_id)) is leaf
+    assert leaf.parent_id == root_id
+    assert len(root.children) == 2
+
+    assert remove_node(root, "507f1f77bcf86cd799439099") is False
+
+    valid = _TreeNode(
+        ObjectId(),
+        "characteristic",
+        children=[
+            _TreeNode(
+                treat_id,
+                "treatment",
+                children=[_TreeNode(fu_id, "followup", parent_id=treat_id)],
+            )
+        ],
+    )
+    validate_followup_treatment_parentage(valid)
+
+    invalid = _TreeNode(
+        ObjectId(),
+        "characteristic",
+        children=[_TreeNode(fu_id, "followup")],
+    )
+    try:
+        validate_followup_treatment_parentage(invalid)
+        raise AssertionError("expected ValueError for orphan followup")
+    except ValueError as exc:
+        assert str(exc) == FOLLOWUP_PARENT_ERROR
+
+    print("business_rules self-test: ok")
+    print("  find_node, remove_node (splice), validate_followup_treatment_parentage")
+
+
+if __name__ == "__main__":
+    import sys
+
+    if __package__ is None:
+        print(
+            "Run from project root: PYTHONPATH=. python -m utils.business_rules",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    _run_self_test()
