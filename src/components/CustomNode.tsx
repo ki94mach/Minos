@@ -188,8 +188,21 @@ const CustomNode = (
   const formattedSize =
     nodeData.size !== undefined ? Number(nodeData.size).toLocaleString() : "";
 
+  const catalogStale = nodeData.catalogStale === true;
+  const staleHint =
+    "Embedded copy may differ from the catalog master. Edit the catalog entry or re-save the node to sync.";
+
+  const tooltipTitle = catalogStale ? (
+    <div>
+      <div style={{ marginBottom: 6, fontWeight: 600 }}>{staleHint}</div>
+      {tooltipContent}
+    </div>
+  ) : (
+    tooltipContent
+  );
+
   return (
-    <Tooltip title={tooltipContent} arrow placement="bottom">
+    <Tooltip title={tooltipTitle} arrow placement="bottom">
       <div
         ref={containerRef}
         onContextMenu={(e) => onContextMenu(e, id)}
@@ -229,6 +242,17 @@ const CustomNode = (
         ) : (
           <>
             {nodeData?.label && <strong>{nodeData.label}</strong>}
+            {catalogStale && (
+              <div
+                style={{
+                  color: theme.palette.warning.main,
+                  fontSize: "11px",
+                  marginTop: 4,
+                  lineHeight: 1.2,
+                }}>
+                May differ from catalog
+              </div>
+            )}
             {nodeData?.size !== undefined && (
               <div style={{ color: theme.palette.text.secondary, fontSize: "12px", marginTop: 4 }}>
                 Size: {formattedSize}

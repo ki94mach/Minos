@@ -39,6 +39,7 @@ import EditTreatmentDialog from "../components/patientDialogs/EditTreatmentDialo
 import AddCharacteristicDialog from "../components/patientDialogs/AddCharacteristicDialog";
 import AddTreatmentDialog from "../components/patientDialogs/AddTreatmentDialog";
 import AddFollowupDialog from "../components/patientDialogs/AddFollowupDialog";
+import { buildCatalogMasterSnapshots } from "../utils/catalogStale";
 import { buildFlowNodes } from "../utils/buildFlowNodes";
 import {
   getUniqueCharId,
@@ -117,6 +118,9 @@ const Patients: React.FC = () => {
 
   const [editCharModalData, setEditCharModalData] = useState<EditCharModalData | null>(null);
   const [allTreatments, setAllTreatments] = useState<TreatmentOption[]>([]);
+  const [allDrugs, setAllDrugs] = useState<
+    { _id: string; name: string; strength: number; unit: string }[]
+  >([]);
   const [editTreatModalData, setEditTreatModalData] = useState<EditTreatModalData|null>(null);
   const [overviewEmptyHint, setOverviewEmptyHint] = useState<string | null>(null);
   const [createPatientDialogOpen, setCreatePatientDialogOpen] = useState(false);
@@ -365,8 +369,17 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
     }, [selectedRootId]);
 
   useEffect(() => {
-      api.get(API_ENDPOINTS.TREATMENTS)
-        .then((r) => setAllTreatments(asApiList(r.data)))
+    Promise.all([
+      api.get(API_ENDPOINTS.CHARACTERISTICS),
+      api.get(API_ENDPOINTS.TREATMENTS),
+      api.get(API_ENDPOINTS.DRUGS),
+    ])
+      .then(([chars, treatments, drugs]) => {
+        setAllCharacteristics(asApiList(chars.data));
+        setAllTreatments(asApiList(treatments.data));
+        setAllDrugs(asApiList(drugs.data));
+      })
+      .catch((err) => console.error("Error fetching catalog masters:", err));
   }, [selectedRootId]);
 
   useEffect(() => {
@@ -375,24 +388,11 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       .catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initial patient graph load
   }, [selectedRootId]);
-    
-  
-  // fetch characteristics for edit/add dialogs (overview mode)
-  useEffect(() => {
-    if (!selectedRootId) {
-      const fetchCharacteristics = async () => {
-        try {
-          const { data } = await api.get(API_ENDPOINTS.CHARACTERISTICS);
-          setAllCharacteristics(asApiList<any>(data));
-        } catch (err) {
-          console.error("Error fetching characteristics:", err);
-        }
-      };
 
-      fetchCharacteristics();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- overview list fetch when not drilled in
-  }, [selectedRootId]);
+  useEffect(() => {
+    drawPatientNodes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh stale hints when catalog lists load
+  }, [allCharacteristics, allTreatments, allDrugs]);
 
   /* --------------------- react‑flow edge connect -------------------------- */
   const onConnect = useCallback(
@@ -531,6 +531,12 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
          * ────────────────────────────────────────────────── */
         
 
+        const catalogMasters = buildCatalogMasterSnapshots(
+          allCharacteristics,
+          allTreatments,
+          allDrugs
+        );
+
         const treeIdMap = new Map<string, string>();
         parsedPatients.forEach((p: any) => {
           const collectIds = (node: any) => {
@@ -615,6 +621,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
               treeIdMap,
               navigate,
               depthLimit,
+              catalogMasters,
             }
           );
 

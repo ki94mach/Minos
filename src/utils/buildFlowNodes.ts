@@ -3,6 +3,10 @@ import { makePatientTreeEdge } from "./flowLayoutUtils";
 import { Edge } from "reactflow";
 import { NavigateFunction } from "react-router-dom";
 import {
+  type CatalogMasterSnapshots,
+  isPatientNodeCatalogStale,
+} from "./catalogStale";
+import {
   canDrillDownPatientNode,
   getEmbeddedCharType,
 } from "./patientTreeUtils";
@@ -29,6 +33,7 @@ export function buildFlowNodes(
     treeIdMap: Map<string, string>;
     navigate: NavigateFunction;
     depthLimit: number;
+    catalogMasters?: CatalogMasterSnapshots | null;
   }
 ): void {
   const {
@@ -158,6 +163,7 @@ export function buildFlowNodes(
         isOverview: isOverviewMode,
         isTreeRoot: parentId === null && depth === 0,
         canDrillDown,
+        catalogStale: isPatientNodeCatalogStale(node, deps.catalogMasters),
         onClick: canDrillDown
           ? () =>
               navigate(`/patients/${catalogId}`, {
