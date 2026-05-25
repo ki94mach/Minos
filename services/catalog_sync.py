@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from bson import ObjectId
 
@@ -29,6 +30,8 @@ from utils.tree_traversal import (
 )
 from utils.utils import Utils
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class SyncResult:
@@ -37,13 +40,228 @@ class SyncResult:
     treatments_updated: int = 0
 
 
-def _persist_patient_tree(patient: PatientTree) -> None:
-    """Full document replace + tree_hash, matching routes/api.py update_patient."""
-    patient.tree_hash = Utils.compute_tree_hash(patient.tree)
-    from mongoengine.connection import get_db
+class CatalogSyncError(Exception):
+    """Propagation failed; may include partial progress before the failing persist."""
 
-    db = get_db()
-    db["patients"].replace_one({"_id": patient.id}, patient.to_mongo().to_dict())
+    def __init__(
+        self,
+        message: str,
+        *,
+        partial: Optional[SyncResult] = None,
+        revert_failed: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.message = message
+        self.partial = partial
+        self.revert_failed = revert_failed
+
+
+def _sync_log(event: str, level: int = logging.INFO, **fields: Any) -> None:
+    extra = {"catalog_sync_event": event, **fields}
+    logger.log(level, "catalog_sync.%s", event, extra=extra)
+
+
+def _result_fields(result: Optional[SyncResult]) -> dict[str, Any]:
+    if result is None:
+        return {}
+    return {
+        "patients_updated": result.patients_updated,
+        "nodes_updated": result.nodes_updated,
+        "treatments_updated": result.treatments_updated,
+    }
+
+
+def catalog_put_after_master_update(
+    *,
+    entity_type: str,
+    entity_id: Any,
+    persist_master: Callable[[], None],
+    restore_master: Callable[[], None],
+    run_sync: Callable[[], SyncResult],
+    user_error: str,
+) -> SyncResult:
+    """
+    Master-first PUT policy (docs/CATALOG_SYNC.md): save master, sync embeds, on
+    failure roll back master and re-run sync to revert partial embed updates.
+    """
+    catalog_id = str(entity_id)
+    _sync_log(
+        "sync_start",
+        catalog_entity=entity_type,
+        catalog_id=catalog_id,
+    )
+    persist_master()
+    try:
+        result = run_sync()
+    except CatalogSyncError as exc:
+        _sync_log(
+            "sync_failed",
+            level=logging.ERROR,
+            catalog_entity=entity_type,
+            catalog_id=catalog_id,
+            error=str(exc),
+            **_result_fields(exc.partial),
+        )
+        restore_master()
+        _sync_log(
+            "sync_revert_start",
+            catalog_entity=entity_type,
+            catalog_id=catalog_id,
+        )
+        try:
+            revert_result = run_sync()
+        except Exception as revert_exc:
+            _sync_log(
+                "sync_revert_failed",
+                level=logging.ERROR,
+                catalog_entity=entity_type,
+                catalog_id=catalog_id,
+                error=str(revert_exc),
+                **_result_fields(
+                    revert_exc.partial
+                    if isinstance(revert_exc, CatalogSyncError)
+                    else None
+                ),
+            )
+            raise CatalogSyncError(
+                f"{user_error} (master rolled back; embed revert failed)",
+                partial=exc.partial,
+                revert_failed=True,
+            ) from revert_exc
+        _sync_log(
+            "sync_revert_complete",
+            catalog_entity=entity_type,
+            catalog_id=catalog_id,
+            **_result_fields(revert_result),
+        )
+        raise CatalogSyncError(user_error, partial=exc.partial) from exc
+    except Exception as exc:
+        wrapped = CatalogSyncError(
+            f"{user_error} ({exc})",
+            partial=getattr(exc, "partial", None),
+        )
+        _sync_log(
+            "sync_failed",
+            level=logging.ERROR,
+            catalog_entity=entity_type,
+            catalog_id=catalog_id,
+            error=str(exc),
+            **_result_fields(wrapped.partial),
+        )
+        restore_master()
+        _sync_log(
+            "sync_revert_start",
+            catalog_entity=entity_type,
+            catalog_id=catalog_id,
+        )
+        try:
+            revert_result = run_sync()
+            _sync_log(
+                "sync_revert_complete",
+                catalog_entity=entity_type,
+                catalog_id=catalog_id,
+                **_result_fields(revert_result),
+            )
+        except Exception as revert_exc:
+            _sync_log(
+                "sync_revert_failed",
+                level=logging.ERROR,
+                catalog_entity=entity_type,
+                catalog_id=catalog_id,
+                error=str(revert_exc),
+            )
+            raise CatalogSyncError(
+                f"{user_error} (master rolled back; embed revert failed)",
+                revert_failed=True,
+            ) from revert_exc
+        raise wrapped from exc
+
+    _sync_log(
+        "sync_complete",
+        catalog_entity=entity_type,
+        catalog_id=catalog_id,
+        **_result_fields(result),
+    )
+    return result
+
+
+def log_catalog_delete_blocked(
+    entity_type: str,
+    entity_id: Any,
+    refs: Any,
+) -> None:
+    """Structured log when DELETE is rejected due to references."""
+    _sync_log(
+        "delete_blocked",
+        catalog_entity=entity_type,
+        catalog_id=str(entity_id),
+        patients=refs.patient_count,
+        nodes=refs.node_count,
+        treatments=refs.treatment_count,
+    )
+
+
+def catalog_sync_failure_details(exc: CatalogSyncError) -> list[str]:
+    details: list[str] = []
+    if exc.partial is not None:
+        p = exc.partial
+        details.append(
+            "partial_sync "
+            f"patients_updated={p.patients_updated} "
+            f"nodes_updated={p.nodes_updated} "
+            f"treatments_updated={p.treatments_updated}"
+        )
+    if exc.revert_failed:
+        details.append(
+            "embed_revert_failed after master rollback; "
+            "some patient/treatment embeds may still reflect the attempted update"
+        )
+    return details
+
+
+def _persist_patient_tree(
+    patient: PatientTree,
+    *,
+    entity_type: str,
+    catalog_id: str,
+) -> None:
+    """Full document replace + tree_hash, matching routes/api.py update_patient."""
+    try:
+        patient.tree_hash = Utils.compute_tree_hash(patient.tree)
+        from mongoengine.connection import get_db
+
+        db = get_db()
+        db["patients"].replace_one({"_id": patient.id}, patient.to_mongo().to_dict())
+    except Exception as exc:
+        raise CatalogSyncError(
+            f"Failed to persist patient tree {patient.id}: {exc}",
+        ) from exc
+    _sync_log(
+        "sync_patient_persisted",
+        catalog_entity=entity_type,
+        catalog_id=catalog_id,
+        patient_id=str(patient.id),
+    )
+
+
+def _persist_master_treatment(
+    treatment: Treatment,
+    *,
+    catalog_id: str,
+) -> None:
+    try:
+        _recompute_treatment_hash(treatment)
+        TreatmentDriver.update(treatment)
+    except Exception as exc:
+        raise CatalogSyncError(
+            f"Failed to persist master treatment {treatment.id}: {exc}",
+        ) from exc
+    _sync_log(
+        "sync_treatment_master_persisted",
+        catalog_entity="drug",
+        catalog_id=catalog_id,
+        treatment_id=str(treatment.id),
+    )
 
 
 def _sync_characteristic_in_tree(
@@ -81,6 +299,7 @@ def sync_characteristic(
     affected PatientTree.
     """
     char_oid = normalize_object_id(char_id)
+    catalog_id = str(char_oid)
     master = CharacteristicDriver.find(id=char_oid).first()
     if master is None:
         raise ValueError(f"Characteristic not found: {char_id}")
@@ -99,7 +318,18 @@ def sync_characteristic(
         if not patched:
             continue
         nodes_updated += patched
-        _persist_patient_tree(patient)
+        partial = SyncResult(
+            patients_updated=patients_updated,
+            nodes_updated=nodes_updated,
+        )
+        try:
+            _persist_patient_tree(
+                patient,
+                entity_type="characteristic",
+                catalog_id=catalog_id,
+            )
+        except CatalogSyncError as exc:
+            raise CatalogSyncError(exc.message, partial=partial) from exc
         patients_updated += 1
 
     return SyncResult(
@@ -211,6 +441,7 @@ def sync_drug(
     trees and master Treatment documents; recompute treatment_hash and tree_hash.
     """
     drug_oid = normalize_object_id(drug_id)
+    catalog_id = str(drug_oid)
     master = DrugDriver.find(id=drug_oid).first()
     if master is None:
         raise ValueError(f"Drug not found: {drug_id}")
@@ -233,7 +464,19 @@ def sync_drug(
         if not patched:
             continue
         nodes_updated += patched
-        _persist_patient_tree(patient)
+        partial = SyncResult(
+            patients_updated=patients_updated,
+            nodes_updated=nodes_updated,
+            treatments_updated=treatments_updated,
+        )
+        try:
+            _persist_patient_tree(
+                patient,
+                entity_type="drug",
+                catalog_id=catalog_id,
+            )
+        except CatalogSyncError as exc:
+            raise CatalogSyncError(exc.message, partial=partial) from exc
         patients_updated += 1
 
     for treatment in Treatment.objects.only(
@@ -244,8 +487,16 @@ def sync_drug(
         )
         if not patched:
             continue
-        _recompute_treatment_hash(treatment)
-        TreatmentDriver.update(treatment)
+        nodes_updated += patched
+        partial = SyncResult(
+            patients_updated=patients_updated,
+            nodes_updated=nodes_updated,
+            treatments_updated=treatments_updated,
+        )
+        try:
+            _persist_master_treatment(treatment, catalog_id=catalog_id)
+        except CatalogSyncError as exc:
+            raise CatalogSyncError(exc.message, partial=partial) from exc
         treatments_updated += 1
 
     return SyncResult(
@@ -321,6 +572,7 @@ def sync_treatment(treatment_id: Any) -> SyncResult:
     fresh snapshot from the master document; recompute tree_hash per patient.
     """
     treat_oid = normalize_object_id(treatment_id)
+    catalog_id = str(treat_oid)
     master = TreatmentDriver.find(id=treat_oid).first()
     if master is None:
         raise ValueError(f"Treatment not found: {treatment_id}")
@@ -336,7 +588,18 @@ def sync_treatment(treatment_id: Any) -> SyncResult:
         if not patched:
             continue
         nodes_updated += patched
-        _persist_patient_tree(patient)
+        partial = SyncResult(
+            patients_updated=patients_updated,
+            nodes_updated=nodes_updated,
+        )
+        try:
+            _persist_patient_tree(
+                patient,
+                entity_type="treatment",
+                catalog_id=catalog_id,
+            )
+        except CatalogSyncError as exc:
+            raise CatalogSyncError(exc.message, partial=partial) from exc
         patients_updated += 1
 
     return SyncResult(

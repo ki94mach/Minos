@@ -36,6 +36,19 @@ class CatalogReferenceResult:
             body["treatment_count"] = self.treatment_count
         return body
 
+    def has_references(self) -> bool:
+        return self.node_count > 0 or self.treatment_count > 0
+
+    def to_delete_references(self) -> dict:
+        """Shape for 409 DELETE payloads: { patients, nodes, treatment_count? }."""
+        body: dict = {
+            "patients": self.patient_ids,
+            "nodes": self.node_count,
+        }
+        if self.treatment_count:
+            body["treatment_count"] = self.treatment_count
+        return body
+
 
 def _count_characteristic_hits(tree: Any, char_id: ObjectId) -> int:
     hits = 0

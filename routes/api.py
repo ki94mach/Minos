@@ -36,7 +36,15 @@ from utils.catalog_references import (
     find_drug_refs,
     find_treatment_refs,
 )
-from services.catalog_sync import sync_characteristic, sync_drug, sync_treatment
+from services.catalog_sync import (
+    CatalogSyncError,
+    catalog_put_after_master_update,
+    catalog_sync_failure_details,
+    log_catalog_delete_blocked,
+    sync_characteristic,
+    sync_drug,
+    sync_treatment,
+)
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -112,38 +120,37 @@ def update_characteristic(validated_data, char_id):
 
         prev_name = char.name
         prev_type = char.char_type
-        for key, value in updates.items():
-            setattr(char, key, value)
-        CharacteristicDriver.update(char)
 
-        try:
-            sync_result = sync_characteristic(
-                char_id,
-                name=char.name,
-                char_type=char.char_type,
-            )
-        except Exception as sync_exc:
-            logging.error(
-                "Characteristic patient sync failed, rolling back master: %s",
-                sync_exc,
-            )
+        def apply_master() -> None:
+            for key, value in updates.items():
+                setattr(char, key, value)
+            CharacteristicDriver.update(char)
+
+        def restore_master() -> None:
             char.name = prev_name
             char.char_type = prev_type
             CharacteristicDriver.update(char)
-            try:
-                sync_characteristic(
+
+        try:
+            sync_result = catalog_put_after_master_update(
+                entity_type="characteristic",
+                entity_id=char_id,
+                persist_master=apply_master,
+                restore_master=restore_master,
+                run_sync=lambda: sync_characteristic(
                     char_id,
-                    name=prev_name,
-                    char_type=prev_type,
-                )
-            except Exception as revert_exc:
-                logging.error(
-                    "Failed to revert patient embeds after sync failure: %s",
-                    revert_exc,
-                )
+                    name=char.name,
+                    char_type=char.char_type,
+                ),
+                user_error=(
+                    "Characteristic was not updated: failed to sync patient trees."
+                ),
+            )
+        except CatalogSyncError as sync_exc:
             return error_response(
-                "Characteristic was not updated: failed to sync patient trees.",
+                sync_exc.message,
                 500,
+                details=catalog_sync_failure_details(sync_exc) or None,
             )
 
         return jsonify({
@@ -181,8 +188,20 @@ def get_characteristic_references(char_id):
 @require_role([ADMIN])
 def delete_characteristic(char_id):
     try:
+        char = CharacteristicDriver.find(id=char_id).first()
+        if not char:
+            return error_response('Characteristic not found', 404)
+        refs = find_characteristic_refs(char_id)
+        if refs.has_references():
+            log_catalog_delete_blocked("characteristic", char_id, refs)
+            return jsonify({
+                'error': 'Cannot delete characteristic: still referenced in patient trees.',
+                'references': refs.to_delete_references(),
+            }), 409
         CharacteristicDriver.delete(char_id)
         return jsonify({'message': 'Characteristic deleted'}), 200
+    except ValueError as ve:
+        return error_response(str(ve), 400)
     except Exception as e:
         logging.error(f"Error deleting characteristic: {e}")
         return error_response("An unexpected error occurred while deleting the characteristic.", 500)
@@ -266,41 +285,39 @@ def update_drug(validated_data, drug_id):
         prev_name = drug.name
         prev_strength = drug.strength
         prev_unit = drug.unit
-        for key, value in updates.items():
-            setattr(drug, key, value)
-        DrugDriver.update(drug)
 
-        try:
-            sync_result = sync_drug(
-                drug_id,
-                name=drug.name,
-                strength=drug.strength,
-                unit=drug.unit,
-            )
-        except Exception as sync_exc:
-            logging.error(
-                "Drug catalog sync failed, rolling back master: %s",
-                sync_exc,
-            )
+        def apply_master() -> None:
+            for key, value in updates.items():
+                setattr(drug, key, value)
+            DrugDriver.update(drug)
+
+        def restore_master() -> None:
             drug.name = prev_name
             drug.strength = prev_strength
             drug.unit = prev_unit
             DrugDriver.update(drug)
-            try:
-                sync_drug(
+
+        try:
+            sync_result = catalog_put_after_master_update(
+                entity_type="drug",
+                entity_id=drug_id,
+                persist_master=apply_master,
+                restore_master=restore_master,
+                run_sync=lambda: sync_drug(
                     drug_id,
-                    name=prev_name,
-                    strength=prev_strength,
-                    unit=prev_unit,
-                )
-            except Exception as revert_exc:
-                logging.error(
-                    "Failed to revert drug embeds after sync failure: %s",
-                    revert_exc,
-                )
+                    name=drug.name,
+                    strength=drug.strength,
+                    unit=drug.unit,
+                ),
+                user_error=(
+                    "Drug was not updated: failed to sync patient trees and treatments."
+                ),
+            )
+        except CatalogSyncError as sync_exc:
             return error_response(
-                "Drug was not updated: failed to sync patient trees and treatments.",
+                sync_exc.message,
                 500,
+                details=catalog_sync_failure_details(sync_exc) or None,
             )
 
         return jsonify({
@@ -339,8 +356,20 @@ def get_drug_references(drug_id):
 @require_role([ADMIN])
 def delete_drug(drug_id):
     try:
+        drug = DrugDriver.find(id=drug_id).first()
+        if not drug:
+            return error_response('Drug not found', 404)
+        refs = find_drug_refs(drug_id)
+        if refs.has_references():
+            log_catalog_delete_blocked("drug", drug_id, refs)
+            return jsonify({
+                'error': 'Cannot delete drug: still referenced in patient trees or treatments.',
+                'references': refs.to_delete_references(),
+            }), 409
         DrugDriver.delete(drug_id)
         return jsonify({'message': 'Drug deleted'}), 200
+    except ValueError as ve:
+        return error_response(str(ve), 400)
     except Exception as e:
         logging.error(f"Error deleting drug: {e}")
         return error_response("An unexpected error occurred while deleting the drug.", 500)
@@ -543,40 +572,32 @@ def update_treatment(validated_data, treatment_id):
 
         snapshot = treatment.to_mongo()
 
-        if validated_data.name is not None:
-            treatment.name = validated_data.name
-        if validated_data.type is not None:
-            treatment.type = validated_data.type
-        if validated_data.regimen is not None:
-            regimen_data = validated_data.regimen
-            treatment.regimen = Regimen(**regimen_data)
-            treatment.alternatives = []
-        elif validated_data.alternatives is not None:
-            alternatives_data = validated_data.alternatives
-            treatment.alternatives = [
-                AlternativeTreatment(**alt) for alt in alternatives_data
-            ]
-            treatment.regimen = None
-
-        hash_input = (
-            treatment.name
-            + treatment.type
-            + str(treatment.regimen or '')
-            + str(treatment.alternatives or '')
-        )
-        treatment.treatment_hash = hashlib.sha256(
-            hash_input.encode('utf-8')
-        ).hexdigest()
-
-        TreatmentDriver.update(treatment)
-
-        try:
-            sync_result = sync_treatment(treatment_id)
-        except Exception as sync_exc:
-            logging.error(
-                "Treatment patient sync failed, rolling back master: %s",
-                sync_exc,
+        def apply_master() -> None:
+            if validated_data.name is not None:
+                treatment.name = validated_data.name
+            if validated_data.type is not None:
+                treatment.type = validated_data.type
+            if validated_data.regimen is not None:
+                treatment.regimen = Regimen(**validated_data.regimen)
+                treatment.alternatives = []
+            elif validated_data.alternatives is not None:
+                treatment.alternatives = [
+                    AlternativeTreatment(**alt)
+                    for alt in validated_data.alternatives
+                ]
+                treatment.regimen = None
+            hash_input = (
+                treatment.name
+                + treatment.type
+                + str(treatment.regimen or '')
+                + str(treatment.alternatives or '')
             )
+            treatment.treatment_hash = hashlib.sha256(
+                hash_input.encode('utf-8')
+            ).hexdigest()
+            TreatmentDriver.update(treatment)
+
+        def restore_master() -> None:
             treatment.name = snapshot['name']
             treatment.type = snapshot['type']
             if snapshot.get('regimen'):
@@ -591,16 +612,23 @@ def update_treatment(validated_data, treatment_id):
                 treatment.alternatives = []
             treatment.treatment_hash = snapshot['treatment_hash']
             TreatmentDriver.update(treatment)
-            try:
-                sync_treatment(treatment_id)
-            except Exception as revert_exc:
-                logging.error(
-                    "Failed to revert patient treatment embeds after sync failure: %s",
-                    revert_exc,
-                )
+
+        try:
+            sync_result = catalog_put_after_master_update(
+                entity_type="treatment",
+                entity_id=treatment_id,
+                persist_master=apply_master,
+                restore_master=restore_master,
+                run_sync=lambda: sync_treatment(treatment_id),
+                user_error=(
+                    "Treatment was not updated: failed to sync patient trees."
+                ),
+            )
+        except CatalogSyncError as sync_exc:
             return error_response(
-                "Treatment was not updated: failed to sync patient trees.",
+                sync_exc.message,
                 500,
+                details=catalog_sync_failure_details(sync_exc) or None,
             )
 
         return jsonify({
@@ -635,8 +663,20 @@ def get_treatment_references(treatment_id):
 @require_role([ADMIN])
 def delete_treatment(treatment_id):
     try:
+        treatment = TreatmentDriver.find(id=treatment_id).first()
+        if not treatment:
+            return error_response('Treatment not found', 404)
+        refs = find_treatment_refs(treatment_id)
+        if refs.has_references():
+            log_catalog_delete_blocked("treatment", treatment_id, refs)
+            return jsonify({
+                'error': 'Cannot delete treatment: still referenced in patient trees.',
+                'references': refs.to_delete_references(),
+            }), 409
         TreatmentDriver.delete(treatment_id)
         return jsonify({'message': 'Treatment deleted'}), 200
+    except ValueError as ve:
+        return error_response(str(ve), 400)
     except Exception as e:
         logging.error(f"Error deleting treatment: {e}")
         return error_response("An unexpected error occurred while deleting the treatment.", 500)

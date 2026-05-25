@@ -409,7 +409,40 @@ def main() -> int:
     )
     ok("T11 delete node", code == 200, str(del_resp))
 
-    # Cleanup catalog (ADMIN mock)
+    # DELETE blocked while referenced (409)
+    code, del_char = request("DELETE", f"/api/characteristics/{char_id}")
+    ok("DELETE characteristic blocked when referenced", code == 409, str(del_char))
+    ok(
+        "DELETE char references payload",
+        isinstance(del_char, dict)
+        and "references" in del_char
+        and del_char["references"].get("nodes", 0) >= 1,
+        str(del_char),
+    )
+
+    code, del_drug = request("DELETE", f"/api/drugs/{drug_id}")
+    ok("DELETE drug blocked when referenced", code == 409, str(del_drug))
+    drug_del_refs = (del_drug or {}).get("references") if isinstance(del_drug, dict) else {}
+    ok(
+        "DELETE drug references payload",
+        drug_del_refs.get("nodes", 0) >= 1
+        and drug_del_refs.get("treatment_count", 0) >= 1,
+        str(del_drug),
+    )
+
+    if treatment_id:
+        code, del_treat = request("DELETE", f"/api/treatments/{treatment_id}")
+        ok("DELETE treatment blocked when referenced", code == 409, str(del_treat))
+        ok(
+            "DELETE treatment references payload",
+            isinstance(del_treat, dict)
+            and del_treat.get("references", {}).get("nodes", 0) >= 1,
+            str(del_treat),
+        )
+
+    # Cleanup: remove patient first so catalog DELETE can succeed
+    code, _ = request("DELETE", f"/api/patients/{patient_id}")
+    ok("cleanup patient", code == 200, str(_))
     if treatment_id:
         code, _ = request("DELETE", f"/api/treatments/{treatment_id}")
         ok("cleanup treatment", code == 200, str(_))
@@ -417,8 +450,6 @@ def main() -> int:
     ok("cleanup drug", code == 200, str(_))
     code, _ = request("DELETE", f"/api/characteristics/{char_id}")
     ok("cleanup characteristic", code == 200, str(_))
-    code, _ = request("DELETE", f"/api/patients/{patient_id}")
-    ok("cleanup patient", code == 200, str(_))
 
     print("\nAll dev API smoke checks passed.")
     print("Next: manual UI at http://localhost:3000/home (see docs/DEV_SMOKE.md)")
