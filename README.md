@@ -10,6 +10,8 @@ SSO integration contract: **[docs/SSO_INTEGRATION.md](docs/SSO_INTEGRATION.md)**
 
 MVP checklist: **[docs/MVP_CHECKLIST.md](docs/MVP_CHECKLIST.md)**.
 
+Catalog sync (master ↔ patient embeds): **[docs/CATALOG_SYNC.md](docs/CATALOG_SYNC.md)**.
+
 ## Quick start
 
 ```bash
