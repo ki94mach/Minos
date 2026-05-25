@@ -233,6 +233,70 @@ def main() -> int:
     )
     ok("catalog add treatment node", code == 200, str(_))
 
+    synced_strength = 150
+    code, drug_put = request(
+        "PUT",
+        f"/api/drugs/{drug_id}",
+        {"name": f"{PREFIX}-Drug", "strength": synced_strength, "unit": "mg"},
+    )
+    ok("catalog drug propagate PUT", code == 200, str(drug_put))
+    ok(
+        "drug sync patients_updated",
+        isinstance(drug_put, dict) and drug_put.get("patients_updated", 0) >= 1,
+        str(drug_put),
+    )
+    ok(
+        "drug sync node_count",
+        isinstance(drug_put, dict) and drug_put.get("node_count", 0) >= 1,
+        str(drug_put),
+    )
+    ok(
+        "drug sync treatments_updated",
+        isinstance(drug_put, dict) and drug_put.get("treatments_updated", 0) >= 1,
+        str(drug_put),
+    )
+
+    code, patients_drug_sync = request("GET", "/api/patients")
+    ok("GET patients after drug sync", code == 200)
+    patient_row = next(
+        (p for p in (patients_drug_sync or []) if str(p.get("_id")) == str(patient_id)),
+        None,
+    )
+    treat_child = next(
+        (
+            c
+            for c in ((patient_row or {}).get("tree") or {}).get("children", [])
+            if c.get("node_type") == "treatment"
+        ),
+        None,
+    )
+    ok("patient treatment child after drug sync", treat_child is not None)
+    patient_drug = (
+        ((treat_child or {}).get("treatment_data") or {}).get("regimen") or {}
+    ).get("drugs", [{}])[0].get("drug", {})
+    ok(
+        "patient embedded drug strength matches master",
+        patient_drug.get("strength") == synced_strength,
+        str(patient_drug),
+    )
+
+    code, treatments_list = request("GET", "/api/treatments")
+    ok("GET treatments after drug sync", code == 200)
+    master_treat = next(
+        (t for t in (treatments_list or []) if str(t.get("_id")) == str(treatment_id)),
+        None,
+    )
+    master_drug = (
+        ((master_treat or {}).get("regimen") or {}).get("drugs", [{}])[0].get("drug", {})
+    )
+    ok(
+        "master treatment drug strength matches",
+        master_drug.get("strength") == synced_strength,
+        str(master_drug),
+    )
+
+    drug_regimen["drugs"][0]["drug"]["strength"] = synced_strength
+
     code, drug_refs = request("GET", f"/api/drugs/{drug_id}/references")
     ok("catalog drug references", code == 200, str(drug_refs))
     ok(

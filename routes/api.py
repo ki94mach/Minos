@@ -36,7 +36,7 @@ from utils.catalog_references import (
     find_drug_refs,
     find_treatment_refs,
 )
-from services.catalog_sync import sync_characteristic
+from services.catalog_sync import sync_characteristic, sync_drug
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -255,12 +255,60 @@ def update_drug(validated_data, drug_id):
         if validated_data.unit is not None:
             updates['unit'] = validated_data.unit
 
-        if updates:
-            for key, value in updates.items():
-                setattr(drug, key, value)
+        if not updates:
+            return jsonify({
+                'message': 'Drug updated',
+                'patients_updated': 0,
+                'node_count': 0,
+                'treatments_updated': 0,
+            }), 200
+
+        prev_name = drug.name
+        prev_strength = drug.strength
+        prev_unit = drug.unit
+        for key, value in updates.items():
+            setattr(drug, key, value)
+        DrugDriver.update(drug)
+
+        try:
+            sync_result = sync_drug(
+                drug_id,
+                name=drug.name,
+                strength=drug.strength,
+                unit=drug.unit,
+            )
+        except Exception as sync_exc:
+            logging.error(
+                "Drug catalog sync failed, rolling back master: %s",
+                sync_exc,
+            )
+            drug.name = prev_name
+            drug.strength = prev_strength
+            drug.unit = prev_unit
             DrugDriver.update(drug)
-        
-        return jsonify({'message': 'Drug updated'}), 200
+            try:
+                sync_drug(
+                    drug_id,
+                    name=prev_name,
+                    strength=prev_strength,
+                    unit=prev_unit,
+                )
+            except Exception as revert_exc:
+                logging.error(
+                    "Failed to revert drug embeds after sync failure: %s",
+                    revert_exc,
+                )
+            return error_response(
+                "Drug was not updated: failed to sync patient trees and treatments.",
+                500,
+            )
+
+        return jsonify({
+            'message': 'Drug updated',
+            'patients_updated': sync_result.patients_updated,
+            'node_count': sync_result.nodes_updated,
+            'treatments_updated': sync_result.treatments_updated,
+        }), 200
     except NotUniqueError:
         logging.error("Duplicate drug detected during update.")
         return error_response(
