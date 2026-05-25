@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Dev-path API smoke tests (no SSO) — maps to MVP T3–T6, T9–T11, partial T12.
+Dev-path API smoke tests (no SSO) — maps to MVP T3–T6, T9–T11, partial T12,
+plus catalog reference endpoints (docs/CATALOG_SYNC.md).
 
 Requires API running with AUTH_DISABLED=true (see docs/DEV_SMOKE.md).
 
@@ -127,6 +128,20 @@ def main() -> int:
     patient_id = patient_resp.get("id") if isinstance(patient_resp, dict) else None
     ok("T6 patient id", bool(patient_id))
 
+    code, char_refs = request("GET", f"/api/characteristics/{char_id}/references")
+    ok("catalog char references", code == 200, str(char_refs))
+    ok(
+        "char references patient_count",
+        isinstance(char_refs, dict) and char_refs.get("patient_count", 0) >= 1,
+        str(char_refs),
+    )
+    char_patient_ids = (char_refs or {}).get("patient_ids") or []
+    ok(
+        "char references lists patient",
+        str(patient_id) in [str(pid) for pid in char_patient_ids],
+        str(char_refs),
+    )
+
     code, patients = request("GET", "/api/patients")
     ok("T7 list patients", code == 200 and isinstance(patients, list))
 
@@ -138,6 +153,66 @@ def main() -> int:
     ok("T7 patient in list", match is not None)
     root_id = str(match["tree"]["_id"]) if match else None
     ok("T8 root node id", bool(root_id))
+
+    treatment_id = None
+    drug_regimen = {
+        "drugs": [
+            {
+                "drug": {
+                    "_id": drug_id,
+                    "name": f"{PREFIX}-Drug",
+                    "strength": 120,
+                    "unit": "mg",
+                },
+                "annual_patient_con": 10,
+            }
+        ]
+    }
+    code, treat_resp = request(
+        "POST",
+        "/api/treatments",
+        {
+            "name": f"{PREFIX}-Regimen",
+            "type": "Regimen",
+            "regimen": drug_regimen,
+        },
+    )
+    ok("catalog create treatment (drug regimen)", code == 201, str(treat_resp))
+    treatment_id = (treat_resp or {}).get("id") if isinstance(treat_resp, dict) else None
+    ok("catalog treatment id", bool(treatment_id))
+
+    code, _ = request(
+        "POST",
+        f"/api/patients/{patient_id}/add_node",
+        {
+            "parent_node_id": root_id,
+            "node": {
+                "node_type": "treatment",
+                "rate": 0.25,
+                "size": 250.0,
+                "treatment_data": {
+                    "_id": treatment_id,
+                    "name": f"{PREFIX}-Regimen",
+                    "type": "Regimen",
+                    "regimen": drug_regimen,
+                },
+            },
+        },
+    )
+    ok("catalog add treatment node", code == 200, str(_))
+
+    code, drug_refs = request("GET", f"/api/drugs/{drug_id}/references")
+    ok("catalog drug references", code == 200, str(drug_refs))
+    ok(
+        "drug references patient_count",
+        isinstance(drug_refs, dict) and drug_refs.get("patient_count", 0) >= 1,
+        str(drug_refs),
+    )
+    ok(
+        "drug references treatment_count",
+        isinstance(drug_refs, dict) and drug_refs.get("treatment_count", 0) >= 1,
+        str(drug_refs),
+    )
 
     # T9 — add child node
     code, add_resp = request(
@@ -185,6 +260,9 @@ def main() -> int:
     ok("T11 delete node", code == 200, str(del_resp))
 
     # Cleanup catalog (ADMIN mock)
+    if treatment_id:
+        code, _ = request("DELETE", f"/api/treatments/{treatment_id}")
+        ok("cleanup treatment", code == 200, str(_))
     code, _ = request("DELETE", f"/api/drugs/{drug_id}")
     ok("cleanup drug", code == 200, str(_))
     code, _ = request("DELETE", f"/api/characteristics/{char_id}")

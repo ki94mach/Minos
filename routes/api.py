@@ -31,6 +31,11 @@ from utils.api_errors import error_response
 from utils.utils import Utils
 
 from utils.business_rules import find_node
+from utils.catalog_references import (
+    find_characteristic_refs,
+    find_drug_refs,
+    find_treatment_refs,
+)
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -112,6 +117,22 @@ def update_characteristic(validated_data, char_id):
     except Exception as e:
         logging.error(f"Error updating characteristic: {e}")
         return error_response("An unexpected error occurred while updating the characteristic.", 500)
+@api_blueprint.route('/characteristics/<char_id>/references', methods=['GET'])
+@sso_required
+def get_characteristic_references(char_id):
+    try:
+        char = CharacteristicDriver.find(id=char_id).first()
+        if not char:
+            return error_response('Characteristic not found', 404)
+        return jsonify(find_characteristic_refs(char_id).to_api_dict()), 200
+    except ValueError as ve:
+        return error_response(str(ve), 400)
+    except Exception as e:
+        logging.error(f"Error fetching characteristic references: {e}")
+        return error_response(
+            "An unexpected error occurred while fetching references.",
+            500,
+        )
 @api_blueprint.route('/characteristics/<char_id>', methods=['DELETE'])
 @sso_required
 @require_role([ADMIN])
@@ -206,6 +227,22 @@ def update_drug(validated_data, drug_id):
     except Exception as e:
         logging.error(f"Error updating drug: {e}")
         return error_response("An unexpected error occurred while updating the drug.", 500)
+@api_blueprint.route('/drugs/<drug_id>/references', methods=['GET'])
+@sso_required
+def get_drug_references(drug_id):
+    try:
+        drug = DrugDriver.find(id=drug_id).first()
+        if not drug:
+            return error_response('Drug not found', 404)
+        return jsonify(find_drug_refs(drug_id).to_api_dict()), 200
+    except ValueError as ve:
+        return error_response(str(ve), 400)
+    except Exception as e:
+        logging.error(f"Error fetching drug references: {e}")
+        return error_response(
+            "An unexpected error occurred while fetching references.",
+            500,
+        )
 @api_blueprint.route('/drugs/<drug_id>', methods=['DELETE'])
 @sso_required
 @require_role([ADMIN])
@@ -426,6 +463,22 @@ def update_treatment(validated_data, treatment_id):
     except Exception as e:
         logging.error(f"Error updating treatment: {e}")
         return error_response("An unexpected error occurred while updating the treatment.", 500)
+@api_blueprint.route('/treatments/<treatment_id>/references', methods=['GET'])
+@sso_required
+def get_treatment_references(treatment_id):
+    try:
+        treatment = TreatmentDriver.find(id=treatment_id).first()
+        if not treatment:
+            return error_response('Treatment not found', 404)
+        return jsonify(find_treatment_refs(treatment_id).to_api_dict()), 200
+    except ValueError as ve:
+        return error_response(str(ve), 400)
+    except Exception as e:
+        logging.error(f"Error fetching treatment references: {e}")
+        return error_response(
+            "An unexpected error occurred while fetching references.",
+            500,
+        )
 @api_blueprint.route('/treatments/<treatment_id>', methods=['DELETE'])
 @sso_required
 @require_role([ADMIN])
