@@ -326,6 +326,38 @@ def validate_followup_treatment_parentage(root) -> None:
     walk(root)
 
 
+def remove_node(node, target_id) -> bool:
+    """
+    Remove a non-root node from an embedded patient tree by splicing.
+
+    Locates the direct child whose _id matches target_id, promotes that child's
+    children into node's children list, and sets each promoted child's parent_id
+    to node._id. Recurses into descendants when the target is deeper.
+
+    Args:
+        node: Subtree root to search (typically the patient tree root).
+        target_id: _id of the node to remove (ObjectId or str).
+
+    Returns:
+        True if the target was found and removed, False otherwise.
+    """
+    target_id = str(target_id)
+    new_children = []
+    removed = False
+    for child in node.children:
+        if str(child._id) == target_id:
+            removed = True
+            for grandchild in child.children:
+                grandchild.parent_id = node._id
+            new_children.extend(child.children)
+        else:
+            child_removed = remove_node(child, target_id)
+            removed = removed or child_removed
+            new_children.append(child)
+    node.children = new_children
+    return removed
+
+
 def find_node(node, target_id):
     """
     Recursively find a node with the given target_id in the tree.

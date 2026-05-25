@@ -30,7 +30,11 @@ from utils.serialize import serialize_documents
 from utils.api_errors import error_response
 from utils.utils import Utils
 
-from utils.business_rules import find_node, validate_followup_treatment_parentage
+from utils.business_rules import (
+    find_node,
+    remove_node,
+    validate_followup_treatment_parentage,
+)
 from utils.catalog_references import (
     find_characteristic_refs,
     find_drug_refs,
@@ -1149,26 +1153,6 @@ def delete_node(patient_id, node_id):
         patient_tree = PatientDriver.find(id=patient_id).first()
         if not patient_tree:
             return error_response('Patient not found', 404)
-        # Recursive function to remove a node and splice its children into the parent's list.
-        def remove_node(node, target_id):
-            new_children = []
-            removed = False
-            for child in node.children:
-                if str(child._id) == target_id:
-                    removed = True
-                    # Before splicing, update each grandchild's parent_id to the current node's _id.
-                    for grandchild in child.children:
-                        grandchild.parent_id = node._id
-                    # Splice the removed node's children into the parent's children list.
-                    new_children.extend(child.children)
-                else:
-                    # Recurse into the child.
-                    child_removed = remove_node(child, target_id)
-                    removed = removed or child_removed
-                    new_children.append(child)
-            node.children = new_children
-            return removed
-
         if str(patient_tree.tree._id) == str(node_id):
             return error_response(
                 'Cannot delete the patient tree root via this endpoint; '
