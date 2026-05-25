@@ -16,6 +16,7 @@ import { Save, Add } from "@mui/icons-material";
 import CatalogPageLayout from "../components/catalog/CatalogPageLayout";
 import CatalogListItem from "../components/catalog/CatalogListItem";
 import { catalogEmptyStateSx, catalogFormActionsSx } from "../components/catalog/catalogPageStyles";
+import { useCatalogEditSave } from "../components/catalog/useCatalogEditSave";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
 
@@ -36,6 +37,7 @@ const Drugs: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [errors, setErrors] = useState("");
   const isEditing = Boolean(editingId);
+  const { confirmBeforePut, formatPutSuccess } = useCatalogEditSave("drug");
 
   const cancelEdit = () => {
     setEditingId("");
@@ -79,13 +81,15 @@ const Drugs: React.FC = () => {
       };
 
       if (editingId) {
-        await api.put(
+        if (!(await confirmBeforePut(editingId))) return;
+
+        const response = await api.put(
           API_ENDPOINTS.DRUG_DETAIL(editingId),
           { name, strength: Number(strength), unit },
           config
         );
         setEditingId("");
-        alert("Drug updated successfully!");
+        alert(formatPutSuccess("Drug updated successfully!", response.data));
       } else {
         await api.post(
           API_ENDPOINTS.DRUGS,

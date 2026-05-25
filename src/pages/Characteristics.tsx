@@ -5,6 +5,7 @@ import api from "../api";
 import CatalogPageLayout from "../components/catalog/CatalogPageLayout";
 import CatalogListItem from "../components/catalog/CatalogListItem";
 import { catalogEmptyStateSx, catalogFormActionsSx } from "../components/catalog/catalogPageStyles";
+import { useCatalogEditSave } from "../components/catalog/useCatalogEditSave";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
 
@@ -22,6 +23,8 @@ const Characteristics: React.FC = () => {
   const [errors, setErrors] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const isEditing = Boolean(editingId);
+  const { confirmBeforePut, formatPutSuccess } =
+    useCatalogEditSave("characteristic");
 
   const cancelEdit = () => {
     setEditingId("");
@@ -49,13 +52,25 @@ const Characteristics: React.FC = () => {
 
     try {
       if (editingId) {
-        await api.put(API_ENDPOINTS.CHARACTERISTIC_DETAIL(editingId), {
-          type,
-          name,
-        });
-      } else {
-        await api.post(API_ENDPOINTS.CHARACTERISTICS, { type, name });
+        if (!(await confirmBeforePut(editingId))) return;
+
+        const response = await api.put(
+          API_ENDPOINTS.CHARACTERISTIC_DETAIL(editingId),
+          { type, name }
+        );
+
+        setEditingId("");
+        setType("");
+        setName("");
+        setErrors("");
+        fetchCharacteristics();
+        alert(
+          formatPutSuccess("Characteristic updated successfully!", response.data)
+        );
+        return;
       }
+
+      await api.post(API_ENDPOINTS.CHARACTERISTICS, { type, name });
 
       setEditingId("");
       setType("");

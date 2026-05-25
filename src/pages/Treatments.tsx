@@ -25,6 +25,7 @@ import {
   catalogNestedListSx,
 } from "../components/catalog/catalogPageStyles";
 import Cookies from "js-cookie";
+import { useCatalogEditSave } from "../components/catalog/useCatalogEditSave";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
 
@@ -76,7 +77,7 @@ const Treatments: React.FC = () => {
     const [selectedRegimenId, setSelectedRegimenId] = useState<string>("");
     const [searchTerm, setSearchTerm] = useState("");
     const [errors, setErrors] = useState<string>("");
-
+    const { confirmBeforePut, formatPutSuccess } = useCatalogEditSave("treatment");
 
     useEffect(() => {
         fetchDrugs();
@@ -219,12 +220,14 @@ const Treatments: React.FC = () => {
           console.log("Submitting payload:", JSON.stringify(payload, null, 2));
 
           if (editingTreatmentId) {
-            await api.put(
+            if (!(await confirmBeforePut(editingTreatmentId))) return;
+
+            const response = await api.put(
               API_ENDPOINTS.TREATMENT_DETAIL(editingTreatmentId),
               payload,
               config
             );
-            alert("Treatment updated.");
+            alert(formatPutSuccess("Treatment updated.", response.data));
           } else {
             await api.post(API_ENDPOINTS.TREATMENTS, payload, config);
             alert("Treatment added.");
