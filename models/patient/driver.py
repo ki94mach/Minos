@@ -24,6 +24,13 @@ class PatientDriver:
     
     @staticmethod
     def update(patient: Patient):
+        """
+        Persist in-memory patient tree mutations.
+
+        Marks ``tree`` changed so MongoEngine saves in-place edits to the
+        nested ``Node`` embed (splice, field updates, catalog sync patches).
+        Top-level ``tree_hash`` updates are tracked automatically on assign.
+        """
         try:
             patient._mark_as_changed('tree')
             patient.save()

@@ -12,6 +12,7 @@ from bson import ObjectId
 
 from models.characteristic.driver import CharacteristicDriver
 from models.drug.driver import DrugDriver
+from models.patient.driver import PatientDriver
 from models.tables import (
     AlternativeTreatment,
     DrugEmbedded,
@@ -225,13 +226,10 @@ def _persist_patient_tree(
     entity_type: str,
     catalog_id: str,
 ) -> None:
-    """Full document replace + tree_hash, matching routes/api.py update_patient."""
+    """Recompute tree_hash and persist embed patches via PatientDriver.update."""
     try:
         patient.tree_hash = Utils.compute_tree_hash(patient.tree)
-        from mongoengine.connection import get_db
-
-        db = get_db()
-        db["patients"].replace_one({"_id": patient.id}, patient.to_mongo().to_dict())
+        PatientDriver.update(patient)
     except Exception as exc:
         raise CatalogSyncError(
             f"Failed to persist patient tree {patient.id}: {exc}",
@@ -295,7 +293,7 @@ def sync_characteristic(
 ) -> SyncResult:
     """
     Copy master characteristic name and type into every matching
-    characteristic_data embed, then recompute tree_hash and replace_one each
+    characteristic_data embed, then recompute tree_hash and PatientDriver.update each
     affected PatientTree.
     """
     char_oid = normalize_object_id(char_id)

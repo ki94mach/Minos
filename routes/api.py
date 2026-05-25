@@ -893,7 +893,7 @@ def add_node(validated_data, patient_id):
       2. Locates the parent node (if provided) by recursively traversing the tree.
       3. Appends the new node (with processed children) to the parent's children list (or as a child of the root if no parent_node_id is provided).
       4. Recomputes the tree_hash over the entire tree.
-      5. Replaces the entire PatientTree document in the database.
+      5. Persists via PatientDriver.update.
     """
     try:
         # Get the validated node data
@@ -1008,10 +1008,8 @@ def update_patient(validated_data, patient_id):
         except Exception as e:
             logging.error(f"Error updating patient tree: {e}")
             return error_response("Invalid tree structure provided.", 400)
-        # Replace the entire document using a full document replacement.
-        from mongoengine.connection import get_db
-        db = get_db()
-        db['patients'].replace_one({'_id': patient.id}, patient.to_mongo().to_dict())
+
+        PatientDriver.update(patient)
 
         return jsonify({'message': 'Patient updated'}), 200
     except Exception as e:
@@ -1046,7 +1044,7 @@ def update_node(validated_data, patient_id, node_id):
       2. Recursively locates the node with _id equal to node_id.
       3. Updates the node's fields with the provided values.
       4. Recomputes the tree_hash over the entire tree.
-      5. Replaces the entire PatientTree document in the database.
+      5. Persists via PatientDriver.update.
     """
     try:
         if not validated_data:
@@ -1103,11 +1101,7 @@ def update_node(validated_data, patient_id, node_id):
             ]
 
         patient_tree.tree_hash = Utils.compute_tree_hash(patient_tree.tree)
-
-        # Replace the entire document using full document replacement.
-        from mongoengine.connection import get_db
-        db = get_db()
-        db['patients'].replace_one({'_id': patient_tree.id}, patient_tree.to_mongo().to_dict())
+        PatientDriver.update(patient_tree)
 
         return jsonify({'message': 'Node updated successfully', 'tree_hash': patient_tree.tree_hash}), 200
 
@@ -1168,11 +1162,7 @@ def delete_node(patient_id, node_id):
         validate_followup_treatment_parentage(patient_tree.tree)
 
         patient_tree.tree_hash = Utils.compute_tree_hash(patient_tree.tree)
-
-        # Replace the entire document using full document replacement.
-        from mongoengine.connection import get_db
-        db = get_db()
-        db['patients'].replace_one({'_id': patient_tree.id}, patient_tree.to_mongo().to_dict())
+        PatientDriver.update(patient_tree)
 
         return jsonify({'message': 'Node deleted successfully', 'tree_hash': patient_tree.tree_hash}), 200
 
