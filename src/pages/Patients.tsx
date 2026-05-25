@@ -276,23 +276,26 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   }
  
 
-  /* ───────────── delete node (splice children to parent) or whole tree at root ───────────── */
-  async function deleteNode(nodeId: string) {
+  /* ───────────── delete node (splice or cascade) or whole tree at root ───────────── */
+  async function deleteNode(nodeId: string, options?: { cascade?: boolean }) {
     const node = nodes.find((n: any) => n.id === nodeId);
     if (!node) return;
 
     const nodeDocId = node.data.docId;
     const patientTreeId = node.data.treeId;
     const isTreeRoot = node.data.isTreeRoot === true;
+    const cascade = options?.cascade === true;
 
     if (!patientTreeId) {
-      alert("Missing patient tree ID.");
+      alert("Missing patient model ID.");
       return;
     }
 
     const confirmMsg = isTreeRoot
-      ? "Delete this entire patient tree? You can create a new one afterward."
-      : "Delete this node? Its child nodes will be moved to the parent. This does not remove child nodes or their branches.";
+      ? "Delete this entire patient model? You can create a new one afterward."
+      : cascade
+        ? "Remove this branch?\n\nThis node and everything below it will be removed. This cannot be undone."
+        : "Remove this node?\n\nThe branch below will stay connected to the node above.";
     if (!window.confirm(confirmMsg)) return;
 
     try {
@@ -304,11 +307,17 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           return;
         }
         await api.delete(
-          API_ENDPOINTS.DELETE_NODE(patientTreeId, nodeDocId)
+          API_ENDPOINTS.DELETE_NODE(patientTreeId, nodeDocId, cascade)
         );
       }
       await drawPatientNodes();
-      alert(isTreeRoot ? "Patient tree deleted." : "Node deleted.");
+      alert(
+        isTreeRoot
+          ? "Patient model deleted."
+          : cascade
+            ? "Branch removed."
+            : "Node removed. The branch below was kept."
+      );
     } catch (err: any) {
       const msg =
         err.response?.data?.error ??
@@ -819,9 +828,21 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
               setCtx(null);
             }}>
             {nodes.find((n) => n.id === ctx?.nodeId)?.data?.isTreeRoot
-              ? "Delete patient tree"
-              : "Delete node"}
+              ? "Delete entire patient model"
+              : "Remove Node"}
           </MenuItem>
+
+          {ctx &&
+            !nodes.find((n) => n.id === ctx.nodeId)?.data?.isTreeRoot &&
+            edges.some((e) => e.source === ctx.nodeId) && (
+              <MenuItem
+                onClick={() => {
+                  deleteNode(ctx.nodeId, { cascade: true });
+                  setCtx(null);
+                }}>
+                Remove Branch
+              </MenuItem>
+            )}
 
           <MenuItem
             onClick={() => {

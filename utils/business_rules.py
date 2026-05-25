@@ -358,6 +358,31 @@ def remove_node(node, target_id) -> bool:
     return removed
 
 
+def remove_node_subtree(node, target_id) -> bool:
+    """
+    Remove a non-root node and its entire descendant subtree (no splice).
+
+    Args:
+        node: Subtree root to search (typically the patient tree root).
+        target_id: _id of the node to remove (ObjectId or str).
+
+    Returns:
+        True if the target was found and removed, False otherwise.
+    """
+    target_id = str(target_id)
+    new_children = []
+    removed = False
+    for child in node.children:
+        if str(child._id) == target_id:
+            removed = True
+        else:
+            child_removed = remove_node_subtree(child, target_id)
+            removed = removed or child_removed
+            new_children.append(child)
+    node.children = new_children
+    return removed
+
+
 def find_node(node, target_id):
     """
     Recursively find a node with the given target_id in the tree.
@@ -420,6 +445,18 @@ def _run_self_test() -> None:
 
     assert remove_node(root, "507f1f77bcf86cd799439099") is False
 
+    root2 = _TreeNode(root_id, "characteristic")
+    mid2 = _TreeNode(mid_id, "characteristic", parent_id=root_id)
+    deep2 = _TreeNode(deep_id, "characteristic", parent_id=mid2)
+    leaf2 = _TreeNode(leaf_id, "characteristic", parent_id=mid2)
+    mid2.children = [deep2, leaf2]
+    root2.children = [mid2]
+    assert remove_node_subtree(root2, str(mid_id)) is True
+    assert find_node(root2, str(mid_id)) is None
+    assert find_node(root2, str(deep2)) is None
+    assert find_node(root2, str(leaf2)) is None
+    assert remove_node_subtree(root2, "507f1f77bcf86cd799439099") is False
+
     valid = _TreeNode(
         ObjectId(),
         "characteristic",
@@ -445,7 +482,10 @@ def _run_self_test() -> None:
         assert str(exc) == FOLLOWUP_PARENT_ERROR
 
     print("business_rules self-test: ok")
-    print("  find_node, remove_node (splice), validate_followup_treatment_parentage")
+    print(
+        "  find_node, remove_node (splice), remove_node_subtree, "
+        "validate_followup_treatment_parentage"
+    )
 
 
 if __name__ == "__main__":

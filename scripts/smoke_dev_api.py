@@ -875,6 +875,30 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
         str(deep_after),
     )
 
+    cascade_mid_id = _add_characteristic_child(
+        patient_id, root_id, char_id, renamed, rate=0.21, size=210.0
+    )
+    cascade_deep_id = _add_characteristic_child(
+        patient_id, cascade_mid_id, char_id, renamed, rate=0.22, size=220.0
+    )
+    code, del_cascade = request(
+        "DELETE",
+        f"/api/patients/{patient_id}/node/{cascade_mid_id}?cascade=true",
+    )
+    ok("DELETE cascade removes node and descendants", code == 200, str(del_cascade))
+    row_after_cascade = _patient_row(patient_id)
+    tree_after_cascade = (row_after_cascade or {}).get("tree") or {}
+    ok(
+        "cascade mid node removed",
+        _find_tree_node(tree_after_cascade, cascade_mid_id) is None,
+        str(tree_after_cascade),
+    )
+    ok(
+        "cascade deep descendant removed",
+        _find_tree_node(tree_after_cascade, cascade_deep_id) is None,
+        str(tree_after_cascade),
+    )
+
     unknown_node_id = "507f1f77bcf86cd799439099"
     code, del_missing = request(
         "DELETE",

@@ -33,6 +33,7 @@ from utils.utils import Utils
 from utils.business_rules import (
     find_node,
     remove_node,
+    remove_node_subtree,
     validate_followup_treatment_parentage,
 )
 from utils.catalog_references import (
@@ -1124,9 +1125,11 @@ def delete_patient(patient_id):
 @sso_required
 def delete_node(patient_id, node_id):
     """
-    Deletes a single non-root node from the PatientTree without discarding its children.
-    The children of the deleted node are spliced into the parent's children list,
-    and their parent_id fields are updated accordingly.
+    Deletes a single non-root node from the PatientTree.
+
+    Query ``cascade`` (optional): when ``true``, ``1``, or ``yes``, removes the node
+    and its entire descendant subtree. Otherwise (default), children are spliced into
+    the parent's children list and their parent_id fields are updated.
 
     To delete an entire patient tree, use DELETE /api/patients/<patient_id> (ADMIN).
 
@@ -1137,11 +1140,12 @@ def delete_node(patient_id, node_id):
     This endpoint:
       1. Fetches the PatientTree document.
       2. Rejects node_id equal to the embedded tree root (400).
-      3. Recursively finds and removes the node with _id equal to node_id,
-         splicing its children into the parent's children list and updating their parent_id.
+      3. Removes the target node (splice or cascade per query).
       4. Validates follow-up parentage, recomputes tree_hash, and persists.
     """
     try:
+        cascade = request.args.get('cascade', '').lower() in ('1', 'true', 'yes')
+
         # Fetch the PatientTree document.
         patient_tree = PatientDriver.find(id=patient_id).first()
         if not patient_tree:
@@ -1153,8 +1157,8 @@ def delete_node(patient_id, node_id):
                 400,
             )
 
-        # Remove the target node from the tree starting at the root.
-        removed = remove_node(patient_tree.tree, node_id)
+        remove_fn = remove_node_subtree if cascade else remove_node
+        removed = remove_fn(patient_tree.tree, node_id)
         if not removed:
             return error_response('Node not found in patient tree', 404)
 
@@ -1163,7 +1167,12 @@ def delete_node(patient_id, node_id):
         patient_tree.tree_hash = Utils.compute_tree_hash(patient_tree.tree)
         PatientDriver.update(patient_tree)
 
-        return jsonify({'message': 'Node deleted successfully', 'tree_hash': patient_tree.tree_hash}), 200
+        message = (
+            'Node and descendants deleted successfully'
+            if cascade
+            else 'Node deleted successfully'
+        )
+        return jsonify({'message': message, 'tree_hash': patient_tree.tree_hash}), 200
 
     except ValueError as ve:
         logging.error(f"Validation error deleting node: {ve}")

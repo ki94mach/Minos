@@ -20,8 +20,10 @@ export const API_ENDPOINTS = {
   FOLLOWUPS: "/api/followups",
   FOLLOWUP_DETAIL: (id: string) => `/api/followups/${id}`,
   ADD_NODE: (patientId: string) => `/api/patients/${patientId}/add_node`,
-  DELETE_NODE: (treeId: string, nodeId: string) =>
-    `/api/patients/${treeId}/node/${nodeId}`,
+  DELETE_NODE: (treeId: string, nodeId: string, cascade = false) =>
+    `/api/patients/${treeId}/node/${nodeId}${
+      cascade ? "?cascade=true" : ""
+    }`,
   UPDATE_NODE: (patientId: string, nodeId: string) =>
     `/api/patients/${patientId}/node/${nodeId}`,
 };
