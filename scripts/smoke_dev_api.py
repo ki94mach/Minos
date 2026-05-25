@@ -297,6 +297,60 @@ def main() -> int:
 
     drug_regimen["drugs"][0]["drug"]["strength"] = synced_strength
 
+    renamed_treatment = f"{PREFIX}-Regimen-Renamed"
+    code, treat_put = request(
+        "PUT",
+        f"/api/treatments/{treatment_id}",
+        {"name": renamed_treatment},
+    )
+    ok("catalog treatment propagate PUT", code == 200, str(treat_put))
+    ok(
+        "treatment sync patients_updated",
+        isinstance(treat_put, dict) and treat_put.get("patients_updated", 0) >= 1,
+        str(treat_put),
+    )
+    ok(
+        "treatment sync node_count",
+        isinstance(treat_put, dict) and treat_put.get("node_count", 0) >= 1,
+        str(treat_put),
+    )
+
+    code, patients_treat_sync = request("GET", "/api/patients")
+    ok("GET patients after treatment sync", code == 200)
+    patient_treat_row = next(
+        (p for p in (patients_treat_sync or []) if str(p.get("_id")) == str(patient_id)),
+        None,
+    )
+    treat_child_sync = next(
+        (
+            c
+            for c in ((patient_treat_row or {}).get("tree") or {}).get("children", [])
+            if c.get("node_type") == "treatment"
+        ),
+        None,
+    )
+    ok(
+        "embedded treatment name matches master",
+        ((treat_child_sync or {}).get("treatment_data") or {}).get("name")
+        == renamed_treatment,
+        str((treat_child_sync or {}).get("treatment_data")),
+    )
+
+    code, treatments_after_sync = request("GET", "/api/treatments")
+    master_after = next(
+        (
+            t
+            for t in (treatments_after_sync or [])
+            if str(t.get("_id")) == str(treatment_id)
+        ),
+        None,
+    )
+    ok(
+        "master treatment name matches after sync PUT",
+        (master_after or {}).get("name") == renamed_treatment,
+        str(master_after),
+    )
+
     code, drug_refs = request("GET", f"/api/drugs/{drug_id}/references")
     ok("catalog drug references", code == 200, str(drug_refs))
     ok(

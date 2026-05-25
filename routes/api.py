@@ -36,7 +36,7 @@ from utils.catalog_references import (
     find_drug_refs,
     find_treatment_refs,
 )
-from services.catalog_sync import sync_characteristic, sync_drug
+from services.catalog_sync import sync_characteristic, sync_drug, sync_treatment
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -527,27 +527,87 @@ def update_treatment(validated_data, treatment_id):
         treatment = TreatmentDriver.find(id=treatment_id).first()
         if not treatment:
             return error_response('Treatment not found', 404)
+
+        had_update = (
+            validated_data.name is not None
+            or validated_data.type is not None
+            or validated_data.regimen is not None
+            or validated_data.alternatives is not None
+        )
+        if not had_update:
+            return jsonify({
+                'message': 'Treatment updated',
+                'patients_updated': 0,
+                'node_count': 0,
+            }), 200
+
+        snapshot = treatment.to_mongo()
+
         if validated_data.name is not None:
             treatment.name = validated_data.name
         if validated_data.type is not None:
             treatment.type = validated_data.type
         if validated_data.regimen is not None:
-            # Convert the provided dictionary to a Regimen instance.
             regimen_data = validated_data.regimen
             treatment.regimen = Regimen(**regimen_data)
-            treatment.alternatives = []  # Clear alternatives if regimen is provided.
+            treatment.alternatives = []
         elif validated_data.alternatives is not None:
             alternatives_data = validated_data.alternatives
-            # Convert each alternative dictionary to an AlternativeTreatment instance.
-            treatment.alternatives = [AlternativeTreatment(**alt) for alt in alternatives_data]
-            treatment.regimen = None  # Clear regimen if alternatives are provided.
+            treatment.alternatives = [
+                AlternativeTreatment(**alt) for alt in alternatives_data
+            ]
+            treatment.regimen = None
 
-        # Recompute the treatment hash.
-        hash_input = treatment.name + treatment.type + str(treatment.regimen or '') + str(treatment.alternatives or '')
-        treatment.treatment_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+        hash_input = (
+            treatment.name
+            + treatment.type
+            + str(treatment.regimen or '')
+            + str(treatment.alternatives or '')
+        )
+        treatment.treatment_hash = hashlib.sha256(
+            hash_input.encode('utf-8')
+        ).hexdigest()
 
         TreatmentDriver.update(treatment)
-        return jsonify({'message': 'Treatment updated'}), 200
+
+        try:
+            sync_result = sync_treatment(treatment_id)
+        except Exception as sync_exc:
+            logging.error(
+                "Treatment patient sync failed, rolling back master: %s",
+                sync_exc,
+            )
+            treatment.name = snapshot['name']
+            treatment.type = snapshot['type']
+            if snapshot.get('regimen'):
+                treatment.regimen = Regimen(**snapshot['regimen'])
+            else:
+                treatment.regimen = None
+            if snapshot.get('alternatives'):
+                treatment.alternatives = [
+                    AlternativeTreatment(**alt) for alt in snapshot['alternatives']
+                ]
+            else:
+                treatment.alternatives = []
+            treatment.treatment_hash = snapshot['treatment_hash']
+            TreatmentDriver.update(treatment)
+            try:
+                sync_treatment(treatment_id)
+            except Exception as revert_exc:
+                logging.error(
+                    "Failed to revert patient treatment embeds after sync failure: %s",
+                    revert_exc,
+                )
+            return error_response(
+                "Treatment was not updated: failed to sync patient trees.",
+                500,
+            )
+
+        return jsonify({
+            'message': 'Treatment updated',
+            'patients_updated': sync_result.patients_updated,
+            'node_count': sync_result.nodes_updated,
+        }), 200
     except NotUniqueError:
         logging.error("Duplicate treatment detected during update.")
         return error_response("Update failed: A treatment with similar properties already exists.", 409)

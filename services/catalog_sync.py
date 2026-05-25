@@ -11,7 +11,15 @@ from bson import ObjectId
 
 from models.characteristic.driver import CharacteristicDriver
 from models.drug.driver import DrugDriver
-from models.tables import PatientTree, Treatment
+from models.tables import (
+    AlternativeTreatment,
+    DrugEmbedded,
+    PatientTree,
+    Regimen,
+    Treatment,
+    TreatmentDrug,
+    TreatmentEmbedded,
+)
 from models.treatment.driver import TreatmentDriver
 from utils.tree_traversal import (
     _get_field,
@@ -244,4 +252,94 @@ def sync_drug(
         patients_updated=patients_updated,
         nodes_updated=nodes_updated,
         treatments_updated=treatments_updated,
+    )
+
+
+def _copy_regimen(regimen: Any) -> Optional[Regimen]:
+    if regimen is None:
+        return None
+    drugs = []
+    for item in _get_field(regimen, "drugs") or []:
+        drug_embed = _get_field(item, "drug")
+        drugs.append(
+            TreatmentDrug(
+                drug=DrugEmbedded(
+                    _id=_get_field(drug_embed, "_id"),
+                    name=_get_field(drug_embed, "name"),
+                    strength=_get_field(drug_embed, "strength"),
+                    unit=_get_field(drug_embed, "unit"),
+                ),
+                annual_patient_con=_get_field(item, "annual_patient_con"),
+            )
+        )
+    return Regimen(drugs=drugs)
+
+
+def _copy_alternatives(alternatives: Any) -> Optional[list]:
+    if not alternatives:
+        return None
+    copied = []
+    for alt in alternatives:
+        copied.append(
+            AlternativeTreatment(
+                _id=_get_field(alt, "_id"),
+                name=_get_field(alt, "name"),
+                regimen=_copy_regimen(_get_field(alt, "regimen")),
+                ratio=_get_field(alt, "ratio"),
+            )
+        )
+    return copied
+
+
+def treatment_embedded_from_master(master: Treatment) -> TreatmentEmbedded:
+    """Full TreatmentEmbedded snapshot from a master Treatment document."""
+    return TreatmentEmbedded(
+        _id=master.id,
+        name=master.name,
+        type=master.type,
+        regimen=_copy_regimen(master.regimen),
+        alternatives=_copy_alternatives(master.alternatives),
+    )
+
+
+def _sync_treatment_in_tree(tree: Any, treatment_id: ObjectId, master: Treatment) -> int:
+    updated = 0
+    for visit in walk_tree(tree):
+        if visit.node_type != "treatment":
+            continue
+        ids = extract_node_catalog_ids(visit.node)
+        if ids.treatment_id != treatment_id:
+            continue
+        visit.node.treatment_data = treatment_embedded_from_master(master)
+        updated += 1
+    return updated
+
+
+def sync_treatment(treatment_id: Any) -> SyncResult:
+    """
+    Replace treatment_data embeds that reference the master Treatment _id with a
+    fresh snapshot from the master document; recompute tree_hash per patient.
+    """
+    treat_oid = normalize_object_id(treatment_id)
+    master = TreatmentDriver.find(id=treat_oid).first()
+    if master is None:
+        raise ValueError(f"Treatment not found: {treatment_id}")
+
+    patients_updated = 0
+    nodes_updated = 0
+
+    for patient in PatientTree.objects.only("id", "tree"):
+        tree = patient.tree
+        if tree is None:
+            continue
+        patched = _sync_treatment_in_tree(tree, treat_oid, master)
+        if not patched:
+            continue
+        nodes_updated += patched
+        _persist_patient_tree(patient)
+        patients_updated += 1
+
+    return SyncResult(
+        patients_updated=patients_updated,
+        nodes_updated=nodes_updated,
     )
