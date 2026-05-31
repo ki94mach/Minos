@@ -6,17 +6,67 @@ export function getEmbeddedCharType(node: any): string | undefined {
   return node.characteristic_data?.type ?? node.characteristic_data?.char_type;
 }
 
-/** Overview drill-down: only Primary Indication nodes directly under a Population root. */
+export function isPrimaryIndicationNode(node: any): boolean {
+  return getEmbeddedCharType(node) === "Primary Indication";
+}
+
+/** True when this node or any descendant is a Primary Indication. */
+export function subtreeContainsPrimaryIndication(node: any): boolean {
+  if (isPrimaryIndicationNode(node)) return true;
+  return (node.children || []).some(subtreeContainsPrimaryIndication);
+}
+
+export function isPopulationNode(node: any): boolean {
+  return getEmbeddedCharType(node) === "Population";
+}
+
+/**
+ * Overview preview visibility:
+ * - Population is always shown
+ * - Every direct Population child is always shown
+ * - On branches that reach a PI, show intermediates and stop at PI
+ * - Nothing below PI
+ */
+export function shouldIncludeInOverviewPreview(
+  node: any,
+  parentIsPopulation: boolean
+): boolean {
+  if (isPopulationNode(node)) return true;
+  if (parentIsPopulation) return true;
+  if (isPrimaryIndicationNode(node)) return true;
+  return subtreeContainsPrimaryIndication(node);
+}
+
+/** Children to recurse into when building the overview preview graph. */
+export function getOverviewPreviewChildren(node: any): any[] {
+  const children = node.children || [];
+  if (children.length === 0) return [];
+
+  if (isPopulationNode(node)) {
+    return children;
+  }
+
+  if (isPrimaryIndicationNode(node)) {
+    return [];
+  }
+
+  if (subtreeContainsPrimaryIndication(node)) {
+    return children.filter((child: any) =>
+      shouldIncludeInOverviewPreview(child, false)
+    );
+  }
+
+  return [];
+}
+
+/** Overview drill-down: any visible Primary Indication node. */
 export function canDrillDownPatientNode(
   node: any,
   isOverviewMode: boolean,
-  parentCharType: string | null | undefined
+  _parentCharType: string | null | undefined
 ): boolean {
   if (!isOverviewMode) return false;
-  return (
-    getEmbeddedCharType(node) === "Primary Indication" &&
-    parentCharType === "Population"
-  );
+  return isPrimaryIndicationNode(node);
 }
 
 export function getUniqueCharId(node: any): string {

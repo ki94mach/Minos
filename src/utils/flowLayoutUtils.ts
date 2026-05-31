@@ -1,5 +1,6 @@
 import { Edge } from "reactflow";
 import { treeTokens } from "../theme/theme";
+import { applyDagreLayout } from "./patientTreeUtils";
 
 type FlowNode = {
   id: string;
@@ -210,4 +211,84 @@ export function applyRadialOverviewLayout(
   }
 
   return { nodes: Array.from(byId.values()), clusterRadius };
+}
+
+export type OverviewClusterLayoutResult = {
+  nodes: FlowNode[];
+  clusterWidth: number;
+};
+
+/**
+ * Layout an overview preview cluster (Population → … → Primary Indication) with
+ * dagre so intermediate characteristics are positioned, not only direct children.
+ */
+export function layoutOverviewPreviewCluster(
+  allNodes: FlowNode[],
+  allEdges: Edge[],
+  rootId: string,
+  center = { x: 400, y: 280 }
+): OverviewClusterLayoutResult {
+  const reachable = new Set<string>();
+  const queue = [rootId];
+
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    if (reachable.has(id)) continue;
+    reachable.add(id);
+    for (const edge of allEdges) {
+      if (edge.source === id && !reachable.has(edge.target)) {
+        queue.push(edge.target);
+      }
+    }
+  }
+
+  if (reachable.size === 0) {
+    return { nodes: allNodes, clusterWidth: 360 };
+  }
+
+  const clusterNodes = allNodes.filter((node) => reachable.has(node.id));
+  const clusterEdges = allEdges.filter(
+    (edge) => reachable.has(edge.source) && reachable.has(edge.target)
+  );
+
+  if (clusterNodes.length === 0) {
+    return { nodes: allNodes, clusterWidth: 360 };
+  }
+
+  const laidOut = applyDagreLayout(clusterNodes, clusterEdges);
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const node of laidOut) {
+    const dim = getNodeDimensions(node);
+    minX = Math.min(minX, node.position.x);
+    minY = Math.min(minY, node.position.y);
+    maxX = Math.max(maxX, node.position.x + dim.width);
+    maxY = Math.max(maxY, node.position.y + dim.height);
+  }
+
+  const clusterCenterX = (minX + maxX) / 2;
+  const clusterCenterY = (minY + maxY) / 2;
+  const dx = center.x - clusterCenterX;
+  const dy = center.y - clusterCenterY;
+
+  const byId = new Map(
+    allNodes.map((node) => [node.id, { ...node, position: { ...node.position } }])
+  );
+
+  for (const node of laidOut) {
+    byId.set(node.id, {
+      ...node,
+      position: {
+        x: node.position.x + dx,
+        y: node.position.y + dy,
+      },
+    });
+  }
+
+  const clusterWidth = Math.max(maxX - minX + 160, 360);
+  return { nodes: Array.from(byId.values()), clusterWidth };
 }

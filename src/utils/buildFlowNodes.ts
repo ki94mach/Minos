@@ -9,6 +9,10 @@ import {
 import {
   canDrillDownPatientNode,
   getEmbeddedCharType,
+  getOverviewPreviewChildren,
+  isPopulationNode,
+  isPrimaryIndicationNode,
+  shouldIncludeInOverviewPreview,
 } from "./patientTreeUtils";
 
 export function buildFlowNodes(
@@ -34,7 +38,8 @@ export function buildFlowNodes(
     navigate: NavigateFunction;
     depthLimit: number;
     catalogMasters?: CatalogMasterSnapshots | null;
-  }
+  },
+  parentIsPopulation = false
 ): void {
   const {
     selectedRootId,
@@ -50,6 +55,13 @@ export function buildFlowNodes(
   } = deps;
 
   if (depth > depthLimit) return;
+
+  if (
+    isOverviewMode &&
+    !shouldIncludeInOverviewPreview(node, parentIsPopulation)
+  ) {
+    return;
+  }
 
   // Catalog id (characteristic/treatment/followup reference) — shared across trees in overview.
   const catalogId =
@@ -67,6 +79,9 @@ export function buildFlowNodes(
     ? catalogId
     : node._id?.$oid || node._id;
 
+  const thisCharType = getEmbeddedCharType(node) ?? null;
+  const childParentIsPopulation = isOverviewMode && isPopulationNode(node);
+
   // ──────────────────────────────────────────────────
   // Overview only: merge duplicate catalog ids (e.g. same Population across patients).
   if (isOverviewMode && visited.has(catalogId)) {
@@ -78,20 +93,19 @@ export function buildFlowNodes(
       }
     }
 
-    const kids = node.children || [];
-    const thisCharType = getEmbeddedCharType(node) ?? null;
-    kids.forEach((child: any, i: number) =>
+    getOverviewPreviewChildren(node).forEach((child: any, i: number) =>
       buildFlowNodes(
         child,
         depth + 1,
         i,
         flowNodeId,
         new Decimal(parentSize).times(node.rate ?? 1),
-        kids.length,
+        (node.children || []).length,
         inheritedColor,
         treeId,
         thisCharType,
-        deps
+        deps,
+        childParentIsPopulation
       )
     );
     return;
@@ -126,7 +140,7 @@ export function buildFlowNodes(
     rawSize = new Decimal(parentSize).times(nodeRate);
   }
   const nodeSize = rawSize.toNumber();
-  const charType = getEmbeddedCharType(node);
+  const charType = thisCharType;
   const canDrillDown = canDrillDownPatientNode(
     node,
     isOverviewMode,
@@ -185,39 +199,28 @@ export function buildFlowNodes(
     }
   }
 
-  function containsPrimaryIndication(node: any): boolean {
-    if (getEmbeddedCharType(node) === "Primary Indication") return true;
-    return (node.children || []).some(containsPrimaryIndication);
+  const isPrimary = isPrimaryIndicationNode(node);
+  if (isOverviewMode && isPrimary) {
+    return;
   }
 
-  function shouldRenderNode(node: any, isOverviewMode: boolean): boolean {
-    if (!isOverviewMode) return true;
-    const charType = getEmbeddedCharType(node);
-    // Overview centers on Population roots (e.g. Iran) plus Primary Indication branches.
-    if (charType === "Population") return true;
-    if (charType === "Primary Indication") return true;
-    return containsPrimaryIndication(node);
-  }
+  const kids = isOverviewMode
+    ? getOverviewPreviewChildren(node)
+    : node.children || [];
 
-  if (!shouldRenderNode(node, isOverviewMode)) return;
-  const isPrimary = getEmbeddedCharType(node) === "Primary Indication";
-  if (!(isOverviewMode && isPrimary)) {
-    const kids = (node.children || []).filter((child: any) =>
-      shouldRenderNode(child, isOverviewMode)
-    );
-    kids.forEach((child: any, i: number) =>
-      buildFlowNodes(
-        child,
-        depth + 1,
-        i,
-        flowNodeId,
-        rawSize,
-        kids.length,
-        inheritedColor,
-        treeId,
-        charType ?? null,
-        deps
-      )
-    );
-  }
-};
+  kids.forEach((child: any, i: number) =>
+    buildFlowNodes(
+      child,
+      depth + 1,
+      i,
+      flowNodeId,
+      rawSize,
+      kids.length,
+      inheritedColor,
+      treeId,
+      charType ?? null,
+      deps,
+      childParentIsPopulation
+    )
+  );
+}

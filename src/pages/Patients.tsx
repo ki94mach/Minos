@@ -53,10 +53,10 @@ import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
 import {
   assignEdgeHandles,
-  applyRadialOverviewLayout,
   collectDescendantIds,
   filterEdgesForNodes,
   keepReachableNodes,
+  layoutOverviewPreviewCluster,
 } from "../utils/flowLayoutUtils";
 import CreatePatientTreeDialog from "../components/patientDialogs/CreatePatientTreeDialog";
 
@@ -696,15 +696,14 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           let offsetX = 360;
           roots.forEach((rootNode: any) => {
             const rootUniqueId = getUniqueCharId(rootNode);
-            const { nodes: laidOut, clusterRadius } = applyRadialOverviewLayout(
+            const { nodes: laidOut, clusterWidth } = layoutOverviewPreviewCluster(
               finalNodes,
               routedEdges,
               rootUniqueId,
-              { x: offsetX, y: 320 },
-              200
+              { x: offsetX, y: 320 }
             );
             finalNodes = laidOut;
-            offsetX += clusterRadius * 2 + 120;
+            offsetX += clusterWidth;
           });
         }
 
