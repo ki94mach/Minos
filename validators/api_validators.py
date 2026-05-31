@@ -23,7 +23,7 @@ from utils.business_rules import (
     validate_and_transform_treatment_embedded,
     validate_and_transform_followup_embedded,
     to_title_format,
-    validate_and_transform_alternative
+    validate_and_transform_alternative,
     validate_alternative_ratios_sum,
 )
 
@@ -257,10 +257,8 @@ class TreatmentCreate(BaseModel):
         if v:
             # Validate each alternative and check ratios
             alt_ids = []
-            ratios_sum = 0.0
             for alt in v:
                 alt_ids.append(str(alt.id))
-                ratios_sum += alt.ratio
             
             # Check for duplicates
             if len(alt_ids) != len(set(alt_ids)):
@@ -268,11 +266,7 @@ class TreatmentCreate(BaseModel):
                     "Duplicate alternative treatments are not allowed"
                     )
             
-            # Validate ratio sum
-            if not (0.99 <= ratios_sum <= 1.01):
-                raise ValueError(
-                    "Alternative treatment ratios must sum to 1.0"
-                    )
+            validate_alternative_ratios_sum([alt.ratio for alt in v])
         return v
 
 class TreatmentUpdate(BaseModel):
@@ -329,21 +323,16 @@ class TreatmentUpdate(BaseModel):
                     )
 
             alt_ids = []
-            ratios_sum = 0.0
             for alt in v:
                 alt.validate_against_database()
                 alt_ids.append(str(alt.id))
-                ratios_sum += alt.ratio
 
             if len(alt_ids) != len(set(alt_ids)):
                 raise ValueError(
                     "Duplicate alternative treatments are not allowed"
                     )
 
-            if not (0.99 <= ratios_sum <= 1.01):
-                raise ValueError(
-                    "Alternative treatment ratios must sum to 1.0"
-                    )
+            validate_alternative_ratios_sum([alt.ratio for alt in v])
         return v
 
 # ------------------------------------------------------------------------------
