@@ -22,7 +22,6 @@ from utils.business_rules import (
     validate_and_transform_characteristic,
     validate_and_transform_treatment_embedded,
     validate_and_transform_followup_embedded,
-    to_title_format,
     validate_and_transform_alternative,
     validate_alternative_ratios_sum,
 )
@@ -64,9 +63,7 @@ class CharacteristicCreate(BaseModel):
     @field_validator('name', 'type', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return to_title_format(
-            validate_non_empty(v, "Characteristic name")
-            )
+        return validate_non_empty(v, "Characteristic name")
 
 class CharacteristicUpdate(BaseModel):
     model_config = ConfigDict(
@@ -81,9 +78,7 @@ class CharacteristicUpdate(BaseModel):
     def validate_optional_fields(
         cls, v: Optional[str]
         ) -> Optional[str]:
-        return to_title_format(
-            validate_optional_string(v, "Field")
-            )
+        return validate_optional_string(v, "Field")
 
 # ------------------------------------------------------------------------------
 # DRUG VALIDATORS
@@ -97,9 +92,7 @@ class DrugCreate(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return to_title_format(
-            validate_non_empty(v, "Drug name")
-            )
+        return validate_non_empty(v, "Drug name")
 
     @field_validator('unit', mode='after')
     @classmethod
@@ -141,9 +134,7 @@ class DrugSubItem(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return to_title_format(
-            validate_non_empty(v, "Regimen name")
-            )
+        return validate_non_empty(v, "Regimen name")
 
     @model_validator(mode="after")
     def validate_against_database(self) -> "DrugSubItem":
@@ -178,9 +169,7 @@ class AlternativeTreatment(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return to_title_format(
-            validate_non_empty(v, "Alternative name")
-            )
+        return validate_non_empty(v, "Alternative name")
 
     @model_validator(mode="after")
     def validate_against_database(self) -> "AlternativeTreatment":
@@ -210,9 +199,7 @@ class TreatmentCreate(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return to_title_format(
-            validate_non_empty(v, "Treatment name")
-        )
+        return validate_non_empty(v, "Treatment name")
 
     @field_validator('type', mode='after')
     @classmethod
@@ -348,9 +335,7 @@ class FollowupCreate(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return to_title_format(
-            validate_non_empty(v, "Followup name")
-        )
+        return validate_non_empty(v, "Followup name")
 
     @model_validator(mode="after")
     def validate_ids(self) -> "FollowupCreate":
@@ -401,9 +386,7 @@ class CharacteristicData(BaseModel):
     @field_validator('name', 'char_type', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        return to_title_format(
-            validate_non_empty(v, "Characteristic name")
-            )
+        return validate_non_empty(v, "Characteristic name")
     @model_validator(mode="after")
     def validate_against_database(self) -> "CharacteristicData":
         char_data = {
@@ -428,9 +411,7 @@ class TreatmentData(BaseModel):
     @field_validator('name', mode='after')
     @classmethod
     def name_must_be_non_empty(cls, v: str) -> str:
-        return to_title_format(
-            validate_non_empty(v, "Treatment name")
-        )
+        return validate_non_empty(v, "Treatment name")
 
     @field_validator('type', mode='after')
     @classmethod

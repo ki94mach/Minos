@@ -3,12 +3,6 @@ from bson import ObjectId
 from typing import Optional
 
 
-def to_title_format(value: str) -> str:
-    """Convert a string to title case, handling None values."""
-    if value is None:
-        return None
-    return value.strip().title()
-
 def validate_non_empty(value: str, field_name: str) -> str:
     """Common validation for non-empty string fields."""
     if not value or not value.strip():
@@ -67,7 +61,7 @@ def normalize_drug_unit(unit: Optional[str]) -> Optional[str]:
 def validate_and_transform_drug(drug_data: dict) -> dict:
     """
     Validate that the drug referenced by its _id exists.
-    Transform the 'name' to title format and normalize unit case.
+    Normalize unit case when provided.
     """
     drug_id = drug_data.get('_id') or drug_data.pop('id', None)
     if not drug_id:
@@ -79,7 +73,7 @@ def validate_and_transform_drug(drug_data: dict) -> dict:
         raise ValueError(f"Drug with _id {drug_id} not found.")
     
     if 'name' in drug_data:
-        drug_data['name'] = to_title_format(drug_data['name'])
+        drug_data['name'] = drug_data['name'].strip()
     if 'unit' in drug_data and drug_data['unit'] is not None:
         drug_data['unit'] = normalize_drug_unit(drug_data['unit'])
 
@@ -95,7 +89,6 @@ def validate_and_transform_drug(drug_data: dict) -> dict:
 def validate_and_transform_characteristic(characteristic_data: dict) -> dict:
     """
     Validate that the characteristic referenced by its _id exists.
-    Transform the 'name' and 'char_type' fields to title format.
     """
     char_id = characteristic_data.get('_id')
     if not char_id:
@@ -107,9 +100,9 @@ def validate_and_transform_characteristic(characteristic_data: dict) -> dict:
         raise ValueError(f"Characteristic with _id {char_id} not found.")
     
     if 'name' in characteristic_data:
-        characteristic_data['name'] = to_title_format(characteristic_data['name'])
+        characteristic_data['name'] = characteristic_data['name'].strip()
     if 'char_type' in characteristic_data:
-        characteristic_data['char_type'] = to_title_format(characteristic_data['char_type'])
+        characteristic_data['char_type'] = characteristic_data['char_type'].strip()
 
     if characteristic_data.get('name') != characteristic.name:
         raise ValueError("Name does not match the database record")
@@ -121,7 +114,6 @@ def validate_and_transform_characteristic(characteristic_data: dict) -> dict:
 def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
     """
     Validate that the treatment referenced by its _id exists.
-    Transform the 'name' to title format and validate type.
     """
     treatment_id = treatment_data.get('_id')
     if not treatment_id:
@@ -133,7 +125,7 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
         raise ValueError(f"Treatment with _id {treatment_id} not found.")
     
     if 'name' in treatment_data:
-        treatment_data['name'] = to_title_format(treatment_data['name'])
+        treatment_data['name'] = treatment_data['name'].strip()
     
     if 'type' in treatment_data:
         if treatment_data['type'] not in ['Treatment', 'Regimen', 'Alternative']:
@@ -237,7 +229,7 @@ def validate_and_transform_alternative(alternative_data: dict) -> dict:
         raise ValueError(f"Referenced treatment must be of type 'Regimen', got {treatment.type}")
     
     if 'name' in alternative_data:
-        alternative_data['name'] = to_title_format(alternative_data['name'])
+        alternative_data['name'] = alternative_data['name'].strip()
     
     if alternative_data.get('name') != treatment.name:
         raise ValueError("Name does not match the database record")

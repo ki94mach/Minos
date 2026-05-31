@@ -33,11 +33,9 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from utils.business_rules import to_title_format as catalog_name
-
 BASE = os.environ.get("SMOKE_API_URL", "http://localhost:5000").rstrip("/")
 PREFIX = f"smoke-{int(time.time())}"
-SMOKE_NAME_PREFIX = catalog_name("smoke-")  # "Smoke-"
+SMOKE_NAME_PREFIX = "smoke-"
 PURGE_ORPHANS = os.environ.get("SMOKE_PURGE_ORPHANS", "true").lower() not in (
     "0",
     "false",
@@ -258,10 +256,10 @@ def purge_orphan_smoke_artifacts() -> None:
 
 
 def _run_smoke_tests(resources: SmokeRunResources) -> None:
-    pop_name = catalog_name(f"{PREFIX}-Pop")
-    pop_updated = catalog_name(f"{PREFIX}-Pop-Updated")
-    drug_name = catalog_name(f"{PREFIX}-Drug")
-    regimen_name = catalog_name(f"{PREFIX}-Regimen")
+    pop_name = f"{PREFIX}-Pop"
+    pop_updated = f"{PREFIX}-Pop-Updated"
+    drug_name = f"{PREFIX}-Drug"
+    regimen_name = f"{PREFIX}-Regimen"
 
     # Health
     code, body = request("GET", "/health", auth=False)
@@ -340,7 +338,7 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
     if patient_id:
         resources.patient_ids.append(str(patient_id))
 
-    renamed = catalog_name(f"{PREFIX}-Pop-Renamed")
+    renamed = f"{PREFIX}-Pop-Renamed"
     code, sync_put = request(
         "PUT",
         f"/api/characteristics/{char_id}",
@@ -554,7 +552,7 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
 
     drug_regimen["drugs"][0]["drug"]["strength"] = synced_strength
 
-    renamed_treatment = catalog_name(f"{PREFIX}-Regimen-Renamed")
+    renamed_treatment = f"{PREFIX}-Regimen-Renamed"
     code, treat_put = request(
         "PUT",
         f"/api/treatments/{treatment_id}",
@@ -595,7 +593,7 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
 
     treatment_node_id = str(treat_child_sync["_id"])
     followup_os = 0.5
-    followup_name = catalog_name(f"{PREFIX}-Followup")
+    followup_name = f"{PREFIX}-Followup"
     code, fu_master = request(
         "POST",
         "/api/followups",
