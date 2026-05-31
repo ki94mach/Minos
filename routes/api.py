@@ -271,13 +271,14 @@ def update_drug(validated_data, drug_id):
         if not drug:
             return error_response('Drug not found', 404)
         # Update only provided fields, data is already validated and transformed
+        provided = validated_data.model_dump(exclude_unset=True)
         updates = {}
-        if validated_data.name is not None:
-            updates['name'] = validated_data.name
-        if validated_data.strength is not None:
-            updates['strength'] = validated_data.strength
-        if validated_data.unit is not None:
-            updates['unit'] = validated_data.unit
+        if 'name' in provided:
+            updates['name'] = provided['name']
+        if 'strength' in provided:
+            updates['strength'] = provided['strength']
+        if 'unit' in provided:
+            updates['unit'] = provided['unit']
 
         if not updates:
             return jsonify({

@@ -16,8 +16,8 @@ import { asApiList } from "../api/parseApiList";
 interface Drug {
   _id: string;
   name: string;
-  strength: number;
-  unit: string;
+  strength?: number | null;
+  unit?: string | null;
 }
 
 interface DrugWithCon {

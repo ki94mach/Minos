@@ -33,24 +33,14 @@ def validate_size(size: float) -> float:
         raise ValueError("Size must be a positive number")
     return size
 
-def validate_strength(strength: int) -> int:
-    """Validate that a strength value is positive."""
-    if not isinstance(strength, int) or strength <= 0:
-        raise ValueError("Strength must be a positive integer")
-    return strength
-
-def normalize_drug_unit(unit: str) -> str:
-    """Normalize drug unit; IU stays uppercase, others lowercase."""
-    if str(unit).upper() == "IU":
+def normalize_drug_unit(unit: Optional[str]) -> Optional[str]:
+    """Normalize drug unit when provided; IU stays uppercase, others lowercase."""
+    if unit is None or not str(unit).strip():
+        return None
+    value = str(unit).strip()
+    if value.upper() == "IU":
         return "IU"
-    return str(unit).lower()
-
-def validate_unit(unit: str, allowed_units: list) -> str:
-    """Validate that a unit is in the allowed list."""
-    normalized = normalize_drug_unit(unit)
-    if normalized not in allowed_units:
-        raise ValueError(f"Unit must be one of {allowed_units}")
-    return normalized
+    return value.lower()
 
 def validate_and_transform_drug(drug_data: dict) -> dict:
     """
@@ -68,7 +58,7 @@ def validate_and_transform_drug(drug_data: dict) -> dict:
     
     if 'name' in drug_data:
         drug_data['name'] = to_title_format(drug_data['name'])
-    if 'unit' in drug_data:
+    if 'unit' in drug_data and drug_data['unit'] is not None:
         drug_data['unit'] = normalize_drug_unit(drug_data['unit'])
 
     if drug_data.get('name') != drug.name:

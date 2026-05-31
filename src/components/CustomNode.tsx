@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Handle, Position, useReactFlow, NodeProps } from "reactflow";
 import { Tooltip, useTheme } from "@mui/material";
 import { treeTokens, textOnColor } from "../theme/theme";
+import { formatDrugStrengthUnit } from "../utils/drugFormat";
 
 const CustomNode = (
   props: NodeProps & {
@@ -145,8 +146,9 @@ const CustomNode = (
                   <ul style={{ paddingLeft: 16, marginTop: 4 }}>
                     {alt.regimen.drugs.map((d: any, j: number) => (
                       <li key={j}>
-                        {d.drug.name} – {d.drug.strength} {d.drug.unit}
-                        (Consumption: {d.annual_patient_con})
+                        {d.drug.name} –{" "}
+                        {formatDrugStrengthUnit(d.drug.strength, d.drug.unit)}
+                        {" "}(Consumption: {d.annual_patient_con})
                       </li>
                     ))}
                   </ul>
@@ -162,7 +164,7 @@ const CustomNode = (
           <div>
             {nodeData.regimen.drugs.map((d: any, i: number) => (
               <div key={i}>
-                {d.drug.name} – {d.drug.strength} {d.drug.unit}
+                {d.drug.name} – {formatDrugStrengthUnit(d.drug.strength, d.drug.unit)}
                 (Consumption: {d.annual_patient_con})
               </div>
             ))}

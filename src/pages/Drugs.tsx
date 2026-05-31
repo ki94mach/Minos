@@ -17,20 +17,23 @@ import CatalogPageLayout from "../components/catalog/CatalogPageLayout";
 import CatalogListItem from "../components/catalog/CatalogListItem";
 import { catalogEmptyStateSx, catalogFormActionsSx } from "../components/catalog/catalogPageStyles";
 import { useCatalogEditSave } from "../components/catalog/useCatalogEditSave";
+import { formatDrugStrengthUnit } from "../utils/drugFormat";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
 
 interface Drug {
   _id: string;
   name: string;
-  strength: number;
-  unit: string;
+  strength?: number | null;
+  unit?: string | null;
 }
+
+const DRUG_UNIT_OPTIONS = ["mg", "g", "ng", "mcg", "ml", "IU", "%"] as const;
 
 const Drugs: React.FC = () => {
   const [name, setName] = useState("");
   const [strength, setStrength] = useState<number | "">("");
-  const [unit, setUnit] = useState("mg");
+  const [unit, setUnit] = useState("");
   const [drugs, setDrugs] = useState<Drug[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string>("");
@@ -43,7 +46,7 @@ const Drugs: React.FC = () => {
     setEditingId("");
     setName("");
     setStrength("");
-    setUnit("mg");
+    setUnit("");
   };
 
   useEffect(() => {
@@ -63,12 +66,14 @@ const Drugs: React.FC = () => {
     }
   };
 
+  const buildDrugPayload = () => ({
+    name,
+    strength: strength === "" ? null : Number(strength),
+    unit: unit.trim() === "" ? null : unit.trim(),
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (strength === "") {
-      alert("Please enter a valid strength value");
-      return;
-    }
 
     try {
       const csrfToken = Cookies.get("csrf_token");
@@ -85,23 +90,19 @@ const Drugs: React.FC = () => {
 
         const response = await api.put(
           API_ENDPOINTS.DRUG_DETAIL(editingId),
-          { name, strength: Number(strength), unit },
+          buildDrugPayload(),
           config
         );
         setEditingId("");
         alert(formatPutSuccess("Drug updated successfully!", response.data));
       } else {
-        await api.post(
-          API_ENDPOINTS.DRUGS,
-          { name, strength: Number(strength), unit },
-          config
-        );
+        await api.post(API_ENDPOINTS.DRUGS, buildDrugPayload(), config);
         alert("Drug added successfully!");
       }
 
       setName("");
       setStrength("");
-      setUnit("mg");
+      setUnit("");
       setErrors("");
       fetchDrugs();
     } catch (error: any) {
@@ -115,8 +116,8 @@ const Drugs: React.FC = () => {
   const handleEdit = (drug: Drug) => {
     setEditingId(drug._id);
     setName(drug.name);
-    setStrength(drug.strength);
-    setUnit(drug.unit);
+    setStrength(drug.strength ?? "");
+    setUnit(drug.unit ?? "");
   };
 
   const handleDelete = async (id: string) => {
@@ -143,6 +144,11 @@ const Drugs: React.FC = () => {
   const filtered = drugs.filter((drug) =>
     drug.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const formatDrugSecondary = (drug: Drug) => {
+    const detail = formatDrugStrengthUnit(drug.strength, drug.unit);
+    return detail || undefined;
+  };
 
   return (
     <CatalogPageLayout
@@ -179,7 +185,6 @@ const Drugs: React.FC = () => {
                 onChange={(e) =>
                   setStrength(e.target.value ? Number(e.target.value) : "")
                 }
-                required
               />
               <FormControl size="small" sx={{ minWidth: 120 }}>
                 <InputLabel id="unit-label">Unit</InputLabel>
@@ -187,13 +192,22 @@ const Drugs: React.FC = () => {
                   labelId="unit-label"
                   value={unit}
                   label="Unit"
+                  displayEmpty
                   onChange={(e) => setUnit(e.target.value)}>
-                  <MenuItem value="mg">mg</MenuItem>
-                  <MenuItem value="g">g</MenuItem>
-                  <MenuItem value="ml">ml</MenuItem>
-                  <MenuItem value="mcg">mcg</MenuItem>
-                  <MenuItem value="IU">IU</MenuItem>
-                  <MenuItem value="%">%</MenuItem>
+                  <MenuItem value="">
+                    <em>None</em>
+                  </MenuItem>
+                  {DRUG_UNIT_OPTIONS.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                  {unit &&
+                    !DRUG_UNIT_OPTIONS.includes(
+                      unit as (typeof DRUG_UNIT_OPTIONS)[number]
+                    ) && (
+                      <MenuItem value={unit}>{unit}</MenuItem>
+                    )}
                 </Select>
               </FormControl>
             </Box>
@@ -222,7 +236,7 @@ const Drugs: React.FC = () => {
           key={drug._id}
           selected={editingId === drug._id}
           primary={drug.name}
-          secondary={`${drug.strength} ${drug.unit}`}
+          secondary={formatDrugSecondary(drug)}
           onEdit={() => handleEdit(drug)}
           onDelete={() => handleDelete(drug._id)}
         />

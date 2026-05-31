@@ -26,14 +26,15 @@ import {
 } from "../components/catalog/catalogPageStyles";
 import Cookies from "js-cookie";
 import { useCatalogEditSave } from "../components/catalog/useCatalogEditSave";
+import { formatDrugLabel, formatDrugStrengthUnit } from "../utils/drugFormat";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
 
 interface Drug {
     _id: string;
     name: string;
-    strength: number;
-    unit: string;
+    strength?: number | null;
+    unit?: string | null;
 }
 
 interface DrugWithCon {
@@ -389,7 +390,7 @@ const Treatments: React.FC = () => {
                       fullWidth
                       options={drugs}
                       getOptionLabel={(option) =>
-                        `${option.name} - ${option.strength} ${option.unit}`
+                        formatDrugLabel(option.name, option.strength, option.unit)
                       }
                       value={
                         drugs.find((d) => d._id === selectedDrugId) || null
@@ -429,7 +430,7 @@ const Treatments: React.FC = () => {
                     {regimenDrugs.map((item, i) => (
                       <CatalogFormListRow
                         key={i}
-                        primary={`${item.drug.name} — ${item.drug.strength} ${item.drug.unit}`}
+                        primary={`${item.drug.name} — ${formatDrugStrengthUnit(item.drug.strength, item.drug.unit)}`}
                         secondary={`Annual consumption: ${item.annual_patient_con}`}
                         onRemove={() =>
                           setRegimenDrugs(

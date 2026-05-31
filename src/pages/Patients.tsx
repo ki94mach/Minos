@@ -127,7 +127,7 @@ const Patients: React.FC = () => {
   const [editCharModalData, setEditCharModalData] = useState<EditCharModalData | null>(null);
   const [allTreatments, setAllTreatments] = useState<TreatmentOption[]>([]);
   const [allDrugs, setAllDrugs] = useState<
-    { _id: string; name: string; strength: number; unit: string }[]
+    { _id: string; name: string; strength?: number | null; unit?: string | null }[]
   >([]);
   const [editTreatModalData, setEditTreatModalData] = useState<EditTreatModalData|null>(null);
   const [overviewEmptyHint, setOverviewEmptyHint] = useState<string | null>(null);

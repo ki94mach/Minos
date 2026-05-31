@@ -17,8 +17,7 @@ from utils.business_rules import (
     validate_optional_string,
     validate_rate,
     validate_size,
-    validate_strength,
-    validate_unit,
+    normalize_drug_unit,
     validate_and_transform_drug,
     validate_and_transform_characteristic,
     validate_and_transform_treatment_embedded,
@@ -27,7 +26,6 @@ from utils.business_rules import (
     validate_and_transform_alternative
 )
 
-ALLOWED_UNITS = ['mg', 'g', 'ng', 'mcg', 'IU']
 ALLOWED_TREATMENT_TYPES = ['Treatment', 'Regimen', 'Alternative']
 ALLOWED_NODE_TYPES = ["characteristic", "treatment", "followup"]
 
@@ -92,8 +90,8 @@ class CharacteristicUpdate(BaseModel):
 
 class DrugCreate(BaseModel):
     name: str = Field(..., min_length=1)
-    strength: int = Field(..., gt=0)
-    unit: str
+    strength: Optional[int] = None
+    unit: Optional[str] = None
 
     @field_validator('name', mode='after')
     @classmethod
@@ -102,19 +100,14 @@ class DrugCreate(BaseModel):
             validate_non_empty(v, "Drug name")
             )
 
-    @field_validator('strength', mode='after')
-    @classmethod
-    def validate_drug_strength(cls, v: int) -> int:
-        return validate_strength(v)
-
     @field_validator('unit', mode='after')
     @classmethod
-    def validate_drug_unit(cls, v: str) -> str:
-        return validate_unit(v, ALLOWED_UNITS)
+    def normalize_unit(cls, v: Optional[str]) -> Optional[str]:
+        return normalize_drug_unit(v)
 
 class DrugUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1)
-    strength: Optional[int] = Field(None, gt=0)
+    strength: Optional[int] = None
     unit: Optional[str] = None
 
     @field_validator('name', mode='after')
@@ -124,22 +117,10 @@ class DrugUpdate(BaseModel):
         ) -> Optional[str]:
         return validate_optional_string(v, "Drug name")
 
-    @field_validator('strength', mode='after')
-    @classmethod
-    def validate_optional_strength(
-        cls, v: Optional[int]
-        ) -> Optional[int]:
-
-        if v is not None:
-            return validate_strength(v)
-        return v
-
     @field_validator('unit', mode='after')
     @classmethod
-    def validate_unit(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            return validate_unit(v, ALLOWED_UNITS)
-        return v
+    def normalize_unit(cls, v: Optional[str]) -> Optional[str]:
+        return normalize_drug_unit(v)
 
 # ------------------------------------------------------------------------------
 # TREATMENT VALIDATORS
@@ -153,8 +134,8 @@ class DrugSubItem(BaseModel):
     )
     id: PyObjectId = Field(..., alias="_id")
     name: str
-    strength: int
-    unit: str
+    strength: Optional[int] = None
+    unit: Optional[str] = None
 
     @field_validator('name', mode='after')
     @classmethod
@@ -163,13 +144,6 @@ class DrugSubItem(BaseModel):
             validate_non_empty(v, "Regimen name")
             )
 
-    @field_validator('unit', mode='after')
-    @classmethod
-    def validate_unit(cls, v: str) -> str:
-        if v not in ALLOWED_UNITS:
-            raise ValueError(f'Unit must be one of {ALLOWED_UNITS}')
-        return v
-    
     @model_validator(mode="after")
     def validate_against_database(self) -> "DrugSubItem":
         drug_data = {

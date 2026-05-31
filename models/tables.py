@@ -95,8 +95,8 @@ class CharacteristicEmbedded(EmbeddedDocument):
 class DrugEmbedded(EmbeddedDocument):
     _id = ObjectIdField(required=True)
     name = StringField(required=True)
-    strength = IntField(required=True)
-    unit = StringField(required=True, choices=['mg', 'g', 'ng', 'mcg', 'IU'])
+    strength = IntField(required=False)
+    unit = StringField(required=False)
 
 
 class TreatmentDrug(EmbeddedDocument):
@@ -147,8 +147,8 @@ class Characteristic(Document):
 
 class Drug(Document):
     name = StringField(required=True)
-    strength = IntField(required=True)
-    unit = StringField(required=True, choices=['mg', 'g', 'ng', 'mcg', 'IU'])
+    strength = IntField(required=False)
+    unit = StringField(required=False)
     meta = {
         'collection': 'drugs',
         'indexes': [{'fields': ['name', 'strength', 'unit'], 'unique': True}]

@@ -3,7 +3,7 @@
 export type CatalogMasterSnapshots = {
   characteristics: Map<string, { name: string; type: string }>;
   treatments: Map<string, { name: string; type: string }>;
-  drugs: Map<string, { name: string; strength: number; unit: string }>;
+  drugs: Map<string, { name: string; strength: number | null; unit: string | null }>;
 };
 
 function catalogIdString(id: unknown): string | null {
@@ -15,7 +15,7 @@ function catalogIdString(id: unknown): string | null {
 }
 
 function drugEmbedStale(
-  embedded: { _id?: unknown; name?: string; strength?: number; unit?: string },
+  embedded: { _id?: unknown; name?: string; strength?: number | null; unit?: string | null },
   masters: CatalogMasterSnapshots
 ): boolean {
   const id = catalogIdString(embedded._id);
@@ -24,8 +24,8 @@ function drugEmbedStale(
   if (!master) return false;
   return (
     (embedded.name ?? "") !== master.name ||
-    Number(embedded.strength) !== Number(master.strength) ||
-    (embedded.unit ?? "") !== master.unit
+    (embedded.strength ?? null) !== master.strength ||
+    (embedded.unit ?? null) !== (master.unit ?? null)
   );
 }
 
@@ -45,7 +45,7 @@ function regimenDrugsStale(
 export function buildCatalogMasterSnapshots(
   characteristics: Array<{ _id: string; type: string; name: string }>,
   treatments: Array<{ _id: string; name: string; type: string }>,
-  drugs: Array<{ _id: string; name: string; strength: number; unit: string }>
+  drugs: Array<{ _id: string; name: string; strength?: number | null; unit?: string | null }>
 ): CatalogMasterSnapshots {
   const characteristicsMap = new Map<string, { name: string; type: string }>();
   for (const c of characteristics) {
@@ -59,13 +59,13 @@ export function buildCatalogMasterSnapshots(
 
   const drugsMap = new Map<
     string,
-    { name: string; strength: number; unit: string }
+    { name: string; strength: number | null; unit: string | null }
   >();
   for (const d of drugs) {
     drugsMap.set(String(d._id), {
       name: d.name,
-      strength: Number(d.strength),
-      unit: d.unit,
+      strength: d.strength == null ? null : Number(d.strength),
+      unit: d.unit == null || String(d.unit).trim() === "" ? null : d.unit,
     });
   }
 

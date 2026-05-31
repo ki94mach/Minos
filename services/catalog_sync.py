@@ -352,8 +352,8 @@ def _patch_drug_embed(
     drug_embed: Any,
     drug_id: ObjectId,
     name: str,
-    strength: int,
-    unit: str,
+    strength: Optional[int],
+    unit: Optional[str],
 ) -> bool:
     if drug_embed is None:
         return False
@@ -375,8 +375,8 @@ def _sync_drug_in_regimen(
     regimen: Any,
     drug_id: ObjectId,
     name: str,
-    strength: int,
-    unit: str,
+    strength: Optional[int],
+    unit: Optional[str],
 ) -> int:
     if regimen is None:
         return 0
@@ -392,8 +392,8 @@ def _sync_drug_in_treatment_body(
     body: Any,
     drug_id: ObjectId,
     name: str,
-    strength: int,
-    unit: str,
+    strength: Optional[int],
+    unit: Optional[str],
 ) -> int:
     """Regimen + alternative regimens on TreatmentEmbedded or master Treatment."""
     updated = _sync_drug_in_regimen(
@@ -410,8 +410,8 @@ def _sync_drug_in_tree(
     tree: Any,
     drug_id: ObjectId,
     name: str,
-    strength: int,
-    unit: str,
+    strength: Optional[int],
+    unit: Optional[str],
 ) -> int:
     """Patch DrugEmbedded slots in treatment nodes only; return embed patch count."""
     updated = 0
