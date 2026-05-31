@@ -9,6 +9,7 @@ type EditTreatmentDialogProps = {
   onSaved: () => void;
   editData: EditTreatModalData;
   allTreatments: TreatmentOption[];
+  container?: HTMLElement | (() => HTMLElement | null) | null;
 };
 
 export default function EditTreatmentDialog({
@@ -17,9 +18,10 @@ export default function EditTreatmentDialog({
   onSaved,
   editData,
   allTreatments,
+  container,
 }: EditTreatmentDialogProps) {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth container={container}>
       <DialogTitle>Edit Treatment Node</DialogTitle>
       <DialogContent dividers>
         <EditTreatmentForm

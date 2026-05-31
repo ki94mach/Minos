@@ -7,6 +7,7 @@ type Props = {
   onClose: () => void;
   parentNode: Node;
   onSaved: () => void;
+  container?: HTMLElement | (() => HTMLElement | null) | null;
 };
 
 export default function AddCharacteristicDialog({
@@ -14,6 +15,7 @@ export default function AddCharacteristicDialog({
   onClose,
   parentNode,
   onSaved,
+  container,
 }: Props) {
   const parentSize = parentNode?.data.size;
   const parentId = parentNode?.data.docId || parentNode.id;
@@ -25,7 +27,7 @@ export default function AddCharacteristicDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth container={container}>
       <DialogContent dividers>
         <CharacteristicForm
           parentId={parentId}

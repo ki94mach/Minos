@@ -8,6 +8,7 @@ type EditCharacteristicDialogProps = {
   onSaved: () => void;
   editData: EditCharModalData;
   allChars: OneChar[];
+  container?: HTMLElement | (() => HTMLElement | null) | null;
 };
 
 export default function EditCharacteristicDialog({
@@ -16,9 +17,10 @@ export default function EditCharacteristicDialog({
   editData,
   allChars,
   onSaved,
+  container,
 }: EditCharacteristicDialogProps) {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth container={container}>
       <DialogTitle>Edit Characteristic Node</DialogTitle>
       <DialogContent dividers>
         <EditCharacteristicForm

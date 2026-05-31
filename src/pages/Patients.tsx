@@ -127,6 +127,15 @@ const Patients: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
   const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
+  const [ctx, setCtx] = useState<
+    { x: number; y: number; nodeId: string } | null
+  >(null);
+
+  const getOverlayContainer = useCallback(
+    () =>
+      (document.fullscreenElement as HTMLElement | null) ?? document.body,
+    []
+  );
 
   const patientTreeFitViewOptions = useMemo(
     () => ({
@@ -145,10 +154,9 @@ const Patients: React.FC = () => {
     const onFullscreenChange = () => {
       const active = document.fullscreenElement === canvasRef.current;
       setIsCanvasFullscreen(active);
+      setCtx(null);
       window.dispatchEvent(new Event("resize"));
-      if (active) {
-        setTimeout(() => fitPatientTreeView(), 100);
-      }
+      setTimeout(() => fitPatientTreeView(), 100);
     };
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
@@ -182,11 +190,6 @@ const Patients: React.FC = () => {
   const { rootId } = useParams<{ rootId?: string }>();
   const selectedRootId = rootId ?? null;
   const isOverview = selectedRootId === null;
-
-  const [ctx, setCtx] = useState<              // null = closed
-  | { x: number; y: number; nodeId: string }
-  | null
->(null);
 
 // ─── “Add Node” state: open dialog under a specific parent ───
 const [addingParentId, setAddingParentId] = useState<string | null>(null);
@@ -762,7 +765,9 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             border: "none",
           },
         }}>
-        <Tooltip title={isCanvasFullscreen ? "Exit full screen" : "Full screen"}>
+        <Tooltip
+          title={isCanvasFullscreen ? "Exit full screen" : "Full screen"}
+          slotProps={{ popper: { container: getOverlayContainer } }}>
           <IconButton
             onClick={() => void toggleCanvasFullscreen()}
             aria-label={isCanvasFullscreen ? "Exit full screen" : "Full screen"}
@@ -810,6 +815,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         <Menu
           open={!!ctx}
           onClose={() => setCtx(null)}
+          container={getOverlayContainer}
           anchorReference="anchorPosition"
           anchorPosition={ctx ? { top: ctx.y, left: ctx.x } : undefined}>
           <MenuItem
@@ -867,6 +873,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             }}
             editData={editCharModalData}
             allChars={allCharacteristics}
+            container={getOverlayContainer}
           />
         )}
         {/* ─── end “Edit Characteristic” ─── */}
@@ -882,6 +889,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             }}
             editData={editTreatModalData}
             allTreatments={allTreatments}
+            container={getOverlayContainer}
           />
         )}
 
@@ -893,6 +901,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       {isChoosingType && (
         <Dialog
           open
+          container={getOverlayContainer}
           onClose={() => {
             setIsChoosingType(false);
             setAddingParentId(null);
@@ -939,6 +948,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           }}
           parentNode={parentNode!}
           onSaved={drawPatientNodes}
+          container={getOverlayContainer}
         />
       )}
       {/* ─── end “Add Characteristic” ─── */}
@@ -953,6 +963,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           }}
           parentNode={parentNode!}
           onSaved={drawPatientNodes}
+          container={getOverlayContainer}
         />
       )}
       {/* ─── end “Add Treatment” ─── */}
@@ -967,6 +978,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           }}
           parentNode={parentNode!}
           onSaved={drawPatientNodes}
+          container={getOverlayContainer}
         />
       )}
       {/* ─── end “Add Follow‐up” ─── */}

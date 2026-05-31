@@ -7,6 +7,7 @@ type Props = {
   onClose: () => void;
   parentNode: Node;
   onSaved: () => void;
+  container?: HTMLElement | (() => HTMLElement | null) | null;
 };
 
 export default function AddTreatmentDialog({
@@ -14,13 +15,14 @@ export default function AddTreatmentDialog({
   onClose,
   parentNode,
   onSaved,
+  container,
 }: Props) {
   const parentSize = parentNode?.data.size ?? 1;
   const parentId = parentNode?.data.docId || parentNode.id;
   const treeId = parentNode?.data.treeId;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth container={container}>
       <DialogContent dividers>
         <TreatmentForm
           parentId={parentId}
