@@ -39,11 +39,18 @@ def validate_strength(strength: int) -> int:
         raise ValueError("Strength must be a positive integer")
     return strength
 
+def normalize_drug_unit(unit: str) -> str:
+    """Normalize drug unit; IU stays uppercase, others lowercase."""
+    if str(unit).upper() == "IU":
+        return "IU"
+    return str(unit).lower()
+
 def validate_unit(unit: str, allowed_units: list) -> str:
     """Validate that a unit is in the allowed list."""
-    if unit not in allowed_units:
+    normalized = normalize_drug_unit(unit)
+    if normalized not in allowed_units:
         raise ValueError(f"Unit must be one of {allowed_units}")
-    return unit.lower()
+    return normalized
 
 def validate_and_transform_drug(drug_data: dict) -> dict:
     """
@@ -62,7 +69,7 @@ def validate_and_transform_drug(drug_data: dict) -> dict:
     if 'name' in drug_data:
         drug_data['name'] = to_title_format(drug_data['name'])
     if 'unit' in drug_data:
-        drug_data['unit'] = drug_data['unit'].lower()
+        drug_data['unit'] = normalize_drug_unit(drug_data['unit'])
 
     if drug_data.get('name') != drug.name:
         raise ValueError("Name does not match the database record")

@@ -192,6 +192,7 @@ const Drugs: React.FC = () => {
                   <MenuItem value="g">g</MenuItem>
                   <MenuItem value="ml">ml</MenuItem>
                   <MenuItem value="mcg">mcg</MenuItem>
+                  <MenuItem value="IU">IU</MenuItem>
                   <MenuItem value="%">%</MenuItem>
                 </Select>
               </FormControl>
