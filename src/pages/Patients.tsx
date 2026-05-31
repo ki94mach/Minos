@@ -47,7 +47,10 @@ import {
   findNodeById,
   calculateSizeFromTree,
   hashColor,
-  applyDagreLayout
+  applyDagreLayout,
+  overviewFlowNodeId,
+  patientIdFromOverviewFlowNodeId,
+  listPatientsWithPopulationRoot,
 } from "../utils/patientTreeUtils";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
@@ -74,6 +77,8 @@ interface EditCharModalData {
   currentType: string;       
   currentName: string;        
   currentRate: number;
+  currentSize?: number;
+  isTreeRoot?: boolean;
   patientId: string;
   parentId: string;
 }
@@ -161,6 +166,8 @@ const Patients: React.FC = () => {
     [ctx, nodes]
   );
   const ctxIsTreeRoot = ctxNode?.data?.isTreeRoot === true;
+  const ctxIsPopulationRoot =
+    ctxIsTreeRoot && ctxNode?.data?.charType === "Population";
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -226,15 +233,33 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       .get(API_ENDPOINTS.PATIENTS)
       .then((res) => {
         const parsedList = asApiList<any>(res.data);
-        let patientDoc = parsedList.find((p: any) => String(p._id) === patientTreeId);
-        if (!patientDoc) {
-          for (const p of parsedList) {
-            // p.tree is the root of this patient’s embedded‐tree
-            const maybeMatch = findNodeById(p.tree, uniqueCharOrTreatId);
-            if (maybeMatch) {
-              patientDoc = p;
-              break;
+        let patientDoc: any = null;
+        let foundNode: any = null;
+
+        if (n.data.treeId) {
+          patientDoc = parsedList.find((p: any) => {
+            const pid = p._id?.$oid || p._id;
+            return String(pid) === String(n.data.treeId);
+          });
+          if (patientDoc && n.data.docId) {
+            foundNode = findNodeById(patientDoc.tree, n.data.docId);
+          }
+        }
+
+        if (!foundNode) {
+          const lookupCatalogId = n.data.catalogId || uniqueCharOrTreatId;
+          patientDoc = parsedList.find((p: any) => String(p._id) === patientTreeId);
+          if (!patientDoc) {
+            for (const p of parsedList) {
+              const maybeMatch = findNodeById(p.tree, lookupCatalogId);
+              if (maybeMatch) {
+                patientDoc = p;
+                foundNode = maybeMatch;
+                break;
+              }
             }
+          } else {
+            foundNode = findNodeById(patientDoc.tree, lookupCatalogId);
           }
         }
 
@@ -245,8 +270,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
         const realPatientId: string = patientDoc._id?.$oid || patientDoc._id;
 
-        const treeObj = patientDoc.tree;
-        const foundNode = findNodeById(treeObj, uniqueCharOrTreatId);
         if (!foundNode) {
           alert("Node not found inside this patient’s tree.");
           return;
@@ -258,16 +281,24 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           foundNode.parent_id?._id?.$oid || foundNode.parent_id;
 
         if (n.data.type === "characteristic") {
-          const existingType = foundNode.characteristic_data?.type || "";
+          const existingType = getEmbeddedCharType(foundNode) || "";
           const existingName = foundNode.characteristic_data?.name || "";
           const existingRate = foundNode.rate ?? 0;
-          // const existingParentId: string = foundNode.parent_id?._id?.$oid || foundNode.parent_id;
+          const isTreeRoot = n.data.isTreeRoot === true;
+          const existingSize =
+            typeof foundNode.size === "number"
+              ? foundNode.size
+              : typeof n.data.size === "number"
+                ? n.data.size
+                : 1;
           setEditCharModalData({
             nodeId: realNodeId,
             currentCharId: getUniqueCharId(foundNode),
             currentType: existingType,
             currentName: existingName,
             currentRate: existingRate,
+            currentSize: existingSize,
+            isTreeRoot,
             patientId: realPatientId,
             parentId: existingParentId,
           });
@@ -322,21 +353,78 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
     const nodeDocId = node.data.docId;
     const patientTreeId = node.data.treeId;
     const isTreeRoot = node.data.isTreeRoot === true;
+    const isPopulationRoot =
+      isTreeRoot && node.data.charType === "Population";
     const cascade = options?.cascade === true;
 
-    if (!patientTreeId) {
+    if (!patientTreeId && !isPopulationRoot) {
       alert("Missing patient model ID.");
       return;
     }
 
-    const confirmMsg = isTreeRoot
-      ? "Delete this entire patient model? You can create a new one afterward."
-      : cascade
-        ? "Remove this branch?\n\nThis node and everything below it will be removed. This cannot be undone."
-        : "Remove this node?\n\nThe branch below will stay connected to the node above.";
-    if (!window.confirm(confirmMsg)) return;
+    const populationName = node.data.label || "Population";
+    const populationCatalogId = node.data.catalogId as string | undefined;
+
+    let confirmMsg: string;
+    if (isPopulationRoot) {
+      // Fetched below; placeholder until we know how many models match.
+      confirmMsg = "";
+    } else if (isTreeRoot) {
+      confirmMsg =
+        "Delete this entire patient model? You can create a new one afterward.";
+    } else if (cascade) {
+      confirmMsg =
+        "Remove this branch?\n\nThis node and everything below it will be removed. This cannot be undone.";
+    } else {
+      confirmMsg =
+        "Remove this node?\n\nThe branch below will stay connected to the node above.";
+    }
 
     try {
+      if (isPopulationRoot) {
+        if (!populationCatalogId) {
+          alert("Missing population catalog ID.");
+          return;
+        }
+
+        const res = await api.get(API_ENDPOINTS.PATIENTS);
+        const parsedList = asApiList<any>(res.data);
+        const toDelete = listPatientsWithPopulationRoot(
+          parsedList,
+          populationCatalogId
+        );
+
+        if (toDelete.length === 0) {
+          alert("No patient models found for this population.");
+          return;
+        }
+
+        const count = toDelete.length;
+        const modelLabel = count === 1 ? "patient model" : `${count} patient models`;
+        const populationConfirm =
+          `Delete ${modelLabel} for "${populationName}"?\n\n` +
+          "Every branch under " +
+          (count === 1 ? "this population" : "each model") +
+          " (characteristics, treatments, and follow-ups) will be permanently removed from the database. " +
+          "This cannot be undone.";
+        if (!window.confirm(populationConfirm)) return;
+
+        for (const patient of toDelete) {
+          const pid = patient._id?.$oid || patient._id;
+          await api.delete(API_ENDPOINTS.PATIENT_DETAIL(String(pid)));
+        }
+
+        await drawPatientNodes();
+        alert(
+          count === 1
+            ? "Population and all of its branches were deleted."
+            : `${count} patient models for "${populationName}" were deleted.`
+        );
+        return;
+      }
+
+      if (!window.confirm(confirmMsg)) return;
+
       if (isTreeRoot) {
         await api.delete(API_ENDPOINTS.PATIENT_DETAIL(patientTreeId));
       } else {
@@ -577,16 +665,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           allDrugs
         );
 
-        const treeIdMap = new Map<string, string>();
-        parsedPatients.forEach((p: any) => {
-          const collectIds = (node: any) => {
-            const id = getUniqueCharId(node);
-            treeIdMap.set(id, p._id?.$oid || p._id);
-            (node.children || []).forEach(collectIds);
-          };
-          collectIds(p.tree);
-        });
-
         // ──────────────────────────────────────────────────
         // 3) Kick off DFS for each root
         roots.forEach((rootNode: any, idx: number) => {     
@@ -658,7 +736,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
               edges,
               hashColor,
               getUniqueCharId,
-              treeIdMap,
               navigate,
               depthLimit,
               catalogMasters,
@@ -668,7 +745,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         });
 
         let finalNodes = Array.from(nodesById.values()).map((node) => {
-          const fallbackTreeId = treeIdMap.get(node.id) || truePatientId;
+          const fallbackTreeId =
+            patientIdFromOverviewFlowNodeId(node.id) || truePatientId;
 
           return {
             ...node,
@@ -682,10 +760,13 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
         let routedEdges = assignEdgeHandles(finalNodes, edges);
 
-        // Overview merges by catalog id; orphans can linger after delete. Drill-down
-        // uses per-tree document ids — do not filter with URL catalog id as root.
+        // Overview scopes nodes per patient tree; orphans can linger after delete.
         if (isOverviewMode) {
-          const overviewRootIds = roots.map((rootNode) => getUniqueCharId(rootNode));
+          const overviewRootIds = roots.map((rootNode: any, idx: number) => {
+            const pid =
+              parsedPatients[idx]?._id?.$oid || parsedPatients[idx]?._id;
+            return overviewFlowNodeId(pid, getUniqueCharId(rootNode));
+          });
           finalNodes = keepReachableNodes(finalNodes, routedEdges, overviewRootIds);
           routedEdges = filterEdgesForNodes(finalNodes, routedEdges);
         }
@@ -694,8 +775,13 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           finalNodes = applyDagreLayout(finalNodes, routedEdges);
         } else {
           let offsetX = 360;
-          roots.forEach((rootNode: any) => {
-            const rootUniqueId = getUniqueCharId(rootNode);
+          roots.forEach((rootNode: any, idx: number) => {
+            const pid =
+              parsedPatients[idx]?._id?.$oid || parsedPatients[idx]?._id;
+            const rootUniqueId = overviewFlowNodeId(
+              pid,
+              getUniqueCharId(rootNode)
+            );
             const { nodes: laidOut, clusterWidth } = layoutOverviewPreviewCluster(
               finalNodes,
               routedEdges,
@@ -877,16 +963,27 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
           {isOverview ? (
             ctx &&
-            !ctxIsTreeRoot && (
+            (ctxIsPopulationRoot ? (
               <MenuItem
                 sx={deleteMenuItemSx}
                 onClick={() => {
-                  deleteNode(ctx.nodeId, { cascade: true });
+                  deleteNode(ctx.nodeId);
                   setCtx(null);
                 }}>
-                Remove Branch
+                Delete Population
               </MenuItem>
-            )
+            ) : (
+              !ctxIsTreeRoot && (
+                <MenuItem
+                  sx={deleteMenuItemSx}
+                  onClick={() => {
+                    deleteNode(ctx.nodeId, { cascade: true });
+                    setCtx(null);
+                  }}>
+                  Remove Branch
+                </MenuItem>
+              )
+            ))
           ) : (
             ctx && (
               <MenuItem

@@ -12,6 +12,7 @@ import {
   getOverviewPreviewChildren,
   isPopulationNode,
   isPrimaryIndicationNode,
+  overviewFlowNodeId,
   shouldIncludeInOverviewPreview,
 } from "./patientTreeUtils";
 
@@ -34,7 +35,6 @@ export function buildFlowNodes(
     edges: Edge[];
     hashColor: (str: string) => string;
     getUniqueCharId: (node: any) => string;
-    treeIdMap: Map<string, string>;
     navigate: NavigateFunction;
     depthLimit: number;
     catalogMasters?: CatalogMasterSnapshots | null;
@@ -49,7 +49,6 @@ export function buildFlowNodes(
     nodesById,
     edges,
     hashColor,
-    treeIdMap,
     navigate,
     depthLimit,
   } = deps;
@@ -74,17 +73,18 @@ export function buildFlowNodes(
     node._id?.$oid ||
     node._id;
 
-  // Overview: one React-Flow node per catalog entity. Drill-down: one node per tree instance.
+  // Overview: one React-Flow node per catalog entity within each patient tree.
+  // Drill-down: one node per tree instance.
   const flowNodeId = isOverviewMode
-    ? catalogId
+    ? overviewFlowNodeId(treeId, catalogId)
     : node._id?.$oid || node._id;
 
   const thisCharType = getEmbeddedCharType(node) ?? null;
   const childParentIsPopulation = isOverviewMode && isPopulationNode(node);
 
   // ──────────────────────────────────────────────────
-  // Overview only: merge duplicate catalog ids (e.g. same Population across patients).
-  if (isOverviewMode && visited.has(catalogId)) {
+  // Overview only: merge duplicate catalog ids within the same patient tree.
+  if (isOverviewMode && visited.has(flowNodeId)) {
     if (parentId) {
       const edgeId = `${parentId}->${flowNodeId}`;
       if (!edgeSet.has(edgeId)) {
@@ -112,7 +112,7 @@ export function buildFlowNodes(
   }
 
   if (isOverviewMode) {
-    visited.add(catalogId);
+    visited.add(flowNodeId);
   }
 
   // Drill-in URL uses catalog id; skip unrelated roots at depth 0.
@@ -173,7 +173,7 @@ export function buildFlowNodes(
         alternatives: node.treatment_data?.alternatives || [],
         color: hashColor(catalogId),
         isOverviewMode: isOverviewMode,
-        treeId: isOverviewMode ? treeIdMap.get(catalogId) : treeId,
+        treeId,
         isOverview: isOverviewMode,
         // Population roots in overview only — not the PI subtree root when drilled in.
         isTreeRoot: isOverviewMode && parentId === null && depth === 0,

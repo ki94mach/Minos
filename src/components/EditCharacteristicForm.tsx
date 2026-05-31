@@ -27,6 +27,8 @@ interface EditCharModalData {
   currentType: string;
   currentName: string;
   currentRate: number;
+  currentSize?: number;
+  isTreeRoot?: boolean;
   patientId: string;
   parentId: string;
 }
@@ -44,13 +46,25 @@ const EditCharacteristicForm: React.FC<EditCharacteristicFormProps> = ({
   onCancel,
   onSave,
 }) => {
-  const { nodeId, patientId, currentCharId, currentType, currentName, currentRate } = editData;
+  const {
+    nodeId,
+    patientId,
+    currentCharId,
+    currentType,
+    currentName,
+    currentRate,
+    currentSize,
+    isTreeRoot,
+  } = editData;
 
   // Local state for the dropdown and rate:
   const [selectedCharId, setSelectedCharId] = useState<string>(currentCharId);
   const [selectedType, setSelectedType] = useState<string>(currentType);
   const [selectedName, setSelectedName] = useState<string>(currentName);
-  const [rateValue, setRateValue] = useState<number>(currentRate);  
+  const [rateValue, setRateValue] = useState<number>(currentRate);
+  const [sizeValue, setSizeValue] = useState<string>(
+    String(currentSize ?? 1)
+  );
 
   useEffect(() => {
     const found: OneChar | undefined = allChars.find((c) => c._id === selectedCharId);
@@ -79,11 +93,24 @@ const EditCharacteristicForm: React.FC<EditCharacteristicFormProps> = ({
       );
     }
 
-        const response = await api.put(
-          API_ENDPOINTS.UPDATE_NODE(patientId, nodeId),
-          { rate: rateValue },
-          config
-        );
+      const nodePayload: { rate?: number; size?: number } = {};
+      if (!isTreeRoot) {
+        nodePayload.rate = rateValue;
+      }
+      if (isTreeRoot) {
+        const parsedSize = Number(sizeValue);
+        if (!Number.isFinite(parsedSize) || parsedSize <= 0) {
+          alert("Enter a valid population size greater than zero.");
+          return;
+        }
+        nodePayload.size = parsedSize;
+      }
+
+      const response = await api.put(
+        API_ENDPOINTS.UPDATE_NODE(patientId, nodeId),
+        nodePayload,
+        config
+      );
 
       if (response.data?.message) {
         alert(response.data.message);
@@ -136,14 +163,25 @@ const EditCharacteristicForm: React.FC<EditCharacteristicFormProps> = ({
         </Typography>
       </Box>
 
-      {/* 3) Editable “rate” text field */}
-      <TextField
-        label="Rate"
-        type="number"
-        fullWidth
-        value={rateValue}
-        onChange={(e) => setRateValue(Number(e.target.value))}
-      />
+      {isTreeRoot ? (
+        <TextField
+          label="Population size"
+          type="number"
+          fullWidth
+          value={sizeValue}
+          inputProps={{ min: 1, step: 1 }}
+          onChange={(e) => setSizeValue(e.target.value)}
+          helperText="Total population size for this root node"
+        />
+      ) : (
+        <TextField
+          label="Rate"
+          type="number"
+          fullWidth
+          value={rateValue}
+          onChange={(e) => setRateValue(Number(e.target.value))}
+        />
+      )}
 
       {/* 4) Cancel / Save buttons */}
       <DialogActions>

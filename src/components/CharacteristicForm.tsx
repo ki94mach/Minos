@@ -155,8 +155,13 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
     
       await api.post(API_ENDPOINTS.ADD_NODE(patientId), payload, config);
       onSaved({ characteristicId: selectedId, rate });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to add node:", err);
+      const msg =
+        err.response?.data?.error ??
+        err.response?.data?.message ??
+        "Failed to add node.";
+      alert(msg);
     } finally {
       setBusy(false);
     }

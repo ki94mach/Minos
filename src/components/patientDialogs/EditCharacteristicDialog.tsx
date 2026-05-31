@@ -21,7 +21,9 @@ export default function EditCharacteristicDialog({
 }: EditCharacteristicDialogProps) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth container={container}>
-      <DialogTitle>Edit Characteristic Node</DialogTitle>
+      <DialogTitle>
+        {editData.isTreeRoot ? "Edit Population Root" : "Edit Characteristic Node"}
+      </DialogTitle>
       <DialogContent dividers>
         <EditCharacteristicForm
           editData={editData}

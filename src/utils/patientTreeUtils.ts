@@ -82,6 +82,31 @@ export function getUniqueCharId(node: any): string {
   );
 }
 
+/** Overview React-Flow id scoped to one patient tree (avoids cross-tree merge). */
+export function overviewFlowNodeId(treeId: string, catalogId: string): string {
+  return `${treeId}:${catalogId}`;
+}
+
+export function patientIdFromOverviewFlowNodeId(flowNodeId: string): string | null {
+  const sep = flowNodeId.indexOf(":");
+  return sep > 0 ? flowNodeId.slice(0, sep) : null;
+}
+
+/** Patient documents whose embedded tree root is this population catalog entry. */
+export function listPatientsWithPopulationRoot(
+  patients: any[],
+  populationCatalogId: string
+): any[] {
+  return patients.filter((patient) => {
+    const root = patient?.tree;
+    if (!root) return false;
+    return (
+      isPopulationNode(root) &&
+      String(getUniqueCharId(root)) === String(populationCatalogId)
+    );
+  });
+}
+
 function nodeDocId(node: any): string | undefined {
   const id = node._id?.$oid || node._id;
   return id != null ? String(id) : undefined;
