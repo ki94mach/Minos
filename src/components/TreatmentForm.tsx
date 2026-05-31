@@ -22,7 +22,7 @@ interface Drug {
 
 interface DrugWithCon {
   drug: Drug;
-  annual_patient_con: number;
+  annual_patient_con?: number | null;
 }
 
 export interface TreatmentOption {

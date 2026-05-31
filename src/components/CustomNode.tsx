@@ -148,7 +148,9 @@ const CustomNode = (
                       <li key={j}>
                         {d.drug.name} –{" "}
                         {formatDrugStrengthUnit(d.drug.strength, d.drug.unit)}
-                        {" "}(Consumption: {d.annual_patient_con})
+                        {d.annual_patient_con != null && (
+                          <> (Consumption: {d.annual_patient_con})</>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -165,7 +167,9 @@ const CustomNode = (
             {nodeData.regimen.drugs.map((d: any, i: number) => (
               <div key={i}>
                 {d.drug.name} – {formatDrugStrengthUnit(d.drug.strength, d.drug.unit)}
-                (Consumption: {d.annual_patient_con})
+                {d.annual_patient_con != null && (
+                  <> (Consumption: {d.annual_patient_con})</>
+                )}
               </div>
             ))}
           </div>

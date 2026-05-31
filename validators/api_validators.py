@@ -24,6 +24,7 @@ from utils.business_rules import (
     validate_and_transform_followup_embedded,
     to_title_format,
     validate_and_transform_alternative
+    validate_alternative_ratios_sum,
 )
 
 ALLOWED_TREATMENT_TYPES = ['Treatment', 'Regimen', 'Alternative']
@@ -157,12 +158,7 @@ class DrugSubItem(BaseModel):
     
 class TreatmentDrugItem(BaseModel):
     drug: DrugSubItem
-    annual_patient_con: int
-
-    @field_validator('annual_patient_con', mode='after')
-    @classmethod
-    def validate_consumtion_size(cls, v: float) -> float:
-        return validate_size(v)
+    annual_patient_con: Optional[int] = None
 
 class Regimen(BaseModel):
     drugs: List[TreatmentDrugItem]

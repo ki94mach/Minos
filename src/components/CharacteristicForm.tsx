@@ -41,7 +41,7 @@ interface ChildNode {
           strength: number;
           unit: string;
         };
-        annual_patient_con: number;
+        annual_patient_con?: number | null;
       }>;
     };
   };

@@ -39,7 +39,7 @@ interface Drug {
 
 interface DrugWithCon {
     drug: Drug;
-    annual_patient_con: number;
+    annual_patient_con?: number | null;
 }
 
 interface Alternative {
@@ -67,7 +67,7 @@ const Treatments: React.FC = () => {
     const [treatmentType, setTreatmentType] = useState("Treatment");
 
     const [selectedDrugId, setSelectedDrugId] = useState("");
-    const [annualConsumption, setAnnualConsumption] = useState<number>(0);
+    const [annualConsumption, setAnnualConsumption] = useState<number | "">("");
     const [regimenDrugs, setRegimenDrugs] = useState<DrugWithCon[]>([]);
 
     const [alternativeRegimenDrugs, setAlternativeRegimenDrugs] = useState<DrugWithCon[]>([]);
@@ -104,8 +104,8 @@ const Treatments: React.FC = () => {
     };
 
     const addDrug = (toAlternative = false) => {
-        if (!selectedDrugId || annualConsumption <= 0) {
-            alert("Please select a drug and provide valid annual patient consumption.");
+        if (!selectedDrugId) {
+            alert("Please select a drug.");
             return;
         }
         const selectedDrug = drugs.find(d => d._id === selectedDrugId);
@@ -116,14 +116,15 @@ const Treatments: React.FC = () => {
               ...selectedDrug,
               _id: selectedDrug._id 
             },
-            annual_patient_con: annualConsumption
+            annual_patient_con:
+              annualConsumption === "" ? null : Number(annualConsumption),
           };
         
         toAlternative ? setAlternativeRegimenDrugs([...alternativeRegimenDrugs, drugWithCon])
             : setRegimenDrugs([...regimenDrugs, drugWithCon]);
 
         setSelectedDrugId("");
-        setAnnualConsumption(0);
+        setAnnualConsumption("");
     };
 
     const addAlternative = () => {
@@ -411,7 +412,9 @@ const Treatments: React.FC = () => {
                       label="Annual consumption"
                       value={annualConsumption}
                       onChange={(e) =>
-                        setAnnualConsumption(Number(e.target.value))
+                        setAnnualConsumption(
+                          e.target.value ? Number(e.target.value) : ""
+                        )
                       }
                     />
                   </Grid>
@@ -431,7 +434,11 @@ const Treatments: React.FC = () => {
                       <CatalogFormListRow
                         key={i}
                         primary={`${item.drug.name} — ${formatDrugStrengthUnit(item.drug.strength, item.drug.unit)}`}
-                        secondary={`Annual consumption: ${item.annual_patient_con}`}
+                        secondary={
+                          item.annual_patient_con != null
+                            ? `Annual consumption: ${item.annual_patient_con}`
+                            : undefined
+                        }
                         onRemove={() =>
                           setRegimenDrugs(
                             regimenDrugs.filter((_, idx) => idx !== i)

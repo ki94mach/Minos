@@ -33,6 +33,28 @@ def validate_size(size: float) -> float:
         raise ValueError("Size must be a positive number")
     return size
 
+def _ratio_near(value: float, target: float, tolerance: float = 0.01) -> bool:
+    return abs(value - target) <= tolerance
+
+def validate_alternative_ratios_sum(ratios: list[float]) -> None:
+    """
+    Validate alternative treatment ratios.
+
+    Ratios must sum to 1.0 unless every alternative is set to 1.0, which
+    indicates the client has not yet determined the split between options.
+    """
+    if not ratios:
+        return
+
+    ratios_sum = sum(ratios)
+    if _ratio_near(ratios_sum, 1.0):
+        return
+
+    if all(_ratio_near(r, 1.0) for r in ratios):
+        return
+
+    raise ValueError("Alternative treatment ratios must sum to 1.0")
+
 def normalize_drug_unit(unit: Optional[str]) -> Optional[str]:
     """Normalize drug unit when provided; IU stays uppercase, others lowercase."""
     if unit is None or not str(unit).strip():
@@ -135,14 +157,15 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
 
         for item in treatment_data['regimen']["drugs"]:
             drug_id = str(item["drug"]["_id"])
-            db_val = db_map.get(drug_id)
-            if db_val is None:
+            if drug_id not in db_map:
                 raise ValueError(f"Drug {drug_id} not found in treatment {treatment_id}")
 
-            if item["annual_patient_con"] != db_val:
+            db_val = db_map[drug_id]
+            payload_apc = item.get("annual_patient_con")
+            if payload_apc != db_val:
                 raise ValueError(
                     f"annual_patient_con mismatch for drug {drug_id}: "
-                    f"{item['annual_patient_con']} (payload) ≠ {db_val} (DB)"
+                    f"{payload_apc} (payload) ≠ {db_val} (DB)"
                 )
     
     if treatment_data['alternatives']:
@@ -234,14 +257,15 @@ def validate_and_transform_alternative(alternative_data: dict) -> dict:
 
         for item in regimen_data["drugs"]:
             drug_id = str(item["drug"]["_id"])
-            db_val = db_map.get(drug_id)
-            if db_val is None:
+            if drug_id not in db_map:
                 raise ValueError(f"Drug {drug_id} not found in treatment {alt_id}")
 
-            if item["annual_patient_con"] != db_val:
+            db_val = db_map[drug_id]
+            payload_apc = item.get("annual_patient_con")
+            if payload_apc != db_val:
                 raise ValueError(
                     f"annual_patient_con mismatch for drug {drug_id}: "
-                    f"{item['annual_patient_con']} (payload) ≠ {db_val} (DB)"
+                    f"{payload_apc} (payload) ≠ {db_val} (DB)"
                 )
         
 
@@ -261,7 +285,7 @@ def validate_regimen_consistency(
       regimen that is stored inside that Treatment document.
 
     • If no *treatment_id* is given (e.g. you are creating a brand‑new
-      Regimen treatment), we only make sure the numbers are positive.
+      Regimen treatment), annual_patient_con is optional on each drug item.
 
     NOTE: Drug attributes (name, strength, unit) are **already**
           guaranteed by DrugSubItem, so we do **not** re‑check them here.
@@ -286,22 +310,20 @@ def validate_regimen_consistency(
 
         for item in regimen_data["drugs"]:
             drug_id = str(item["drug"]["_id"])
-            db_val = db_map.get(drug_id)
-            if db_val is None:
+            if drug_id not in db_map:
                 raise ValueError(f"Drug {drug_id} not found in treatment {treatment_id}")
 
-            if item["annual_patient_con"] != db_val:
+            db_val = db_map[drug_id]
+            payload_apc = item.get("annual_patient_con")
+            if payload_apc != db_val:
                 raise ValueError(
                     f"annual_patient_con mismatch for drug {drug_id}: "
-                    f"{item['annual_patient_con']} (payload) ≠ {db_val} (DB)"
+                    f"{payload_apc} (payload) ≠ {db_val} (DB)"
                 )
 
         return
-    
-    for item in regimen_data["drugs"]:
-        apc = item["annual_patient_con"]
-        if not isinstance(apc, int) or apc <= 0:
-            raise ValueError("annual_patient_con must be a positive integer")
+
+    # No validation on annual_patient_con when creating a new regimen.
 
 FOLLOWUP_PARENT_ERROR = (
     "Follow-up nodes must be under a treatment node"

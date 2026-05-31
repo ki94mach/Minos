@@ -101,7 +101,7 @@ class DrugEmbedded(EmbeddedDocument):
 
 class TreatmentDrug(EmbeddedDocument):
     drug = EmbeddedDocumentField(DrugEmbedded, required=True)
-    annual_patient_con = IntField(required=True)
+    annual_patient_con = IntField(required=False)
 
 
 class Regimen(EmbeddedDocument):
