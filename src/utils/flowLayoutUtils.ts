@@ -75,6 +75,54 @@ export function assignEdgeHandles(nodes: FlowNode[], edges: Edge[]): Edge[] {
   });
 }
 
+/** Drop nodes not reachable from any root via directed edges (overview orphan cleanup). */
+export function keepReachableNodes(
+  nodes: FlowNode[],
+  edges: Edge[],
+  rootIds: string[]
+): FlowNode[] {
+  if (rootIds.length === 0) return nodes;
+
+  const reachable = new Set<string>();
+  const queue = [...rootIds];
+
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    if (reachable.has(id)) continue;
+    reachable.add(id);
+    for (const edge of edges) {
+      if (edge.source === id && !reachable.has(edge.target)) {
+        queue.push(edge.target);
+      }
+    }
+  }
+
+  return nodes.filter((node) => reachable.has(node.id));
+}
+
+export function filterEdgesForNodes(nodes: FlowNode[], edges: Edge[]): Edge[] {
+  const ids = new Set(nodes.map((node) => node.id));
+  return edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target));
+}
+
+export function collectDescendantIds(
+  rootId: string,
+  edges: Edge[]
+): Set<string> {
+  const removed = new Set<string>([rootId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const edge of edges) {
+      if (removed.has(edge.source) && !removed.has(edge.target)) {
+        removed.add(edge.target);
+        changed = true;
+      }
+    }
+  }
+  return removed;
+}
+
 export function makePatientTreeEdge(
   source: string,
   target: string,

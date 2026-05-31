@@ -83,13 +83,6 @@ const CustomNode = (
   const numberInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { fitView } = useReactFlow();
-  useEffect(() => {
-    setTimeout(() => {
-      fitView();
-    }, 300);
-  }, [isOverviewMode, fitView]);
-
   useEffect(() => {
     if (isEditing && labelInputRef.current) {
       labelInputRef.current.focus();

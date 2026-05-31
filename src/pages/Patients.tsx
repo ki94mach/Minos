@@ -54,6 +54,9 @@ import { asApiList } from "../api/parseApiList";
 import {
   assignEdgeHandles,
   applyRadialOverviewLayout,
+  collectDescendantIds,
+  filterEdgesForNodes,
+  keepReachableNodes,
 } from "../utils/flowLayoutUtils";
 import CreatePatientTreeDialog from "../components/patientDialogs/CreatePatientTreeDialog";
 
@@ -127,6 +130,7 @@ const Patients: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
   const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
+  const [graphEpoch, setGraphEpoch] = useState(0);
   const [ctx, setCtx] = useState<
     { x: number; y: number; nodeId: string } | null
   >(null);
@@ -149,6 +153,14 @@ const Patients: React.FC = () => {
   const fitPatientTreeView = useCallback(() => {
     reactFlowRef.current?.fitView(patientTreeFitViewOptions);
   }, [patientTreeFitViewOptions]);
+
+  const deleteMenuItemSx = { color: "error.main" };
+
+  const ctxNode = useMemo(
+    () => (ctx ? nodes.find((n) => n.id === ctx.nodeId) : null),
+    [ctx, nodes]
+  );
+  const ctxIsTreeRoot = ctxNode?.data?.isTreeRoot === true;
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -279,6 +291,29 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   }
  
 
+  const applyFlowGraph = useCallback(
+    (nextNodes: any[], nextEdges: Edge[]) => {
+      setNodes(nextNodes);
+      setEdges(nextEdges);
+      setDebouncedNodes(nextNodes);
+      setDebouncedEdges(nextEdges);
+    },
+    [setNodes, setEdges]
+  );
+
+  const pruneFlowGraph = useCallback(
+    (nodeId: string, nodeList: any[], edgeList: Edge[]) => {
+      const removedIds = collectDescendantIds(nodeId, edgeList);
+      return {
+        nodes: nodeList.filter((n) => !removedIds.has(n.id)),
+        edges: edgeList.filter(
+          (e) => !removedIds.has(e.source) && !removedIds.has(e.target)
+        ),
+      };
+    },
+    []
+  );
+
   /* ───────────── delete node (splice or cascade) or whole tree at root ───────────── */
   async function deleteNode(nodeId: string, options?: { cascade?: boolean }) {
     const node = nodes.find((n: any) => n.id === nodeId);
@@ -313,6 +348,19 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           API_ENDPOINTS.DELETE_NODE(patientTreeId, nodeDocId, cascade)
         );
       }
+
+      const pruned = cascade
+        ? pruneFlowGraph(nodeId, nodes, edges)
+        : { nodes, edges: edges.filter((e) => e.source !== nodeId && e.target !== nodeId) };
+      if (cascade) {
+        applyFlowGraph(pruned.nodes, pruned.edges);
+      } else {
+        applyFlowGraph(
+          nodes.filter((n) => n.id !== nodeId),
+          pruned.edges
+        );
+      }
+
       await drawPatientNodes();
       alert(
         isTreeRoot
@@ -342,31 +390,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   /* ----------------------------- effects ---------------------------------- */
 
   useEffect(() => {
-    const handleError = (e: ErrorEvent) => {
-      if (e.message && e.message.includes("ResizeObserver loop")) {
-        e.stopImmediatePropagation();
-        e.preventDefault();
-        return false;
-      }
-    };
-  
-    const handleUnhandledRejection = (e: PromiseRejectionEvent) => {
-      if (e.reason && e.reason.message && e.reason.message.includes("ResizeObserver loop")) {
-        e.preventDefault();
-        return false;
-      }
-    };
-  
-    window.addEventListener("error", handleError);
-    window.addEventListener("unhandledrejection", handleUnhandledRejection);
-  
-    return () => {
-      window.removeEventListener("error", handleError);
-      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
-    };
-  }, []);
-
-  useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedNodes(nodes);
       setDebouncedEdges(edges);
@@ -374,6 +397,13 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   
     return () => clearTimeout(timer);
   }, [nodes, edges]);
+
+  // Fit after graph rebuild (drill-down, back to overview, delete, etc.) — not on node drag.
+  useEffect(() => {
+    if (debouncedNodes.length === 0) return;
+    const timer = window.setTimeout(() => fitPatientTreeView(), 120);
+    return () => window.clearTimeout(timer);
+  }, [selectedRootId, graphEpoch, debouncedNodes.length, fitPatientTreeView]);
 
   useEffect(() => {
        drawPatientNodes();
@@ -451,8 +481,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           setOverviewEmptyHint(
             "No patient trees yet. Click below to choose a Population and set the root size."
           );
-          setNodes([]);
-          setEdges([]);
+          applyFlowGraph([], []);
           return;
         }
 
@@ -523,8 +552,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         }
 
         if (roots.length === 0 || roots.every((r) => r == null)) {
-          setNodes([]);
-          setEdges([]);
+          applyFlowGraph([], []);
           return;
         }
     
@@ -652,15 +680,25 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           };
         });
 
+        let routedEdges = assignEdgeHandles(finalNodes, edges);
+
+        // Overview merges by catalog id; orphans can linger after delete. Drill-down
+        // uses per-tree document ids — do not filter with URL catalog id as root.
+        if (isOverviewMode) {
+          const overviewRootIds = roots.map((rootNode) => getUniqueCharId(rootNode));
+          finalNodes = keepReachableNodes(finalNodes, routedEdges, overviewRootIds);
+          routedEdges = filterEdgesForNodes(finalNodes, routedEdges);
+        }
+
         if (selectedRootId) {
-          finalNodes = applyDagreLayout(finalNodes, edges);
+          finalNodes = applyDagreLayout(finalNodes, routedEdges);
         } else {
           let offsetX = 360;
           roots.forEach((rootNode: any) => {
             const rootUniqueId = getUniqueCharId(rootNode);
             const { nodes: laidOut, clusterRadius } = applyRadialOverviewLayout(
               finalNodes,
-              edges,
+              routedEdges,
               rootUniqueId,
               { x: offsetX, y: 320 },
               200
@@ -670,9 +708,9 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           });
         }
 
-        const routedEdges = assignEdgeHandles(finalNodes, edges);
-        setNodes(finalNodes);
-        setEdges(routedEdges);
+        routedEdges = assignEdgeHandles(finalNodes, routedEdges);
+        applyFlowGraph(finalNodes, routedEdges);
+        setGraphEpoch((epoch) => epoch + 1);
       } catch (err) {
         console.error("Error drawing patients:", err);
         alert("Failed to draw patients.");
@@ -830,29 +868,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           <MenuItem
             onClick={() => {
               if (!ctx) return;
-              deleteNode(ctx.nodeId);
-              setCtx(null);
-            }}>
-            {nodes.find((n) => n.id === ctx?.nodeId)?.data?.isTreeRoot
-              ? "Delete entire patient model"
-              : "Remove Node"}
-          </MenuItem>
-
-          {ctx &&
-            !nodes.find((n) => n.id === ctx.nodeId)?.data?.isTreeRoot &&
-            edges.some((e) => e.source === ctx.nodeId) && (
-              <MenuItem
-                onClick={() => {
-                  deleteNode(ctx.nodeId, { cascade: true });
-                  setCtx(null);
-                }}>
-                Remove Branch
-              </MenuItem>
-            )}
-
-          <MenuItem
-            onClick={() => {
-              if (!ctx) return;
               addNode(ctx.nodeId);
               setAddingParentId(ctx.nodeId);
               setIsChoosingType(true);
@@ -860,6 +875,31 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             }}>
             Add Node
           </MenuItem>
+
+          {isOverview ? (
+            ctx &&
+            !ctxIsTreeRoot && (
+              <MenuItem
+                sx={deleteMenuItemSx}
+                onClick={() => {
+                  deleteNode(ctx.nodeId, { cascade: true });
+                  setCtx(null);
+                }}>
+                Remove Branch
+              </MenuItem>
+            )
+          ) : (
+            ctx && (
+              <MenuItem
+                sx={deleteMenuItemSx}
+                onClick={() => {
+                  deleteNode(ctx.nodeId, { cascade: true });
+                  setCtx(null);
+                }}>
+                Remove Branch
+              </MenuItem>
+            )
+          )}
         </Menu>
 
         {/* ===== “Edit Characteristic” dialog ===== */}

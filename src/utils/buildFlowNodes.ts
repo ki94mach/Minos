@@ -161,7 +161,8 @@ export function buildFlowNodes(
         isOverviewMode: isOverviewMode,
         treeId: isOverviewMode ? treeIdMap.get(catalogId) : treeId,
         isOverview: isOverviewMode,
-        isTreeRoot: parentId === null && depth === 0,
+        // Population roots in overview only — not the PI subtree root when drilled in.
+        isTreeRoot: isOverviewMode && parentId === null && depth === 0,
         canDrillDown,
         catalogStale: isPatientNodeCatalogStale(node, deps.catalogMasters),
         onClick: canDrillDown
