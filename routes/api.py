@@ -3,11 +3,13 @@ from models.tables import (
     Regimen, AlternativeTreatment
 )
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 import logging
 import hashlib
+from datetime import datetime
 from bson import ObjectId
 from mongoengine.errors import NotUniqueError
+from pydantic import ValidationError
 
 from models.characteristic.driver import CharacteristicDriver
 from models.drug.driver import DrugDriver
@@ -17,18 +19,26 @@ from models.treatment.driver import TreatmentDriver
 
 from models.tables import (Characteristic, Drug, Followup, PatientTree)
 from models.tables import (Node, CharacteristicEmbedded,
-                           TreatmentEmbedded, FollowupEmbedded)
+                           TreatmentEmbedded, FollowupEmbedded, NodeReference)
 
 from validators.api_validators import (CharacteristicCreate, CharacteristicUpdate,
                                        DrugCreate, DrugUpdate, TreatmentUpdate,
                                        TreatmentCreate, PatientCreate, PatientUpdate,
-                                       AddNode, UpdateNode, FollowupUpdate, FollowupCreate)
+                                       AddNode, UpdateNode, FollowupUpdate, FollowupCreate,
+                                       NodeLinkReferenceCreate)
 from utils.validate_request import validate_request
-from utils.sso_auth import sso_required
+from utils.sso_auth import sso_required, get_request_principal
 from utils.decorators import require_role, ADMIN
 from utils.serialize import serialize_documents
 from utils.api_errors import error_response
 from utils.utils import Utils
+from utils.uploads import (
+    UploadError,
+    delete_patient_upload_dir,
+    delete_reference_file,
+    reference_file_path,
+    save_reference_file,
+)
 
 from utils.business_rules import (
     find_node,
@@ -1079,6 +1089,10 @@ def update_node(validated_data, patient_id, node_id):
         if validated_data.parent_id is not None:
             parent = validated_data.parent_id
             target_node.parent_id = ObjectId(parent) if parent else None
+        if validated_data.description is not None:
+            target_node.description = validated_data.description
+            target_node.description_updated_by = _current_user_label()
+            target_node.description_updated_at = datetime.utcnow()
 
         # Update the embedded payload based on node_type.
         if target_node.node_type == 'characteristic' and validated_data.characteristic_data:
@@ -1118,15 +1132,234 @@ def update_node(validated_data, patient_id, node_id):
     except Exception as e:
         logging.error(f"Error updating node: {e}")
         return error_response("An unexpected error occurred while updating the node.", 500)
+
+
+# --------------------------------------------------
+# Node Reference Helpers and Endpoints
+# --------------------------------------------------
+def _current_user_label() -> str:
+    """Best-effort identifier of the caller for annotation authorship."""
+    principal = get_request_principal()
+    if principal is not None:
+        return principal.email or principal.sub or "unknown"
+    return "unknown"
+
+
+def _reference_to_dict(reference: NodeReference) -> dict:
+    """Serialize a NodeReference for an API response."""
+    created_at = getattr(reference, 'created_at', None)
+    return {
+        '_id': str(reference._id),
+        'kind': reference.kind,
+        'title': reference.title,
+        'url': reference.url,
+        'original_name': reference.original_name,
+        'content_type': reference.content_type,
+        'size_bytes': reference.size_bytes,
+        'created_by': reference.created_by,
+        'created_at': created_at.isoformat() + 'Z' if created_at else None,
+    }
+
+
+def _node_file_stored_names(node):
+    """Yield stored_name for every file reference directly on a single node."""
+    for ref in (getattr(node, 'references', None) or []):
+        if getattr(ref, 'kind', None) == 'file' and getattr(ref, 'stored_name', None):
+            yield ref.stored_name
+
+
+def _subtree_file_refs(node):
+    """Yield (node_id, stored_name) for file references on a node and all descendants."""
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        node_id = str(current._id)
+        for stored_name in _node_file_stored_names(current):
+            yield node_id, stored_name
+        stack.extend(current.children or [])
+
+
+@api_blueprint.route('/patients/<patient_id>/node/<node_id>/references', methods=['POST'])
+@sso_required
+def add_node_reference(patient_id, node_id):
+    """
+    Attach a reference to a tree node.
+
+    Accepts either:
+      - multipart/form-data with a ``file`` field (PDF/Word) and optional ``title``, or
+      - a JSON body ``{ "url": "https://...", "title": "..." }`` for an external link.
+    """
+    try:
+        patient_tree = PatientDriver.find(id=patient_id).first()
+        if not patient_tree:
+            return error_response('Patient not found.', 404)
+
+        target_node = find_node(patient_tree.tree, node_id)
+        if not target_node:
+            return error_response('Node not found in patient tree.', 404)
+
+        logging.info(
+            "add_node_reference: content_type=%r files=%r form=%r",
+            request.content_type,
+            list(request.files.keys()),
+            list(request.form.keys()),
+        )
+
+        uploaded = request.files.get('file')
+        if uploaded is not None and uploaded.filename:
+            logging.info(
+                "add_node_reference: handling file upload name=%r mimetype=%r",
+                uploaded.filename,
+                uploaded.mimetype,
+            )
+            try:
+                stored_name, original_name, content_type, size_bytes = save_reference_file(
+                    uploaded, patient_id, node_id
+                )
+            except UploadError as ue:
+                logging.warning("add_node_reference: upload rejected: %s", ue)
+                return error_response(str(ue), 400)
+            title = (request.form.get('title') or '').strip() or None
+            reference = NodeReference(
+                _id=ObjectId(),
+                kind='file',
+                title=title,
+                stored_name=stored_name,
+                original_name=original_name,
+                content_type=content_type,
+                size_bytes=size_bytes,
+                created_by=_current_user_label(),
+                created_at=datetime.utcnow(),
+            )
+        else:
+            payload = request.get_json(silent=True) or {}
+            logging.info(
+                "add_node_reference: no file found, treating as link; payload_keys=%r",
+                list(payload.keys()) if isinstance(payload, dict) else None,
+            )
+            try:
+                link = NodeLinkReferenceCreate(**payload)
+            except ValidationError as ve:
+                first = ve.errors()[0] if ve.errors() else {}
+                logging.warning("add_node_reference: link payload rejected: %s", ve.errors())
+                return error_response(first.get('msg', 'Invalid reference payload.'), 400)
+            reference = NodeReference(
+                _id=ObjectId(),
+                kind='link',
+                title=link.title,
+                url=link.url,
+                created_by=_current_user_label(),
+                created_at=datetime.utcnow(),
+            )
+
+        if target_node.references is None:
+            target_node.references = []
+        target_node.references.append(reference)
+
+        patient_tree.tree_hash = Utils.compute_tree_hash(patient_tree.tree)
+        PatientDriver.update(patient_tree)
+
+        return jsonify({
+            'message': 'Reference added',
+            'reference': _reference_to_dict(reference),
+        }), 201
+
+    except ValueError as ve:
+        logging.error(f"Validation error adding node reference: {ve}")
+        return error_response(str(ve), 400)
+    except Exception as e:
+        logging.error(f"Error adding node reference: {e}")
+        return error_response("An unexpected error occurred while adding the reference.", 500)
+
+
+@api_blueprint.route(
+    '/patients/<patient_id>/node/<node_id>/references/<reference_id>/download',
+    methods=['GET'],
+)
+@sso_required
+def download_node_reference(patient_id, node_id, reference_id):
+    """Stream a stored reference file as an attachment (authenticated)."""
+    try:
+        patient_tree = PatientDriver.find(id=patient_id).first()
+        if not patient_tree:
+            return error_response('Patient not found.', 404)
+
+        target_node = find_node(patient_tree.tree, node_id)
+        if not target_node:
+            return error_response('Node not found in patient tree.', 404)
+
+        reference = next(
+            (r for r in (target_node.references or []) if str(r._id) == str(reference_id)),
+            None,
+        )
+        if not reference or reference.kind != 'file':
+            return error_response('File reference not found.', 404)
+
+        path = reference_file_path(patient_id, node_id, reference.stored_name)
+        if not path:
+            return error_response('Stored file not found.', 404)
+
+        return send_file(
+            path,
+            as_attachment=True,
+            download_name=reference.original_name or 'reference',
+            mimetype=reference.content_type or None,
+        )
+    except Exception as e:
+        logging.error(f"Error downloading node reference: {e}")
+        return error_response("An unexpected error occurred while downloading the file.", 500)
+
+
+@api_blueprint.route(
+    '/patients/<patient_id>/node/<node_id>/references/<reference_id>',
+    methods=['DELETE'],
+)
+@sso_required
+def delete_node_reference(patient_id, node_id, reference_id):
+    """Remove a reference from a node and delete its file (if any)."""
+    try:
+        patient_tree = PatientDriver.find(id=patient_id).first()
+        if not patient_tree:
+            return error_response('Patient not found.', 404)
+
+        target_node = find_node(patient_tree.tree, node_id)
+        if not target_node:
+            return error_response('Node not found in patient tree.', 404)
+
+        reference = next(
+            (r for r in (target_node.references or []) if str(r._id) == str(reference_id)),
+            None,
+        )
+        if not reference:
+            return error_response('Reference not found.', 404)
+
+        target_node.references = [
+            r for r in target_node.references if str(r._id) != str(reference_id)
+        ]
+
+        patient_tree.tree_hash = Utils.compute_tree_hash(patient_tree.tree)
+        PatientDriver.update(patient_tree)
+
+        if reference.kind == 'file' and reference.stored_name:
+            delete_reference_file(patient_id, node_id, reference.stored_name)
+
+        return jsonify({'message': 'Reference deleted'}), 200
+
+    except Exception as e:
+        logging.error(f"Error deleting node reference: {e}")
+        return error_response("An unexpected error occurred while deleting the reference.", 500)
+
+
 @api_blueprint.route('/patients/<patient_id>', methods=['DELETE'])
 @sso_required
 @require_role([ADMIN])
 def delete_patient(patient_id):
     """
-    Deletes the entire PatientTree document.
+    Deletes the entire PatientTree document and any uploaded reference files.
     """
     try:
         PatientDriver.delete(patient_id)
+        delete_patient_upload_dir(patient_id)
         return jsonify({'message': 'Patient deleted'}), 200
     except Exception as e:
         logging.error(f"Error deleting patient: {e}")
@@ -1167,6 +1400,20 @@ def delete_node(patient_id, node_id):
                 400,
             )
 
+        # Collect reference files that will be orphaned by this delete. On a
+        # splice only the target node's own files are orphaned (children are
+        # promoted); on a cascade the entire subtree's files are removed.
+        target_node = find_node(patient_tree.tree, node_id)
+        files_to_delete = []
+        if target_node is not None:
+            if cascade:
+                files_to_delete = list(_subtree_file_refs(target_node))
+            else:
+                files_to_delete = [
+                    (str(target_node._id), stored_name)
+                    for stored_name in _node_file_stored_names(target_node)
+                ]
+
         remove_fn = remove_node_subtree if cascade else remove_node
         removed = remove_fn(patient_tree.tree, node_id)
         if not removed:
@@ -1176,6 +1423,9 @@ def delete_node(patient_id, node_id):
 
         patient_tree.tree_hash = Utils.compute_tree_hash(patient_tree.tree)
         PatientDriver.update(patient_tree)
+
+        for ref_node_id, stored_name in files_to_delete:
+            delete_reference_file(patient_id, ref_node_id, stored_name)
 
         message = (
             'Node and descendants deleted successfully'

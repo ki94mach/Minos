@@ -47,6 +47,7 @@ const CustomNode = (
 
   const containerStyle: React.CSSProperties = isOverviewMode
     ? {
+        position: "relative",
         width: "120px",
         height: "120px",
         borderRadius: "50%",
@@ -72,6 +73,7 @@ const CustomNode = (
         transition: "box-shadow 0.2s ease, transform 0.2s ease",
       }
     : {
+        position: "relative",
         padding: "12px 14px",
         borderRadius: "12px",
         background: theme.palette.background.paper,
@@ -223,6 +225,16 @@ const CustomNode = (
         })}%`
       : "";
 
+  const refCount =
+    typeof nodeData.refCount === "number" ? nodeData.refCount : 0;
+  const hasNotes = nodeData.hasDescription === true || refCount > 0;
+  const notesBadgeTitle = [
+    nodeData.hasDescription ? "Has description" : null,
+    refCount > 0 ? `${refCount} reference${refCount === 1 ? "" : "s"}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   const catalogStale = nodeData.catalogStale === true;
   const staleHint =
     "Embedded copy may differ from the catalog master. Edit the catalog entry or re-save the node to sync.";
@@ -263,6 +275,29 @@ const CustomNode = (
         }}
         onBlur={handleBlur}
         tabIndex={-1}>
+        {hasNotes && !isOverviewMode && (
+          <span
+            title={notesBadgeTitle}
+            style={{
+              position: "absolute",
+              top: isOverviewMode ? 8 : -8,
+              right: isOverviewMode ? 8 : -8,
+              minWidth: 18,
+              height: 18,
+              padding: "0 5px",
+              borderRadius: 9,
+              background: theme.palette.primary.main,
+              color: theme.palette.primary.contrastText,
+              fontSize: "11px",
+              fontWeight: 700,
+              lineHeight: "18px",
+              textAlign: "center",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+              pointerEvents: "none",
+            }}>
+            {refCount > 0 ? refCount : "•"}
+          </span>
+        )}
         {isEditing ? (
           <>
             <input

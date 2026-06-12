@@ -31,6 +31,9 @@ ALLOWED_TREATMENT_TYPES = ['Treatment', 'Regimen', 'Alternative']
 ALLOWED_NODE_TYPES = ["characteristic", "treatment", "followup"]
 PRIMARY_INDICATION_TYPE = "Primary Indication"
 ALLOWED_MEASURE_TYPES = ['Prevalence', 'Incidence']
+MAX_DESCRIPTION_LENGTH = 5000
+MAX_REFERENCE_TITLE_LENGTH = 300
+ALLOWED_LINK_SCHEMES = ("http", "https")
 
 # ------------------------------------------------------------------------------
 # Utility for ObjectId Validation
@@ -707,6 +710,7 @@ class UpdateNode(BaseModel):
     treatment_data: Optional[TreatmentData] = None
     followup_data: Optional[FollowupData] = None
     children: Optional[List[PatientNode]] = None
+    description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
 
     @field_validator('node_type', mode='after')
     @classmethod
@@ -748,3 +752,32 @@ class UpdateNode(BaseModel):
         elif self.node_type == "followup" and not self.followup_data:
             raise ValueError("followup_data is required when changing node_type to followup")
         return self
+
+
+# ------------------------------------------------------------------------------
+# NODE REFERENCE VALIDATORS
+# ------------------------------------------------------------------------------
+
+class NodeLinkReferenceCreate(BaseModel):
+    """JSON payload to attach an external link (URL/DOI) reference to a node."""
+    url: str = Field(..., min_length=1)
+    title: Optional[str] = Field(None, max_length=MAX_REFERENCE_TITLE_LENGTH)
+
+    @field_validator('url', mode='after')
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        value = v.strip()
+        if not value:
+            raise ValueError("url must not be empty")
+        scheme = value.split("://", 1)[0].lower() if "://" in value else ""
+        if scheme not in ALLOWED_LINK_SCHEMES:
+            raise ValueError("url must start with http:// or https://")
+        return value
+
+    @field_validator('title', mode='after')
+    @classmethod
+    def validate_title(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        value = v.strip()
+        return value or None

@@ -174,6 +174,10 @@ export function buildFlowNodes(
         regimen: node.treatment_data?.regimen || null,
         alternatives: node.treatment_data?.alternatives || [],
         color: hashColor(catalogId),
+        hasDescription: Boolean(
+          node.description && String(node.description).trim().length > 0
+        ),
+        refCount: Array.isArray(node.references) ? node.references.length : 0,
         isOverviewMode: isOverviewMode,
         treeId,
         isOverview: isOverviewMode,

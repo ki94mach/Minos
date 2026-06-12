@@ -121,7 +121,14 @@ def configure_security(app):
     app.config['WTF_CSRF_METHODS'] = ['POST', 'PUT', 'PATCH', 'DELETE']
     app.config['WTF_CSRF_CHECK_DEFAULT'] = True
     app.config['WTF_CSRF_HEADERS'] = ['X-CSRFToken', 'X-CSRF-Token']
-    
+
+    # Cap upload size (PDF/Word node references) and set the storage root.
+    app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB max file size
+    app.config['UPLOAD_FOLDER'] = os.environ.get(
+        "UPLOAD_DIR",
+        os.path.join(os.path.abspath(os.getcwd()), "var", "uploads"),
+    )
+
     # Initialize CSRF protection
     csrf.init_app(app)
 

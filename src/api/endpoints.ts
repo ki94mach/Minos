@@ -26,4 +26,17 @@ export const API_ENDPOINTS = {
     }`,
   UPDATE_NODE: (patientId: string, nodeId: string) =>
     `/api/patients/${patientId}/node/${nodeId}`,
+  NODE_REFERENCES: (patientId: string, nodeId: string) =>
+    `/api/patients/${patientId}/node/${nodeId}/references`,
+  NODE_REFERENCE_DETAIL: (
+    patientId: string,
+    nodeId: string,
+    referenceId: string
+  ) => `/api/patients/${patientId}/node/${nodeId}/references/${referenceId}`,
+  NODE_REFERENCE_DOWNLOAD: (
+    patientId: string,
+    nodeId: string,
+    referenceId: string
+  ) =>
+    `/api/patients/${patientId}/node/${nodeId}/references/${referenceId}/download`,
 };

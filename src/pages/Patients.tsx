@@ -36,6 +36,9 @@ import Decimal from "decimal.js";
 import { TreatmentOption } from "../components/TreatmentForm";
 import EditCharacteristicDialog from "../components/patientDialogs/EditCharacteristicDialog";
 import EditTreatmentDialog from "../components/patientDialogs/EditTreatmentDialog";
+import NodeDetailsDialog, {
+  NodeDetailsModalData,
+} from "../components/patientDialogs/NodeDetailsDialog";
 import AddCharacteristicDialog from "../components/patientDialogs/AddCharacteristicDialog";
 import AddTreatmentDialog from "../components/patientDialogs/AddTreatmentDialog";
 import AddFollowupDialog from "../components/patientDialogs/AddFollowupDialog";
@@ -134,6 +137,8 @@ const Patients: React.FC = () => {
     { _id: string; name: string; strength?: number | null; unit?: string | null }[]
   >([]);
   const [editTreatModalData, setEditTreatModalData] = useState<EditTreatModalData|null>(null);
+  const [nodeDetailsData, setNodeDetailsData] = useState<NodeDetailsModalData | null>(null);
+  const [nodeDetailsReadOnly, setNodeDetailsReadOnly] = useState(false);
   const [overviewEmptyHint, setOverviewEmptyHint] = useState<string | null>(null);
   const [createPatientDialogOpen, setCreatePatientDialogOpen] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -334,7 +339,84 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         alert("Could not load the patient’s tree for editing.");
       });
   }
- 
+
+  function openNodeDetails(
+    uniqueId: string,
+    options?: { readOnly?: boolean }
+  ) {
+    const n = nodes.find((x: any) => x.id === uniqueId);
+    if (!n) return;
+
+    const readOnly = options?.readOnly === true;
+
+    api
+      .get(API_ENDPOINTS.PATIENTS)
+      .then((res) => {
+        const parsedList = asApiList<any>(res.data);
+        let patientDoc: any = null;
+        let foundNode: any = null;
+
+        if (n.data.treeId) {
+          patientDoc = parsedList.find((p: any) => {
+            const pid = p._id?.$oid || p._id;
+            return String(pid) === String(n.data.treeId);
+          });
+          if (patientDoc && n.data.docId) {
+            foundNode = findNodeById(patientDoc.tree, n.data.docId);
+          }
+        }
+
+        if (!foundNode) {
+          const lookupId = n.data.catalogId || uniqueId;
+          for (const p of parsedList) {
+            const maybeMatch = findNodeById(p.tree, lookupId);
+            if (maybeMatch) {
+              patientDoc = p;
+              foundNode = maybeMatch;
+              break;
+            }
+          }
+        }
+
+        if (!patientDoc || !foundNode) {
+          alert("Could not find that node to edit details.");
+          return;
+        }
+
+        const realPatientId: string = patientDoc._id?.$oid || patientDoc._id;
+        const realNodeId: string = foundNode._id?.$oid || foundNode._id;
+        const label =
+          foundNode.characteristic_data?.name ||
+          foundNode.treatment_data?.name ||
+          (foundNode.node_type === "followup" ? "Follow-up" : "Node");
+
+        const references = (foundNode.references || []).map((r: any) => ({
+          _id: r._id?.$oid || r._id,
+          kind: r.kind,
+          title: r.title,
+          url: r.url,
+          original_name: r.original_name,
+          content_type: r.content_type,
+          size_bytes: r.size_bytes,
+          created_by: r.created_by,
+          created_at: r.created_at?.$date || r.created_at,
+        }));
+
+        setNodeDetailsReadOnly(readOnly);
+        setNodeDetailsData({
+          patientId: realPatientId,
+          nodeId: realNodeId,
+          nodeLabel: label,
+          description: foundNode.description || "",
+          references,
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to fetch patientTree for node details:", err);
+        alert("Could not load the node details.");
+      });
+  }
+
 
   const applyFlowGraph = useCallback(
     (nextNodes: any[], nextEdges: Edge[]) => {
@@ -585,7 +667,12 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   );
 
   const onNodeClick = (_: any, node: any) => {
-    if (!node.data.canDrillDown) return;
+    if (!node.data.canDrillDown) {
+      // Non-drillable nodes (treatments, follow-ups, leaf characteristics):
+      // open a read-only view of the description and references.
+      openNodeDetails(node.id, { readOnly: true });
+      return;
+    }
 
     const clickedId = node.data.catalogId ?? node.id;
     const whichTree = node.data.treeId;
@@ -597,14 +684,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           navigate(`/patients/${clickedId}`, {
             state: { color: node.data.color, treeId: whichTree },
           });
-    //       return;
-    //     }
-    //   }
-  
-    //   alert("⚠️ Couldn't find the root of this node.");
-    // } catch (err) {
-    //   console.error("🚨 Error finding root:", err);
-    // }
   };
   
 
@@ -1043,6 +1122,15 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             Add Node
           </MenuItem>
 
+          <MenuItem
+            onClick={() => {
+              if (!ctx) return;
+              openNodeDetails(ctx.nodeId);
+              setCtx(null);
+            }}>
+            Details / References
+          </MenuItem>
+
           {ctxIsOverviewNode ? (
             ctx &&
             (ctxIsPopulationRoot ? (
@@ -1124,6 +1212,19 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         )}
 
         {/* ─── end “Edit Treatment” ─── */}
+
+        {/* ===== “Node Details / References” dialog ===== */}
+        {nodeDetailsData && (
+          <NodeDetailsDialog
+            open={true}
+            onClose={() => setNodeDetailsData(null)}
+            onSaved={() => drawPatientNodes()}
+            data={nodeDetailsData}
+            readOnly={nodeDetailsReadOnly}
+            container={getOverlayContainer}
+          />
+        )}
+        {/* ─── end “Node Details / References” ─── */}
       </Box>
       {/* ─── end ReactFlow container ─── */}
 

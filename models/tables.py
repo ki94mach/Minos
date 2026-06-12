@@ -188,6 +188,23 @@ class Followup(Document):
 # Tree Node Embedded Document (for building a heterogeneous tree)
 # =============================================================================
 
+# User-authored reference attached to a tree node: either an uploaded file
+# (PDF/Word) stored on disk, or an external link (URL/DOI).
+class NodeReference(EmbeddedDocument):
+    _id = ObjectIdField(required=True)
+    kind = StringField(required=True, choices=['file', 'link'])
+    title = StringField(required=False)
+    # link references
+    url = StringField(required=False)
+    # file references (stored_name is a server-generated UUID; never user input)
+    stored_name = StringField(required=False)
+    original_name = StringField(required=False)
+    content_type = StringField(required=False)
+    size_bytes = IntField(required=False)
+    created_by = StringField(required=False)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+
 class Node(EmbeddedDocument):
     # Node type indicates which master node is represented:
     # 'treatment', 'followup', or 'characteristic'
@@ -202,6 +219,12 @@ class Node(EmbeddedDocument):
     treatment_data = EmbeddedDocumentField(TreatmentEmbedded, required=False)
     followup_data = EmbeddedDocumentField(FollowupEmbedded, required=False)
     characteristic_data = EmbeddedDocumentField(CharacteristicEmbedded, required=False)
+
+    # User-authored annotations (excluded from tree_hash; see Utils.compute_tree_hash).
+    description = StringField(required=False)
+    description_updated_by = StringField(required=False)
+    description_updated_at = DateTimeField(required=False)
+    references = ListField(EmbeddedDocumentField(NodeReference))
 
     # Allow a node to have children to form a recursive tree.
     children = ListField(EmbeddedDocumentField('Node'))
