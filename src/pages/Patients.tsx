@@ -168,6 +168,10 @@ const Patients: React.FC = () => {
   const ctxIsTreeRoot = ctxNode?.data?.isTreeRoot === true;
   const ctxIsPopulationRoot =
     ctxIsTreeRoot && ctxNode?.data?.charType === "Population";
+  const ctxIsOverviewNode = ctxNode?.data?.isOverviewMode === true;
+  const ctxHasChildren = Boolean(
+    ctx && edges.some((e) => e.source === ctx.nodeId)
+  );
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -961,7 +965,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             Add Node
           </MenuItem>
 
-          {isOverview ? (
+          {ctxIsOverviewNode ? (
             ctx &&
             (ctxIsPopulationRoot ? (
               <MenuItem
@@ -986,14 +990,26 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             ))
           ) : (
             ctx && (
-              <MenuItem
-                sx={deleteMenuItemSx}
-                onClick={() => {
-                  deleteNode(ctx.nodeId, { cascade: true });
-                  setCtx(null);
-                }}>
-                Remove Branch
-              </MenuItem>
+              <>
+                <MenuItem
+                  sx={deleteMenuItemSx}
+                  onClick={() => {
+                    deleteNode(ctx.nodeId);
+                    setCtx(null);
+                  }}>
+                  Delete Node
+                </MenuItem>
+                {ctxHasChildren && (
+                  <MenuItem
+                    sx={deleteMenuItemSx}
+                    onClick={() => {
+                      deleteNode(ctx.nodeId, { cascade: true });
+                      setCtx(null);
+                    }}>
+                    Remove Branch
+                  </MenuItem>
+                )}
+              </>
             )
           )}
         </Menu>
