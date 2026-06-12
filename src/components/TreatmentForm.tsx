@@ -25,12 +25,36 @@ interface DrugWithCon {
   annual_patient_con?: number | null;
 }
 
+interface AlternativeOption {
+  _id: string;
+  name: string;
+  ratio: number;
+  priority: number;
+  regimen?: {
+    drugs: DrugWithCon[];
+  };
+}
+
 export interface TreatmentOption {
   _id: string;
   name: string;
   type: "Regimen" | "Treatment" | "Alternative";
   regimen?: {
     drugs: DrugWithCon[];
+  };
+  alternatives?: AlternativeOption[];
+}
+
+function extractId(id: unknown): string {
+  return typeof id === "object" && id !== null && "$oid" in id
+    ? (id as { $oid: string }).$oid
+    : String(id);
+}
+
+function normalizeDrugRef(drug: Drug): Drug {
+  return {
+    ...drug,
+    _id: extractId(drug._id),
   };
 }
 
@@ -81,16 +105,31 @@ export default function TreatmentForm({
       ? {
           drugs: selected.regimen.drugs.map((d) => ({
             ...d,
-            drug: {
-              ...d.drug,
-              _id:
-                typeof d.drug._id === "object" && "$oid" in d.drug._id
-                  ? d.drug._id["$oid"]
-                  : d.drug._id,
-            },
+            drug: normalizeDrugRef(d.drug),
           })),
         }
-      : undefined; 
+      : undefined;
+
+    const fixedAlternatives =
+      selected.type === "Alternative" && selected.alternatives?.length
+        ? selected.alternatives.map((alt) => {
+            const entry: Record<string, unknown> = {
+              _id: extractId(alt._id),
+              name: alt.name,
+              ratio: alt.ratio,
+              priority: alt.priority,
+            };
+            if (alt.regimen?.drugs?.length) {
+              entry.regimen = {
+                drugs: alt.regimen.drugs.map((d) => ({
+                  ...d,
+                  drug: normalizeDrugRef(d.drug),
+                })),
+              };
+            }
+            return entry;
+          })
+        : undefined;
 
     const node = {
       node_type: "treatment",
@@ -100,10 +139,10 @@ export default function TreatmentForm({
         _id: selected._id,
         name: selected.name,
         type: selected.type,
-        // regimen: fixedRegimen,
         ...(selected.type === "Regimen" && fixedRegimen
           ? { regimen: fixedRegimen }
           : {}),
+        ...(fixedAlternatives ? { alternatives: fixedAlternatives } : {}),
       },
     };
 

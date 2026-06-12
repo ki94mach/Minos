@@ -14,7 +14,7 @@ import api from "../api";
 import Cookies from "js-cookie";
 import { Save, Add } from "@mui/icons-material";
 import CatalogPageLayout from "../components/catalog/CatalogPageLayout";
-import CatalogListItem from "../components/catalog/CatalogListItem";
+import CatalogListItemWithUsages from "../components/catalog/CatalogListItemWithUsages";
 import { catalogEmptyStateSx, catalogFormActionsSx } from "../components/catalog/catalogPageStyles";
 import { useCatalogEditSave } from "../components/catalog/useCatalogEditSave";
 import { formatDrugStrengthUnit } from "../utils/drugFormat";
@@ -232,8 +232,10 @@ const Drugs: React.FC = () => {
         </form>
       }>
       {filtered.map((drug) => (
-        <CatalogListItem
+        <CatalogListItemWithUsages
           key={drug._id}
+          catalogId={drug._id}
+          kind="drug"
           selected={editingId === drug._id}
           primary={drug.name}
           secondary={formatDrugSecondary(drug)}

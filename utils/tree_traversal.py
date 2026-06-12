@@ -80,6 +80,32 @@ def drug_ids_from_treatment_embedded(treatment_data: Any) -> list[ObjectId]:
     return ids
 
 
+def drug_ids_from_treatment_with_master_fallback(
+    treatment_data: Any,
+    master: Any = None,
+) -> list[ObjectId]:
+    """
+    Drug ids on a patient embed, unioned with the master Treatment document.
+
+    Patient Alternative nodes are often stored without alternatives[] on the
+    embed (catalog id + name + type only). Regimen drugs inside each
+    alternative option live on the master Treatment until copied explicitly.
+    """
+    ids: list[ObjectId] = []
+    seen: set[ObjectId] = set()
+
+    def absorb(body: Any) -> None:
+        for drug_id in drug_ids_from_treatment_embedded(body):
+            if drug_id not in seen:
+                seen.add(drug_id)
+                ids.append(drug_id)
+
+    absorb(treatment_data)
+    if master is not None:
+        absorb(master)
+    return ids
+
+
 def extract_node_catalog_ids(node: Any) -> NodeCatalogIds:
     """
     Catalog master ids carried by one Node:
@@ -250,6 +276,29 @@ def _run_self_test() -> None:
     assert ObjectId("507f1f77bcf86cd799439011") == normalize_object_id(
         "507f1f77bcf86cd799439011"
     )
+
+    sparse_alt_embed = {
+        "_id": ObjectId(),
+        "name": "Alt bundle",
+        "type": "Alternative",
+    }
+    master_only_drug = ObjectId()
+    master_alt = {
+        "alternatives": [
+            {
+                "regimen": {
+                    "drugs": [
+                        {"drug": {"_id": master_only_drug, "name": "Gem"}}
+                    ]
+                }
+            }
+        ]
+    }
+    assert drug_ids_from_treatment_embedded(sparse_alt_embed) == []
+    merged = drug_ids_from_treatment_with_master_fallback(
+        sparse_alt_embed, master_alt
+    )
+    assert merged == [master_only_drug]
 
     print("tree_traversal self-test: ok")
     print(f"  nodes visited: {len(visits)}")

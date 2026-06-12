@@ -39,6 +39,11 @@ const CustomNode = (
 
   const baseShadow = treeTokens.nodeShadow;
   const hoverShadow = treeTokens.nodeHoverShadow;
+  const isFocused = nodeData.isFocused === true;
+  const focusRing = `0 0 0 3px ${theme.palette.primary.main}`;
+  const restingShadow = isFocused
+    ? `${focusRing}, ${baseShadow}`
+    : baseShadow;
 
   const containerStyle: React.CSSProperties = isOverviewMode
     ? {
@@ -47,7 +52,9 @@ const CustomNode = (
         borderRadius: "50%",
         background: nodeFill,
         border: `2px solid color-mix(in srgb, ${borderColor} 70%, white)`,
-        boxShadow: `${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`,
+        boxShadow: isFocused
+          ? `${focusRing}, ${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`
+          : `${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -69,7 +76,7 @@ const CustomNode = (
         borderRadius: "12px",
         background: theme.palette.background.paper,
         border: `1.5px solid ${borderColor}`,
-        boxShadow: baseShadow,
+        boxShadow: restingShadow,
         textAlign: "center",
         minWidth: "150px",
         cursor: canDrillDown ? "pointer" : "default",
@@ -236,10 +243,16 @@ const CustomNode = (
         onContextMenu={(e) => onContextMenu(e, id)}
         style={containerStyle}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLDivElement).style.boxShadow = hoverShadow;
+          (e.currentTarget as HTMLDivElement).style.boxShadow = isFocused
+            ? `${focusRing}, ${hoverShadow}`
+            : hoverShadow;
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLDivElement).style.boxShadow = baseShadow;
+          (e.currentTarget as HTMLDivElement).style.boxShadow = isOverviewMode
+            ? isFocused
+              ? `${focusRing}, ${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`
+              : `${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`
+            : restingShadow;
         }}
         onClick={() => {
           if (!isEditing && nodeData.onClick) nodeData.onClick();

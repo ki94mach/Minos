@@ -16,7 +16,7 @@ import {
 import api from "../api";
 import { Save, Add } from "@mui/icons-material";
 import CatalogPageLayout from "../components/catalog/CatalogPageLayout";
-import CatalogListItem from "../components/catalog/CatalogListItem";
+import CatalogListItemWithUsages from "../components/catalog/CatalogListItemWithUsages";
 import CatalogFormListRow from "../components/catalog/CatalogFormListRow";
 import {
   catalogEmptyStateSx,
@@ -626,8 +626,10 @@ const Treatments: React.FC = () => {
           </form>
         }>
         {filteredTreatments.map((treatment) => (
-          <CatalogListItem
+          <CatalogListItemWithUsages
             key={treatment._id}
+            catalogId={treatment._id}
+            kind="treatment"
             selected={editingTreatmentId === treatment._id}
             primary={`${treatment.name} (${treatment.type})`}
             secondary={

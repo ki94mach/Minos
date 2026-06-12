@@ -383,6 +383,23 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
         str(patient_id) in [str(pid) for pid in char_patient_ids],
         str(char_refs),
     )
+    ok(
+        "char references groups payload",
+        isinstance(char_refs, dict)
+        and isinstance(char_refs.get("groups"), list)
+        and len(char_refs.get("groups") or []) >= 1,
+        str(char_refs),
+    )
+    char_groups = (char_refs or {}).get("groups") or []
+    char_first_usage = (
+        (char_groups[0].get("usages") or [{}])[0] if char_groups else {}
+    )
+    ok(
+        "char references usage has node_id and path_label",
+        bool(char_first_usage.get("node_id"))
+        and bool(char_first_usage.get("path_label")),
+        str(char_first_usage),
+    )
 
     code, patients = request("GET", "/api/patients")
     ok("T7 list patients", code == 200 and isinstance(patients, list))
@@ -867,6 +884,13 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
         isinstance(drug_refs, dict) and drug_refs.get("treatment_count", 0) >= 1,
         str(drug_refs),
     )
+    ok(
+        "drug references groups payload",
+        isinstance(drug_refs, dict)
+        and isinstance(drug_refs.get("groups"), list)
+        and len(drug_refs.get("groups") or []) >= 1,
+        str(drug_refs),
+    )
 
     code, treat_refs = request("GET", f"/api/treatments/{treatment_id}/references")
     ok("catalog treatment references", code == 200, str(treat_refs))
@@ -880,6 +904,23 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
         "treatment references lists patient",
         str(patient_id) in [str(pid) for pid in treat_patient_ids],
         str(treat_refs),
+    )
+    ok(
+        "treatment references groups payload",
+        isinstance(treat_refs, dict)
+        and isinstance(treat_refs.get("groups"), list)
+        and len(treat_refs.get("groups") or []) >= 1,
+        str(treat_refs),
+    )
+    treat_groups = (treat_refs or {}).get("groups") or []
+    treat_first_usage = (
+        (treat_groups[0].get("usages") or [{}])[0] if treat_groups else {}
+    )
+    ok(
+        "treatment references usage has node_id and path_label",
+        bool(treat_first_usage.get("node_id"))
+        and bool(treat_first_usage.get("path_label")),
+        str(treat_first_usage),
     )
 
     # Alternative treatment priority (catalog-owned, Treatment + Regimen refs)

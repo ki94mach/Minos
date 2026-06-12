@@ -3,7 +3,7 @@ import { TextField, Button, Stack, Typography } from "@mui/material";
 import { Save, Add } from "@mui/icons-material";
 import api from "../api";
 import CatalogPageLayout from "../components/catalog/CatalogPageLayout";
-import CatalogListItem from "../components/catalog/CatalogListItem";
+import CatalogListItemWithUsages from "../components/catalog/CatalogListItemWithUsages";
 import { catalogEmptyStateSx, catalogFormActionsSx } from "../components/catalog/catalogPageStyles";
 import { useCatalogEditSave } from "../components/catalog/useCatalogEditSave";
 import { API_ENDPOINTS } from "../api/endpoints";
@@ -172,11 +172,14 @@ const Characteristics: React.FC = () => {
         </form>
       }>
       {filtered.map((char) => (
-        <CatalogListItem
+        <CatalogListItemWithUsages
           key={char._id}
+          catalogId={char._id}
+          kind="characteristic"
           selected={editingId === char._id}
           primary={char.name}
           secondary={char.type}
+          isPopulationCatalogHit={char.type === "Population"}
           onEdit={() => handleEdit(char)}
           onDelete={() => handleDelete(char._id)}
         />

@@ -66,6 +66,8 @@ import CreatePatientTreeDialog from "../components/patientDialogs/CreatePatientT
 type PatientsLocationState = {
   treeId?: string;
   color?: string;
+  focusNodeDocId?: string;
+  focusOverviewNodeId?: string;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -136,6 +138,8 @@ const Patients: React.FC = () => {
   const [createPatientDialogOpen, setCreatePatientDialogOpen] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
+  const pendingFocusFlowNodeIdRef = useRef<string | null>(null);
+  const focusHighlightTimerRef = useRef<number | null>(null);
   const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
   const [graphEpoch, setGraphEpoch] = useState(0);
   const [ctx, setCtx] = useState<
@@ -224,6 +228,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   const location = useLocation();
   const navState = (location.state ?? {}) as PatientsLocationState;
   const patientTreeId = navState.treeId as string;
+  const focusNodeDocId = navState.focusNodeDocId as string | undefined;
+  const focusOverviewNodeId = navState.focusOverviewNodeId as string | undefined;
 
   const mapColor = canvasBackground(navState.color);
 
@@ -494,12 +500,52 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
     return () => clearTimeout(timer);
   }, [nodes, edges]);
 
+  const clearFocusHighlight = useCallback(() => {
+    if (focusHighlightTimerRef.current != null) {
+      window.clearTimeout(focusHighlightTimerRef.current);
+      focusHighlightTimerRef.current = null;
+    }
+    setNodes((current) =>
+      current.map((node) =>
+        node.data?.isFocused
+          ? { ...node, data: { ...node.data, isFocused: false } }
+          : node
+      )
+    );
+  }, [setNodes]);
+
   // Fit after graph rebuild (drill-down, back to overview, delete, etc.) — not on node drag.
   useEffect(() => {
     if (debouncedNodes.length === 0) return;
-    const timer = window.setTimeout(() => fitPatientTreeView(), 120);
+    const timer = window.setTimeout(() => {
+      const focusFlowNodeId = pendingFocusFlowNodeIdRef.current;
+      if (focusFlowNodeId && reactFlowRef.current) {
+        reactFlowRef.current.fitView({
+          nodes: [{ id: focusFlowNodeId }],
+          padding: 0.35,
+          duration: 400,
+          includeHiddenNodes: false,
+        });
+        pendingFocusFlowNodeIdRef.current = null;
+        if (focusHighlightTimerRef.current != null) {
+          window.clearTimeout(focusHighlightTimerRef.current);
+        }
+        focusHighlightTimerRef.current = window.setTimeout(
+          () => clearFocusHighlight(),
+          3000
+        );
+        return;
+      }
+      fitPatientTreeView();
+    }, 120);
     return () => window.clearTimeout(timer);
-  }, [selectedRootId, graphEpoch, debouncedNodes.length, fitPatientTreeView]);
+  }, [
+    selectedRootId,
+    graphEpoch,
+    debouncedNodes.length,
+    fitPatientTreeView,
+    clearFocusHighlight,
+  ]);
 
   useEffect(() => {
        drawPatientNodes();
@@ -590,9 +636,15 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           const drillTarget = drillPatient
             ? findNodeById(drillPatient.tree, selectedRootId)
             : null;
+          const drillCharType = drillTarget
+            ? getEmbeddedCharType(drillTarget)
+            : null;
+          const allowNonPiDrill =
+            Boolean(focusNodeDocId) || drillCharType === "Population";
           if (
             drillTarget &&
-            getEmbeddedCharType(drillTarget) !== "Primary Indication"
+            drillCharType !== "Primary Indication" &&
+            !allowNonPiDrill
           ) {
             navigate("/patients", { replace: true });
             return;
@@ -802,6 +854,28 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         }
 
         routedEdges = assignEdgeHandles(finalNodes, routedEdges);
+
+        let focusFlowNodeId: string | null = null;
+        if (focusOverviewNodeId) {
+          finalNodes = finalNodes.map((node) => {
+            const isFocused = node.id === focusOverviewNodeId;
+            if (isFocused) focusFlowNodeId = node.id;
+            return isFocused
+              ? { ...node, data: { ...node.data, isFocused: true } }
+              : node;
+          });
+        } else if (focusNodeDocId) {
+          finalNodes = finalNodes.map((node) => {
+            const isFocused =
+              String(node.data.docId) === String(focusNodeDocId);
+            if (isFocused) focusFlowNodeId = node.id;
+            return isFocused
+              ? { ...node, data: { ...node.data, isFocused: true } }
+              : node;
+          });
+        }
+
+        pendingFocusFlowNodeIdRef.current = focusFlowNodeId;
         applyFlowGraph(finalNodes, routedEdges);
         setGraphEpoch((epoch) => epoch + 1);
       } catch (err) {
