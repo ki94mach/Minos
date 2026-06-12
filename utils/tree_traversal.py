@@ -198,6 +198,7 @@ def _demo_tree() -> dict:
                                 {
                                     "_id": ObjectId(),
                                     "name": "Alt A",
+                                    "priority": 1,
                                     "ratio": 0.5,
                                     "regimen": {
                                         "drugs": [

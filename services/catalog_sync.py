@@ -529,12 +529,14 @@ def _copy_alternatives(alternatives: Any) -> Optional[list]:
         return None
     copied = []
     for alt in alternatives:
+        alt_regimen = _get_field(alt, "regimen")
         copied.append(
             AlternativeTreatment(
                 _id=_get_field(alt, "_id"),
                 name=_get_field(alt, "name"),
-                regimen=_copy_regimen(_get_field(alt, "regimen")),
+                regimen=_copy_regimen(alt_regimen) if alt_regimen else None,
                 ratio=_get_field(alt, "ratio"),
+                priority=_get_field(alt, "priority"),
             )
         )
     return copied

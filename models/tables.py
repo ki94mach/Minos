@@ -113,8 +113,9 @@ class Regimen(EmbeddedDocument):
 class AlternativeTreatment(EmbeddedDocument):
     _id = ObjectIdField(required=True)
     name = StringField(required=True)
-    regimen = EmbeddedDocumentField(Regimen, required=True)
+    regimen = EmbeddedDocumentField(Regimen, required=False)
     ratio = FloatField(required=True)
+    priority = IntField(required=True, min_value=1)
 
 
 # Embedded version of a treatment node

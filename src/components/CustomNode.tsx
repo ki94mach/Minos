@@ -135,12 +135,18 @@ const CustomNode = (
   const tooltipContent = (() => {
     if (nodeData.type === "treatment") {
       if (nodeData.alternatives?.length) {
+        const sortedAlternatives = [...nodeData.alternatives].sort(
+          (a: any, b: any) =>
+            (a.priority ?? Number.MAX_SAFE_INTEGER) -
+              (b.priority ?? Number.MAX_SAFE_INTEGER) ||
+            String(a.name).localeCompare(String(b.name))
+        );
         return (
           <div>
-            {nodeData.alternatives.map((alt: any, i: number) => (
+            {sortedAlternatives.map((alt: any, i: number) => (
               <div key={i} style={{ marginBottom: 8 }}>
                 <strong>
-                  {alt.name} (Ratio: {alt.ratio})
+                  {alt.name} (Priority: {alt.priority ?? "?"}, Ratio: {alt.ratio})
                 </strong>
                 {!!alt.regimen?.drugs?.length && (
                   <ul style={{ paddingLeft: 16, marginTop: 4 }}>

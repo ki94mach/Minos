@@ -882,6 +882,188 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
         str(treat_refs),
     )
 
+    # Alternative treatment priority (catalog-owned, Treatment + Regimen refs)
+    regimen_b_name = f"{PREFIX}-Regimen-B"
+    alt_regimen_a = {
+        "drugs": [
+            {
+                "drug": {
+                    "_id": drug_id,
+                    "name": drug_name,
+                    "strength": synced_strength,
+                    "unit": "mg",
+                },
+                "annual_patient_con": 10,
+            }
+        ]
+    }
+    alt_regimen_b = {
+        "drugs": [
+            {
+                "drug": {
+                    "_id": drug_id,
+                    "name": drug_name,
+                    "strength": synced_strength,
+                    "unit": "mg",
+                },
+                "annual_patient_con": 20,
+            }
+        ]
+    }
+    code, regimen_b_resp = request(
+        "POST",
+        "/api/treatments",
+        {
+            "name": regimen_b_name,
+            "type": "Regimen",
+            "regimen": alt_regimen_b,
+        },
+    )
+    ok("catalog create second regimen", code == 201, str(regimen_b_resp))
+    regimen_b_id = (
+        (regimen_b_resp or {}).get("id")
+        if isinstance(regimen_b_resp, dict)
+        else None
+    )
+    ok("second regimen id", bool(regimen_b_id))
+    if regimen_b_id:
+        resources.treatment_ids.append(str(regimen_b_id))
+
+    basic_treat_name = f"{PREFIX}-Basic-Treatment"
+    code, basic_treat_resp = request(
+        "POST",
+        "/api/treatments",
+        {"name": basic_treat_name, "type": "Treatment"},
+    )
+    ok("catalog create basic treatment", code == 201, str(basic_treat_resp))
+    basic_treat_id = (
+        (basic_treat_resp or {}).get("id")
+        if isinstance(basic_treat_resp, dict)
+        else None
+    )
+    ok("basic treatment id", bool(basic_treat_id))
+    if basic_treat_id:
+        resources.treatment_ids.append(str(basic_treat_id))
+
+    alt_bundle_name = f"{PREFIX}-Alt-Bundle"
+    alt_alternatives = [
+        {
+            "_id": treatment_id,
+            "name": renamed_treatment,
+            "priority": 1,
+            "ratio": 0.5,
+            "regimen": alt_regimen_a,
+        },
+        {
+            "_id": regimen_b_id,
+            "name": regimen_b_name,
+            "priority": 1,
+            "ratio": 0.5,
+            "regimen": alt_regimen_b,
+        },
+    ]
+    code, alt_bundle_resp = request(
+        "POST",
+        "/api/treatments",
+        {
+            "name": alt_bundle_name,
+            "type": "Alternative",
+            "alternatives": alt_alternatives,
+        },
+    )
+    ok("catalog create alternative bundle (tied priorities)", code == 201, str(alt_bundle_resp))
+    alt_bundle_id = (
+        (alt_bundle_resp or {}).get("id")
+        if isinstance(alt_bundle_resp, dict)
+        else None
+    )
+    ok("alternative bundle id", bool(alt_bundle_id))
+    if alt_bundle_id:
+        resources.treatment_ids.append(str(alt_bundle_id))
+
+    alt_basic_name = f"{PREFIX}-Alt-Basic"
+    code, alt_basic_resp = request(
+        "POST",
+        "/api/treatments",
+        {
+            "name": alt_basic_name,
+            "type": "Alternative",
+            "alternatives": [
+                {
+                    "_id": basic_treat_id,
+                    "name": basic_treat_name,
+                    "priority": 1,
+                    "ratio": 1.0,
+                }
+            ],
+        },
+    )
+    ok("catalog create alternative with basic Treatment ref", code == 201, str(alt_basic_resp))
+    alt_basic_id = (
+        (alt_basic_resp or {}).get("id")
+        if isinstance(alt_basic_resp, dict)
+        else None
+    )
+    ok("alternative basic ref id", bool(alt_basic_id))
+    if alt_basic_id:
+        resources.treatment_ids.append(str(alt_basic_id))
+
+    code, alt_priority_reject = request(
+        "POST",
+        f"/api/patients/{patient_id}/add_node",
+        {
+            "parent_node_id": root_id,
+            "node": {
+                "node_type": "treatment",
+                "rate": 0.1,
+                "size": 100.0,
+                "treatment_data": {
+                    "_id": alt_bundle_id,
+                    "name": alt_bundle_name,
+                    "type": "Alternative",
+                    "alternatives": [
+                        {
+                            **alt_alternatives[0],
+                            "priority": 99,
+                        },
+                        alt_alternatives[1],
+                    ],
+                },
+            },
+        },
+    )
+    ok(
+        "add_node rejects alternative priority mismatch",
+        code == 400,
+        str(alt_priority_reject),
+    )
+    ok(
+        "add_node priority mismatch error",
+        isinstance(alt_priority_reject, dict)
+        and "priority" in (alt_priority_reject.get("error") or "").lower(),
+        str(alt_priority_reject),
+    )
+
+    code, alt_node_ok = request(
+        "POST",
+        f"/api/patients/{patient_id}/add_node",
+        {
+            "parent_node_id": root_id,
+            "node": {
+                "node_type": "treatment",
+                "rate": 0.1,
+                "size": 100.0,
+                "treatment_data": {
+                    "_id": alt_bundle_id,
+                    "name": alt_bundle_name,
+                    "type": "Alternative",
+                    "alternatives": alt_alternatives,
+                },
+            },
+        },
+    )
+    ok("add_node accepts catalog-matching alternative priorities", code == 200, str(alt_node_ok))
+
     # T9 — add child node
     code, add_resp = request(
         "POST",

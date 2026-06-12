@@ -382,6 +382,18 @@ def delete_drug(drug_id):
 # --------------------------------------------------
 # Treatment Endpoints
 # --------------------------------------------------
+
+def _alternative_treatment_from_payload(alt: dict) -> AlternativeTreatment:
+    alt_regimen = alt.get("regimen")
+    alt_regimen_doc = Regimen(**alt_regimen) if alt_regimen else None
+    return AlternativeTreatment(
+        _id=alt["_id"],
+        name=alt["name"],
+        regimen=alt_regimen_doc,
+        ratio=alt["ratio"],
+        priority=alt["priority"],
+    )
+
 @api_blueprint.route('/treatments', methods=['GET'])
 @sso_required
 def get_treatments():
@@ -424,7 +436,8 @@ def create_treatment(validated_data: TreatmentCreate):
                   // Similar structure as above.
               ]
            },
-           "ratio": 0.75
+           "ratio": 0.75,
+           "priority": 1
          }
       ]
     }
@@ -436,6 +449,7 @@ def create_treatment(validated_data: TreatmentCreate):
             {
             "_id": "67d022c49e8a82122fb0332d",
             "name": "Carboplatin with Gemcitabine",
+            "priority": 1,
             "regimen": {
                 "drugs": [
                 {
@@ -463,6 +477,7 @@ def create_treatment(validated_data: TreatmentCreate):
             {
             "_id": "67d023479e8a82122fb0332f",
             "name": "Carboplatin with Paclitaxel",
+            "priority": 2,
             "regimen": {
                 "drugs": [
                 {
@@ -501,7 +516,6 @@ def create_treatment(validated_data: TreatmentCreate):
 
         from models.tables import Treatment as TreatmentDoc
         from models.tables import Regimen as RegimenDoc
-        from models.tables import AlternativeTreatment as AltTreatDoc
 
         regimen_doc = None
         alts_docs = []
@@ -515,16 +529,7 @@ def create_treatment(validated_data: TreatmentCreate):
             if not raw_alts:
                 return error_response('Alternatives are required for treatment type "Alternative"', 400)
             for alt in raw_alts:
-                alt_regimen = alt["regimen"]
-                alt_regimen_doc = RegimenDoc(**alt_regimen)
-                alts_docs.append(
-                    AltTreatDoc(
-                        _id=alt["_id"],
-                        name=alt["name"],
-                        regimen=alt_regimen_doc,
-                        ratio=alt["ratio"]
-                    )
-                )
+                alts_docs.append(_alternative_treatment_from_payload(alt))
 
         hash_input = payload["name"] + treatment_type + str(raw_regimen) + str(raw_alts)
         treatment_hash = hashlib.sha256(hash_input.encode()).hexdigest()

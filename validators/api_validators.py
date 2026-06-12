@@ -24,6 +24,7 @@ from utils.business_rules import (
     validate_and_transform_followup_embedded,
     validate_and_transform_alternative,
     validate_alternative_ratios_sum,
+    validate_alternative_priorities,
 )
 
 ALLOWED_TREATMENT_TYPES = ['Treatment', 'Regimen', 'Alternative']
@@ -165,20 +166,30 @@ class AlternativeTreatment(BaseModel):
     )
     id: PyObjectId = Field(..., alias="_id")
     name: str
-    regimen: Regimen
+    regimen: Optional[Regimen] = None
     ratio: float
+    priority: int = Field(..., ge=1)
 
     @field_validator('name', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
         return validate_non_empty(v, "Alternative name")
 
+    @field_validator('priority', mode='before')
+    @classmethod
+    def priority_must_be_int(cls, v: Any) -> int:
+        if isinstance(v, bool) or not isinstance(v, int):
+            raise ValueError("Priority must be a positive integer")
+        return v
+
+    @field_validator('priority', mode='after')
+    @classmethod
+    def validate_priority(cls, v: int) -> int:
+        validate_alternative_priorities([v])
+        return v
+
     @model_validator(mode="after")
     def validate_against_database(self) -> "AlternativeTreatment":
-        # First validate the regimen if present
-        # if self.regimen:
-        #     self.regimen.validate_against_database(str(self.id))
-
         regimen_data = (
             self.regimen.model_dump(by_alias=True)
             if self.regimen else None
@@ -187,7 +198,8 @@ class AlternativeTreatment(BaseModel):
             '_id': str(self.id),
             'name': self.name,
             'regimen': regimen_data,
-            'ratio': self.ratio
+            'ratio': self.ratio,
+            'priority': self.priority,
         }
         validate_and_transform_alternative(alternative_data)
         return self
@@ -256,6 +268,7 @@ class TreatmentCreate(BaseModel):
                     )
             
             validate_alternative_ratios_sum([alt.ratio for alt in v])
+            validate_alternative_priorities([alt.priority for alt in v])
         return v
 
 class TreatmentUpdate(BaseModel):
@@ -322,6 +335,7 @@ class TreatmentUpdate(BaseModel):
                     )
 
             validate_alternative_ratios_sum([alt.ratio for alt in v])
+            validate_alternative_priorities([alt.priority for alt in v])
         return v
 
 # ------------------------------------------------------------------------------

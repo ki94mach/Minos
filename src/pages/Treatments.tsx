@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Typography,
   TextField,
@@ -46,7 +46,8 @@ interface Alternative {
     _id?: string;
     name: string;
     ratio: number;
-    regimen: {
+    priority: number;
+    regimen?: {
         drugs: DrugWithCon[];
     };
 }
@@ -58,6 +59,20 @@ interface Treatment {
     regimen?: { drugs: DrugWithCon[] };
     alternatives?: Alternative[];
 }
+
+function compareAlternatives(a: Alternative, b: Alternative): number {
+    return a.priority - b.priority || a.name.localeCompare(b.name);
+}
+
+function nextAlternativePriority(alternatives: Alternative[]): number {
+    if (alternatives.length === 0) return 1;
+    return Math.max(...alternatives.map((alt) => alt.priority)) + 1;
+}
+
+const extractId = (id: unknown): string =>
+    typeof id === "object" && id !== null && "$oid" in id
+        ? (id as { $oid: string }).$oid
+        : String(id);
 
 const Treatments: React.FC = () => {
     const [drugs, setDrugs] = useState<Drug[]>([]);
@@ -72,10 +87,14 @@ const Treatments: React.FC = () => {
 
     const [alternativeRegimenDrugs, setAlternativeRegimenDrugs] = useState<DrugWithCon[]>([]);
     const [alternativeRatio, setAlternativeRatio] = useState<number>(0);
+    const [alternativePriority, setAlternativePriority] = useState<number>(1);
     const [alternatives, setAlternatives] = useState<Alternative[]>([]);
+    const [draggedAlternativeIndex, setDraggedAlternativeIndex] = useState<number | null>(null);
     const [editingTreatmentId, setEditingTreatmentId] = useState<string | null>(null);
-    const regimenOptions = treatments.filter(t => t.type === "Regimen");
-    const [selectedRegimenId, setSelectedRegimenId] = useState<string>("");
+    const alternativeRefOptions = treatments.filter(
+        (t) => t.type === "Regimen" || t.type === "Treatment"
+    );
+    const [selectedAlternativeRefId, setSelectedAlternativeRefId] = useState<string>("");
     const [searchTerm, setSearchTerm] = useState("");
     const [errors, setErrors] = useState<string>("");
     const { confirmBeforePut, formatPutSuccess } = useCatalogEditSave("treatment");
@@ -127,41 +146,74 @@ const Treatments: React.FC = () => {
         setAnnualConsumption("");
     };
 
+    const sortedAlternatives = useMemo(
+        () => [...alternatives].sort(compareAlternatives),
+        [alternatives]
+    );
+
+    useEffect(() => {
+        setAlternativePriority(nextAlternativePriority(alternatives));
+    }, [alternatives]);
+
     const addAlternative = () => {
-        if (!selectedRegimenId || alternativeRatio <= 0 || alternativeRatio > 1) {
-          alert("Select a regimen and a valid ratio (0-1).");
+        if (!selectedAlternativeRefId || alternativeRatio <= 0 || alternativeRatio > 1) {
+          alert("Select a treatment/regimen and a valid ratio (0-1).");
           return;
         }
-      
-        const selectedRegimen = regimenOptions.find(r => r._id === selectedRegimenId);
-        if (!selectedRegimen || !selectedRegimen.regimen) {
-          alert("Selected regimen not found.");
+        if (!Number.isInteger(alternativePriority) || alternativePriority < 1) {
+          alert("Priority must be a positive integer.");
           return;
         }
-      
+
+        const selectedRef = alternativeRefOptions.find(
+            (r) => r._id === selectedAlternativeRefId
+        );
+        if (!selectedRef) {
+          alert("Selected treatment not found.");
+          return;
+        }
+        if (selectedRef.type === "Regimen" && !selectedRef.regimen) {
+          alert("Selected regimen has no drug data.");
+          return;
+        }
+
         const newAlt: Alternative = {
-          _id: selectedRegimen._id,
-          // name: selectedRegimen.name,
-          name: treatments.find(t => t._id === selectedRegimen._id)?.name || selectedRegimen.name, 
+          _id: selectedRef._id,
+          name: selectedRef.name,
           ratio: alternativeRatio,
-          regimen: selectedRegimen.regimen,
-          // regimen: {
-          //   drugs: selectedRegimen.regimen.drugs.map(item => ({
-          //     drug: {
-          //       ...item.drug,
-          //       _id: typeof item.drug._id === "object" && "$oid" in item.drug._id
-          //         ? (item.drug._id as any)["$oid"]
-          //         : item.drug._id,
-          //     },
-          //     annual_patient_con: item.annual_patient_con,
-          //   }))
-          // }
+          priority: alternativePriority,
         };
-      
-        setAlternatives(prev => [...prev, newAlt]);
-        setSelectedRegimenId("");
+        if (selectedRef.regimen) {
+          newAlt.regimen = selectedRef.regimen;
+        }
+
+        setAlternatives((prev) => [...prev, newAlt]);
+        setSelectedAlternativeRefId("");
         setAlternativeRatio(0);
       };
+
+    const updateAlternativePriority = (altId: string | undefined, value: number) => {
+        if (!Number.isInteger(value) || value < 1) return;
+        setAlternatives((prev) =>
+            prev.map((alt) =>
+                alt._id === altId ? { ...alt, priority: value } : alt
+            )
+        );
+    };
+
+    const handleAlternativeDrop = (targetIndex: number) => {
+        if (draggedAlternativeIndex === null || draggedAlternativeIndex === targetIndex) {
+            setDraggedAlternativeIndex(null);
+            return;
+        }
+        const reordered = [...sortedAlternatives];
+        const [moved] = reordered.splice(draggedAlternativeIndex, 1);
+        reordered.splice(targetIndex, 0, moved);
+        setAlternatives(
+            reordered.map((alt, index) => ({ ...alt, priority: index + 1 }))
+        );
+        setDraggedAlternativeIndex(null);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -184,27 +236,28 @@ const Treatments: React.FC = () => {
           };
         } else if (treatmentType === "Alternative") {
           if (alternatives.length === 0) return alert("Add at least one alternative.");
-          payload.alternatives = alternatives.map((alt) => ({
-            _id: typeof alt._id === "object" && "$oid" in alt._id
-            ? alt._id["$oid"]
-            : alt._id,
-            name: alt.name,
-            ratio: alt.ratio,
-            regimen: {
+          payload.alternatives = alternatives.map((alt) => {
+            const entry: Record<string, unknown> = {
+              _id: extractId(alt._id),
+              name: alt.name,
+              ratio: alt.ratio,
+              priority: alt.priority,
+            };
+            if (alt.regimen?.drugs?.length) {
+              entry.regimen = {
                 drugs: alt.regimen.drugs.map((item) => ({
-                    drug: {
-                        _id: typeof item.drug._id === "object" && "$oid" in item.drug._id
-                          ? item.drug._id["$oid"]
-                          : item.drug._id,
-                        name: item.drug.name,
-                        strength: item.drug.strength,
-                        unit: item.drug.unit
-                      },
+                  drug: {
+                    _id: extractId(item.drug._id),
+                    name: item.drug.name,
+                    strength: item.drug.strength,
+                    unit: item.drug.unit,
+                  },
                   annual_patient_con: item.annual_patient_con,
                 })),
-              },
-            }));
-            // delete payload.regimen; 
+              };
+            }
+            return entry;
+          });
         }
         console.log("Submitting Payload: ", JSON.stringify(payload, null, 2));
 
@@ -253,7 +306,10 @@ const Treatments: React.FC = () => {
         setAlternatives([]);
         setAlternativeRegimenDrugs([]);
         setSelectedDrugId("");
-        setSelectedRegimenId("");
+        setSelectedAlternativeRefId("");
+        setAlternativeRatio(0);
+        setAlternativePriority(1);
+        setDraggedAlternativeIndex(null);
     };
 
     const isEditing = Boolean(editingTreatmentId);
@@ -268,33 +324,38 @@ const Treatments: React.FC = () => {
         setName(treatment.name);
         setTreatmentType(treatment.type);
       
-        const extractId = (id: any): string =>
-          typeof id === "object" && id !== null && "$oid" in id
-            ? (id.$oid as string)
-            : (id as string);
-      
+        const extractDrugId = (id: unknown): string => extractId(id);
+
         if (treatment.type === "Regimen" && treatment.regimen) {
           const sanitizedDrugs = treatment.regimen.drugs.map((item) => ({
             drug: {
               ...item.drug,
-              _id: extractId(item.drug._id),
+              _id: extractDrugId(item.drug._id),
             },
             annual_patient_con: item.annual_patient_con,
           }));
           setRegimenDrugs(sanitizedDrugs);
         } else if (treatment.type === "Alternative" && treatment.alternatives) {
-          const sanitizedAlternatives = treatment.alternatives.map((alt) => ({
-            ...alt,
-            regimen: {
-              drugs: alt.regimen.drugs.map((item) => ({
-                drug: {
-                  ...item.drug,
-                  _id: extractId(item.drug._id),
-                },
-                annual_patient_con: item.annual_patient_con,
-              })),
-            },
-          }));
+          const sanitizedAlternatives = treatment.alternatives.map((alt, index) => {
+            const sanitized: Alternative = {
+              _id: extractId(alt._id),
+              name: alt.name,
+              ratio: alt.ratio,
+              priority: alt.priority ?? index + 1,
+            };
+            if (alt.regimen?.drugs?.length) {
+              sanitized.regimen = {
+                drugs: alt.regimen.drugs.map((item) => ({
+                  drug: {
+                    ...item.drug,
+                    _id: extractDrugId(item.drug._id),
+                  },
+                  annual_patient_con: item.annual_patient_con,
+                })),
+              };
+            }
+            return sanitized;
+          });
           setAlternatives(sanitizedAlternatives);
         }
       };
@@ -460,20 +521,36 @@ const Treatments: React.FC = () => {
                   <Autocomplete
                     size="small"
                     fullWidth
-                    options={regimenOptions}
-                    getOptionLabel={(option) => option.name}
+                    options={alternativeRefOptions}
+                    getOptionLabel={(option) => `${option.name} (${option.type})`}
                     value={
-                      regimenOptions.find((r) => r._id === selectedRegimenId) ||
-                      null
+                      alternativeRefOptions.find(
+                        (r) => r._id === selectedAlternativeRefId
+                      ) || null
                     }
                     onChange={(_event, newValue) =>
-                      setSelectedRegimenId(newValue ? newValue._id : "")
+                      setSelectedAlternativeRefId(newValue ? newValue._id : "")
                     }
                     renderInput={(params) => (
-                      <TextField {...params} label="Regimen" size="small" />
+                      <TextField
+                        {...params}
+                        label="Treatment or Regimen"
+                        size="small"
+                      />
                     )}
                   />
                   <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                    <TextField
+                      type="number"
+                      size="small"
+                      label="Priority"
+                      value={alternativePriority}
+                      onChange={(e) =>
+                        setAlternativePriority(Number(e.target.value))
+                      }
+                      inputProps={{ min: 1, step: 1 }}
+                      sx={{ minWidth: 120, flex: 1 }}
+                    />
                     <TextField
                       type="number"
                       size="small"
@@ -490,16 +567,37 @@ const Treatments: React.FC = () => {
                     </Button>
                   </Box>
                 </Stack>
-                {alternatives.length > 0 && (
+                {sortedAlternatives.length > 0 && (
                   <List disablePadding sx={catalogNestedListSx}>
-                    {alternatives.map((alt, i) => (
+                    {sortedAlternatives.map((alt, i) => (
                       <CatalogFormListRow
-                        key={i}
+                        key={extractId(alt._id)}
+                        sortable
                         primary={alt.name}
-                        secondary={`Ratio: ${alt.ratio}`}
+                        secondary={`Priority ${alt.priority} — Ratio ${alt.ratio}`}
+                        onDragStart={() => setDraggedAlternativeIndex(i)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => handleAlternativeDrop(i)}
+                        onDragEnd={() => setDraggedAlternativeIndex(null)}
+                        trailing={
+                          <TextField
+                            type="number"
+                            size="small"
+                            label="Priority"
+                            value={alt.priority}
+                            onChange={(e) =>
+                              updateAlternativePriority(
+                                alt._id,
+                                Number(e.target.value)
+                              )
+                            }
+                            inputProps={{ min: 1, step: 1 }}
+                            sx={{ width: 96 }}
+                          />
+                        }
                         onRemove={() =>
                           setAlternatives(
-                            alternatives.filter((_, idx) => idx !== i)
+                            alternatives.filter((item) => item._id !== alt._id)
                           )
                         }
                       />
@@ -538,8 +636,9 @@ const Treatments: React.FC = () => {
                     .map((d) => d.drug.name)
                     .join(", ")}`
                 : treatment.alternatives
-                ? `Alternatives: ${treatment.alternatives
-                    .map((a) => a.name)
+                ? `Alternatives: ${[...treatment.alternatives]
+                    .sort(compareAlternatives)
+                    .map((a) => `${a.name} (P${a.priority ?? "?"})`)
                     .join(", ")}`
                 : "Basic treatment"
             }

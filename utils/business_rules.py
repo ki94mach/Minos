@@ -49,6 +49,14 @@ def validate_alternative_ratios_sum(ratios: list[float]) -> None:
 
     raise ValueError("Alternative treatment ratios must sum to 1.0")
 
+def validate_alternative_priorities(priorities: list[int]) -> None:
+    """Validate alternative treatment priorities (positive integers; ties allowed)."""
+    if not priorities:
+        return
+    for p in priorities:
+        if not isinstance(p, int) or p < 1:
+            raise ValueError("Priority must be a positive integer")
+
 def normalize_drug_unit(unit: Optional[str]) -> Optional[str]:
     """Normalize drug unit when provided; IU stays uppercase, others lowercase."""
     if unit is None or not str(unit).strip():
@@ -160,22 +168,34 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
                     f"{payload_apc} (payload) ≠ {db_val} (DB)"
                 )
     
-    if treatment_data['alternatives']:
+    if treatment_data.get('alternatives'):
         if treatment.type != 'Alternative':
             raise ValueError("Alternatives can only be present for treatment type 'Alternative'")
-        db_map = { str(alt._id): alt.ratio for alt in treatment.alternatives }
-        payload_map = { str(alt['_id']): alt['ratio'] for alt in treatment_data['alternatives'] }
-        # compare IDs
+        db_map = {
+            str(alt._id): (alt.ratio, alt.priority)
+            for alt in treatment.alternatives
+        }
+        payload_map = {
+            str(alt['_id']): (alt['ratio'], alt['priority'])
+            for alt in treatment_data['alternatives']
+        }
         if set(db_map) != set(payload_map):
             raise ValueError(
                 f"Alternatives mismatch: DB has {set(db_map)}, payload has {set(payload_map)}"
             )
 
         for alt_id in db_map:
-            if payload_map[alt_id] != db_map[alt_id]:
+            db_ratio, db_priority = db_map[alt_id]
+            payload_ratio, payload_priority = payload_map[alt_id]
+            if payload_ratio != db_ratio:
                 raise ValueError(
                     f"Ratio mismatch for alternative {alt_id}: "
-                    f"{payload_map[alt_id]} (payload) ≠ {db_map[alt_id]} (DB)"
+                    f"{payload_ratio} (payload) ≠ {db_ratio} (DB)"
+                )
+            if payload_priority != db_priority:
+                raise ValueError(
+                    f"Priority mismatch for alternative {alt_id}: "
+                    f"{payload_priority} (payload) ≠ {db_priority} (DB)"
                 )
     return treatment_data
 
@@ -224,21 +244,31 @@ def validate_and_transform_alternative(alternative_data: dict) -> dict:
     ratio = alternative_data.get("ratio")
     if not isinstance(ratio, (int, float)):
         raise ValueError(f"Ratio must be a number, got {ratio!r}")
-    
-    if treatment.type != 'Regimen':
-        raise ValueError(f"Referenced treatment must be of type 'Regimen', got {treatment.type}")
-    
+
+    priority = alternative_data.get("priority")
+    if priority is None:
+        raise ValueError("Priority is required for alternative treatments")
+    validate_alternative_priorities([priority])
+
+    if treatment.type not in ('Regimen', 'Treatment'):
+        raise ValueError(
+            f"Referenced treatment must be of type 'Regimen' or 'Treatment', "
+            f"got {treatment.type}"
+        )
+
     if 'name' in alternative_data:
         alternative_data['name'] = alternative_data['name'].strip()
-    
+
     if alternative_data.get('name') != treatment.name:
         raise ValueError("Name does not match the database record")
-    
-    if 'regimen' in alternative_data:
+
+    regimen_data = alternative_data.get('regimen')
+    if treatment.type == 'Regimen':
+        if not regimen_data:
+            raise ValueError("Regimen payload is required when referencing a Regimen")
         if not treatment.regimen:
             raise ValueError("Referenced treatment must have a regimen")
-            
-        regimen_data = alternative_data['regimen']
+
         db_map = {
             str(item.drug._id): item.annual_patient_con
             for item in treatment.regimen.drugs
@@ -259,12 +289,9 @@ def validate_and_transform_alternative(alternative_data: dict) -> dict:
                     f"annual_patient_con mismatch for drug {drug_id}: "
                     f"{payload_apc} (payload) ≠ {db_val} (DB)"
                 )
-        
+    elif regimen_data:
+        raise ValueError("Regimen must be empty when referencing a basic Treatment")
 
-        # for drug_item in alternative_data['regimen'].get('drugs', []):
-        #     if 'drug' in drug_item:
-        #         drug_item['drug'] = validate_and_transform_drug(drug_item['drug'])
-    
     return alternative_data
 
 def validate_regimen_consistency(
