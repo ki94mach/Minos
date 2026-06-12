@@ -193,6 +193,14 @@ const CustomNode = (
   const formattedSize =
     nodeData.size !== undefined ? Number(nodeData.size).toLocaleString() : "";
 
+  const formattedRate =
+    nodeData.rate !== undefined
+      ? `${(Number(nodeData.rate) * 100).toLocaleString(undefined, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        })}%`
+      : "";
+
   const catalogStale = nodeData.catalogStale === true;
   const staleHint =
     "Embedded copy may differ from the catalog master. Edit the catalog entry or re-save the node to sync.";
@@ -258,9 +266,18 @@ const CustomNode = (
                 May differ from catalog
               </div>
             )}
-            {nodeData?.size !== undefined && (
-              <div style={{ color: theme.palette.text.secondary, fontSize: "12px", marginTop: 4 }}>
-                Size: {formattedSize}
+            {(formattedRate !== "" || nodeData?.size !== undefined) && (
+              <div style={{ marginTop: 4 }}>
+                {formattedRate !== "" && (
+                  <div style={{ color: theme.palette.text.secondary, fontSize: "12px" }}>
+                    Rate: {formattedRate}
+                  </div>
+                )}
+                {nodeData?.size !== undefined && (
+                  <div style={{ color: theme.palette.text.secondary, fontSize: "12px", marginTop: 2 }}>
+                    Size: {formattedSize}
+                  </div>
+                )}
               </div>
             )}
             {nodeData?.charType === "Primary Indication" && nodeData?.measureType && (
