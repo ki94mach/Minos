@@ -78,6 +78,8 @@ interface EditCharModalData {
   currentName: string;        
   currentRate: number;
   currentSize?: number;
+  currentMeasureType?: "Prevalence" | "Incidence";
+  currentMeasureYears?: number;
   isTreeRoot?: boolean;
   patientId: string;
   parentId: string;
@@ -302,6 +304,8 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             currentName: existingName,
             currentRate: existingRate,
             currentSize: existingSize,
+            currentMeasureType: foundNode.characteristic_data?.measure_type,
+            currentMeasureYears: foundNode.characteristic_data?.measure_years,
             isTreeRoot,
             patientId: realPatientId,
             parentId: existingParentId,

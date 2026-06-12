@@ -89,6 +89,8 @@ class CharacteristicEmbedded(EmbeddedDocument):
     _id = ObjectIdField(required=True)
     char_type = StringField(required=True, db_field="type")
     name = StringField(required=True)
+    measure_type = StringField(required=False, choices=['Prevalence', 'Incidence'])
+    measure_years = IntField(required=False, min_value=1)
 
 
 # Embedded version of a drug (used within treatments)

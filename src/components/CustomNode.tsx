@@ -257,6 +257,18 @@ const CustomNode = (
                 Size: {formattedSize}
               </div>
             )}
+            {nodeData?.charType === "Primary Indication" && nodeData?.measureType && (
+                <div
+                  style={{
+                    color: theme.palette.text.secondary,
+                    fontSize: "12px",
+                    marginTop: 4,
+                  }}>
+                  {nodeData.measureYears != null
+                    ? `${nodeData.measureType} · ${nodeData.measureYears} years`
+                    : nodeData.measureType}
+                </div>
+              )}
           </>
         )}
         <Handle

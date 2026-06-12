@@ -1,9 +1,22 @@
 import React, { useState, useEffect, useMemo } from "react";
 import api from "../api";
 import Cookies from "js-cookie";
-import { TextField, Button, Stack, FormControl, Autocomplete } from "@mui/material";
+import {
+  TextField,
+  Button,
+  Stack,
+  FormControl,
+  Autocomplete,
+  InputLabel,
+  Select,
+  MenuItem,
+} from "@mui/material";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
+
+const PRIMARY_INDICATION_TYPE = "Primary Indication";
+
+type MeasureType = "Prevalence" | "Incidence";
 
 interface CharacteristicOption {
   _id: string;
@@ -57,7 +70,12 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
   const [options, setOptions] = useState<CharacteristicOption[]>([]);
   const [selectedId, setSelectedId] = useState(initial?._id || "");
   const [rate, setRate] = useState<number>(initial?.rate ?? 1);
+  const [measureType, setMeasureType] = useState<MeasureType | "">("");
+  const [measureYears, setMeasureYears] = useState<string>("");
   const [busy, setBusy] = useState(false);
+
+  const selectedOpt = options.find((opt) => opt._id === selectedId);
+  const isPrimaryIndication = selectedOpt?.type === PRIMARY_INDICATION_TYPE;
 
   // Fetch available characteristics for dropdown
   useEffect(() => {
@@ -84,22 +102,40 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
     if (!parentId || !selectedId) return;
     setBusy(true);
 
-    const selectedOpt = options.find((opt) => opt._id === selectedId);
     if (!selectedOpt) {
       console.error("Selected characteristic not found in options");
       setBusy(false);
       return;
     }
 
+    const characteristicData: Record<string, string | number> = {
+      _id: selectedOpt._id,
+      char_type: selectedOpt.type,
+      name: selectedOpt.name,
+    };
+    if (selectedOpt.type === PRIMARY_INDICATION_TYPE) {
+      if (measureType !== "Prevalence" && measureType !== "Incidence") {
+        alert("Select Prevalence or Incidence.");
+        setBusy(false);
+        return;
+      }
+      characteristicData.measure_type = measureType;
+      const parsedYears = Number(measureYears);
+      if (measureYears.trim() !== "") {
+        if (!Number.isFinite(parsedYears) || parsedYears < 1) {
+          alert("Enter a valid number of years (at least 1).");
+          setBusy(false);
+          return;
+        }
+        characteristicData.measure_years = parsedYears;
+      }
+    }
+
     const nodePart = {
       node_type: "characteristic",
       rate,
       size,
-      characteristic_data: {
-        _id: selectedOpt._id,
-        char_type: selectedOpt.type,
-        name: selectedOpt.name,
-      },
+      characteristic_data: characteristicData,
     };
 
     // const childrenPayload = myChildForms.map(child => ({
@@ -199,6 +235,34 @@ export default function CharacteristicForm({ initial, parentId, parentSize, pati
         value={size}
         InputProps={{ readOnly: true }}
       />
+
+      {isPrimaryIndication && (
+        <>
+          <FormControl fullWidth required>
+            <InputLabel id="measure-type-label">Measure type</InputLabel>
+            <Select
+              labelId="measure-type-label"
+              value={measureType}
+              label="Measure type"
+              onChange={(e) =>
+                setMeasureType(e.target.value as MeasureType | "")
+              }
+            >
+              <MenuItem value="Prevalence">Prevalence</MenuItem>
+              <MenuItem value="Incidence">Incidence</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            label="Years"
+            type="number"
+            fullWidth
+            value={measureYears}
+            inputProps={{ min: 1, step: 1 }}
+            onChange={(e) => setMeasureYears(e.target.value)}
+            helperText="Number of years for this epidemiological measure"
+          />
+        </>
+      )}
 
       <Button type="submit" variant="contained" disabled={busy}>
         Add Node

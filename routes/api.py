@@ -818,7 +818,9 @@ def create_node_from_dict(node_dict, parent_id=None):
             new_node.characteristic_data = CharacteristicEmbedded(
                 _id=ObjectId(char_data.get('_id')) if char_data.get('_id') else ObjectId(),
                 char_type=char_data.get('char_type'),
-                name=char_data.get('name')
+                name=char_data.get('name'),
+                measure_type=char_data.get('measure_type'),
+                measure_years=char_data.get('measure_years'),
             )
     elif new_node.node_type == 'treatment':
         treatment_data = node_dict.get('treatment_data')
@@ -1075,11 +1077,13 @@ def update_node(validated_data, patient_id, node_id):
 
         # Update the embedded payload based on node_type.
         if target_node.node_type == 'characteristic' and validated_data.characteristic_data:
-            char_data = validated_data.characteristic_data
+            char_data = validated_data.characteristic_data.model_dump(by_alias=True)
             target_node.characteristic_data = CharacteristicEmbedded(
                 _id=ObjectId(char_data.get('_id')),
                 char_type=char_data.get('char_type'),
-                name=char_data.get('name')
+                name=char_data.get('name'),
+                measure_type=char_data.get('measure_type'),
+                measure_years=char_data.get('measure_years'),
             )
         elif target_node.node_type == 'treatment' and validated_data.treatment_data:
             target_node.treatment_data = TreatmentEmbedded(**validated_data.treatment_data)

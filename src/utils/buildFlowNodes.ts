@@ -165,6 +165,8 @@ export function buildFlowNodes(
         catalogId,
         parentDocId: node.parent_id?._id?.$oid || node.parent_id || null,
         charType,
+        measureType: node.characteristic_data?.measure_type,
+        measureYears: node.characteristic_data?.measure_years,
         size: nodeSize,
         rate: node.rate ?? 1,
         drugs:

@@ -15,6 +15,10 @@ import api from "../api";
 import Cookies from "js-cookie";
 import { API_ENDPOINTS } from "../api/endpoints";
 
+const PRIMARY_INDICATION_TYPE = "Primary Indication";
+
+type MeasureType = "Prevalence" | "Incidence";
+
 interface OneChar {
   _id: string;
   type: string;
@@ -28,6 +32,8 @@ interface EditCharModalData {
   currentName: string;
   currentRate: number;
   currentSize?: number;
+  currentMeasureType?: MeasureType;
+  currentMeasureYears?: number;
   isTreeRoot?: boolean;
   patientId: string;
   parentId: string;
@@ -54,6 +60,8 @@ const EditCharacteristicForm: React.FC<EditCharacteristicFormProps> = ({
     currentName,
     currentRate,
     currentSize,
+    currentMeasureType,
+    currentMeasureYears,
     isTreeRoot,
   } = editData;
 
@@ -65,12 +73,24 @@ const EditCharacteristicForm: React.FC<EditCharacteristicFormProps> = ({
   const [sizeValue, setSizeValue] = useState<string>(
     String(currentSize ?? 1)
   );
+  const [measureType, setMeasureType] = useState<MeasureType | "">(
+    currentMeasureType ?? ""
+  );
+  const [measureYears, setMeasureYears] = useState<string>(
+    currentMeasureYears != null ? String(currentMeasureYears) : ""
+  );
+
+  const isPrimaryIndication = selectedType === PRIMARY_INDICATION_TYPE;
 
   useEffect(() => {
     const found: OneChar | undefined = allChars.find((c) => c._id === selectedCharId);
     if (found) {
       setSelectedType(found.type);
       setSelectedName(found.name);
+      if (found.type !== PRIMARY_INDICATION_TYPE) {
+        setMeasureType("");
+        setMeasureYears("");
+      }
     }
   }, [selectedCharId, allChars]);
 
@@ -93,7 +113,11 @@ const EditCharacteristicForm: React.FC<EditCharacteristicFormProps> = ({
       );
     }
 
-      const nodePayload: { rate?: number; size?: number } = {};
+      const nodePayload: {
+        rate?: number;
+        size?: number;
+        characteristic_data?: Record<string, string | number>;
+      } = {};
       if (!isTreeRoot) {
         nodePayload.rate = rateValue;
       }
@@ -104,6 +128,32 @@ const EditCharacteristicForm: React.FC<EditCharacteristicFormProps> = ({
           return;
         }
         nodePayload.size = parsedSize;
+      }
+
+      if (isPrimaryIndication) {
+        if (measureType !== "Prevalence" && measureType !== "Incidence") {
+          alert("Select Prevalence or Incidence.");
+          return;
+        }
+        const hasMeasureYears = measureYears.trim() !== "";
+        const parsedYears = Number(measureYears);
+        if (hasMeasureYears) {
+          if (!Number.isFinite(parsedYears) || parsedYears < 1) {
+            alert("Enter a valid number of years (at least 1).");
+            return;
+          }
+        }
+
+        const charData: Record<string, string | number> = {
+          _id: selectedCharId,
+          char_type: selectedType,
+          name: selectedName,
+          measure_type: measureType,
+        };
+        if (hasMeasureYears) {
+          charData.measure_years = parsedYears;
+        }
+        nodePayload.characteristic_data = charData;
       }
 
       const response = await api.put(
@@ -181,6 +231,34 @@ const EditCharacteristicForm: React.FC<EditCharacteristicFormProps> = ({
           value={rateValue}
           onChange={(e) => setRateValue(Number(e.target.value))}
         />
+      )}
+
+      {isPrimaryIndication && (
+        <>
+          <FormControl fullWidth required>
+            <InputLabel id="edit-measure-type-label">Measure type</InputLabel>
+            <Select
+              labelId="edit-measure-type-label"
+              value={measureType}
+              label="Measure type"
+              onChange={(e) =>
+                setMeasureType(e.target.value as MeasureType | "")
+              }
+            >
+              <MenuItem value="Prevalence">Prevalence</MenuItem>
+              <MenuItem value="Incidence">Incidence</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            label="Years"
+            type="number"
+            fullWidth
+            value={measureYears}
+            inputProps={{ min: 1, step: 1 }}
+            onChange={(e) => setMeasureYears(e.target.value)}
+            helperText="Number of years for this epidemiological measure"
+          />
+        </>
       )}
 
       {/* 4) Cancel / Save buttons */}

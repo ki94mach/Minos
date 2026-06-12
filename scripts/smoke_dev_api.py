@@ -396,6 +396,108 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
     root_id = str(match["tree"]["_id"]) if match else None
     ok("T8 root node id", bool(root_id))
 
+    pi_name = f"{PREFIX}-PI"
+    code, pi_created = request(
+        "POST",
+        "/api/characteristics",
+        {"type": "Primary Indication", "name": pi_name},
+    )
+    ok("PI create characteristic", code == 201, str(pi_created))
+    pi_char_id = (pi_created or {}).get("id") if isinstance(pi_created, dict) else None
+    if pi_char_id:
+        resources.characteristic_ids.append(str(pi_char_id))
+
+    code, pi_add = request(
+        "POST",
+        f"/api/patients/{patient_id}/add_node",
+        {
+            "parent_node_id": root_id,
+            "node": {
+                "node_type": "characteristic",
+                "rate": 0.5,
+                "size": 500.0,
+                "characteristic_data": {
+                    "_id": pi_char_id,
+                    "char_type": "Primary Indication",
+                    "name": pi_name,
+                    "measure_type": "Prevalence",
+                    "measure_years": 5,
+                },
+            },
+        },
+    )
+    ok("PI add_node with measure fields", code == 200, str(pi_add))
+
+    code, patients_after_pi = request("GET", "/api/patients")
+    pi_match = next(
+        (p for p in (patients_after_pi or []) if str(p.get("_id")) == str(patient_id)),
+        None,
+    )
+    pi_embed = None
+    for child in ((pi_match or {}).get("tree") or {}).get("children") or []:
+        char_data = child.get("characteristic_data") or {}
+        if char_data.get("name") == pi_name:
+            pi_embed = char_data
+            break
+    ok("PI embed found on tree", pi_embed is not None, str(pi_embed))
+    ok(
+        "PI measure_type round-trip",
+        (pi_embed or {}).get("measure_type") == "Prevalence",
+        str(pi_embed),
+    )
+    ok(
+        "PI measure_years round-trip",
+        (pi_embed or {}).get("measure_years") == 5,
+        str(pi_embed),
+    )
+
+    code, pi_reject = request(
+        "POST",
+        f"/api/patients/{patient_id}/add_node",
+        {
+            "parent_node_id": root_id,
+            "node": {
+                "node_type": "characteristic",
+                "rate": 0.1,
+                "size": 100.0,
+                "characteristic_data": {
+                    "_id": pi_char_id,
+                    "char_type": "Primary Indication",
+                    "name": pi_name,
+                },
+            },
+        },
+    )
+    ok(
+        "PI add_node rejects missing measure_type",
+        code == 400,
+        str(pi_reject),
+    )
+
+    code, pi_no_years = request(
+        "POST",
+        f"/api/patients/{patient_id}/add_node",
+        {
+            "parent_node_id": root_id,
+            "node": {
+                "node_type": "characteristic",
+                "rate": 0.15,
+                "size": 150.0,
+                "characteristic_data": {
+                    "_id": pi_char_id,
+                    "char_type": "Primary Indication",
+                    "name": pi_name,
+                    "measure_type": "Incidence",
+                },
+            },
+        },
+    )
+    ok(
+        "PI add_node allows missing measure_years",
+        code == 200,
+        str(pi_no_years),
+    )
+
     # Root delete: whole tree only via DELETE /api/patients/<id> (ADMIN), not node DELETE on root id.
     code, del_root_via_node = request(
         "DELETE",

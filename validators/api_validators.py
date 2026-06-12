@@ -7,7 +7,7 @@ from pydantic import (
     ConfigDict,
     ValidationInfo,
 )
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Literal
 from bson import ObjectId
 
 
@@ -28,6 +28,8 @@ from utils.business_rules import (
 
 ALLOWED_TREATMENT_TYPES = ['Treatment', 'Regimen', 'Alternative']
 ALLOWED_NODE_TYPES = ["characteristic", "treatment", "followup"]
+PRIMARY_INDICATION_TYPE = "Primary Indication"
+ALLOWED_MEASURE_TYPES = ['Prevalence', 'Incidence']
 
 # ------------------------------------------------------------------------------
 # Utility for ObjectId Validation
@@ -382,11 +384,33 @@ class CharacteristicData(BaseModel):
     id: PyObjectId = Field(..., alias="_id")
     char_type: str
     name: str
+    measure_type: Optional[Literal['Prevalence', 'Incidence']] = None
+    measure_years: Optional[int] = Field(None, ge=1)
 
     @field_validator('name', 'char_type', mode='after')
     @classmethod
     def validate_name(cls, v: str) -> str:
         return validate_non_empty(v, "Characteristic name")
+
+    @model_validator(mode="after")
+    def validate_measure_fields(self) -> "CharacteristicData":
+        is_pi = self.char_type == PRIMARY_INDICATION_TYPE
+        if is_pi:
+            if self.measure_type is None:
+                raise ValueError(
+                    "measure_type is required for Primary Indication characteristics"
+                )
+            if self.measure_type not in ALLOWED_MEASURE_TYPES:
+                raise ValueError(
+                    f"measure_type must be one of {ALLOWED_MEASURE_TYPES}"
+                )
+        elif self.measure_type is not None or self.measure_years is not None:
+            raise ValueError(
+                "measure_type and measure_years are only allowed for "
+                "Primary Indication characteristics"
+            )
+        return self
+
     @model_validator(mode="after")
     def validate_against_database(self) -> "CharacteristicData":
         char_data = {
