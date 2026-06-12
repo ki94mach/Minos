@@ -185,6 +185,21 @@ const CustomNode = (
     }
 
     if (nodeData.type === "characteristic") {
+      if (nodeData.charType === "Primary Indication") {
+        return (
+          <div>
+            <div>{nodeData.charType}</div>
+            {nodeData.measureType && (
+              <div style={{ marginTop: 4 }}>
+                Measure type: {nodeData.measureType}
+              </div>
+            )}
+            {nodeData.measureYears != null && (
+              <div style={{ marginTop: 4 }}>Years: {nodeData.measureYears}</div>
+            )}
+          </div>
+        );
+      }
       return nodeData.charType ?? "Characteristic";
     }
     return "";
@@ -280,18 +295,6 @@ const CustomNode = (
                 )}
               </div>
             )}
-            {nodeData?.charType === "Primary Indication" && nodeData?.measureType && (
-                <div
-                  style={{
-                    color: theme.palette.text.secondary,
-                    fontSize: "12px",
-                    marginTop: 4,
-                  }}>
-                  {nodeData.measureYears != null
-                    ? `${nodeData.measureType} · ${nodeData.measureYears} years`
-                    : nodeData.measureType}
-                </div>
-              )}
           </>
         )}
         <Handle
