@@ -5,6 +5,7 @@ import { NavigateFunction } from "react-router-dom";
 import {
   type CatalogMasterSnapshots,
   isPatientNodeCatalogStale,
+  resolveTreatmentDisplayPayload,
 } from "./catalogStale";
 import {
   canDrillDownPatientNode,
@@ -151,6 +152,14 @@ export function buildFlowNodes(
   // F) Create the React-Flow node object once:
   const isNewNode = !nodesById.has(flowNodeId);
   if (isNewNode) {
+    const treatmentDisplay =
+      node.node_type === "treatment"
+        ? resolveTreatmentDisplayPayload(
+            node.treatment_data,
+            deps.catalogMasters?.treatmentDetails
+          )
+        : { regimen: null, alternatives: [] };
+
     nodesById.set(flowNodeId, {
       id: flowNodeId,
       position: { x: 0, y: 0 }, // we will re‐position later
@@ -170,9 +179,10 @@ export function buildFlowNodes(
         size: nodeSize,
         rate: node.rate ?? 1,
         drugs:
-          node.treatment_data?.regimen?.drugs?.map((d: any) => d.drug) || [],
-        regimen: node.treatment_data?.regimen || null,
-        alternatives: node.treatment_data?.alternatives || [],
+          treatmentDisplay.regimen?.drugs?.map((d: any) => d.drug) || [],
+        regimen: treatmentDisplay.regimen,
+        alternatives: treatmentDisplay.alternatives,
+        treatmentCatalogType: node.treatment_data?.type ?? null,
         color: hashColor(catalogId),
         hasDescription: Boolean(
           node.description && String(node.description).trim().length > 0

@@ -174,7 +174,12 @@ export function calculateSizeFromTree(
 
 export function hashColor(str: string): string {
   return hashNodeColor(str);
-} 
+}
+
+export function estimateDrillDownNodeHeight(nodeData: { type?: string }): number {
+  if (nodeData.type === "treatment") return 148;
+  return 120;
+}
 
 export function applyDagreLayout(nodes: any[], edges: any[]) {
   const g = new dagre.graphlib.Graph();
@@ -190,7 +195,7 @@ export function applyDagreLayout(nodes: any[], edges: any[]) {
   nodes.forEach((n) => {
     const isOverview = n.data?.isOverviewMode === true;
     const width = isOverview ? 120 : 190;
-    const height = isOverview ? 120 : 88;
+    const height = isOverview ? 120 : estimateDrillDownNodeHeight(n.data ?? {});
     g.setNode(n.id, { width, height });
   });
   edges.forEach((e) => g.setEdge(e.source, e.target));
@@ -201,7 +206,7 @@ export function applyDagreLayout(nodes: any[], edges: any[]) {
     const { x, y } = g.node(n.id);
     const isOverview = n.data?.isOverviewMode === true;
     const width = isOverview ? 120 : 190;
-    const height = isOverview ? 120 : 88;
+    const height = isOverview ? 120 : estimateDrillDownNodeHeight(n.data ?? {});
     return {
       ...n,
       position: {

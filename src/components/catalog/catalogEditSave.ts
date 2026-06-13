@@ -27,6 +27,13 @@ const FETCH_REFERENCES: Record<
   treatment: fetchTreatmentReferences,
 };
 
+export function fetchCatalogReferences(
+  kind: CatalogEntityKind,
+  id: string
+): Promise<CatalogReferences> {
+  return FETCH_REFERENCES[kind](id);
+}
+
 function plural(count: number, singular: string, pluralForm?: string): string {
   return count === 1 ? singular : (pluralForm ?? `${singular}s`);
 }

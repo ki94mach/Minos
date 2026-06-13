@@ -65,6 +65,10 @@ import {
   layoutOverviewPreviewCluster,
 } from "../utils/flowLayoutUtils";
 import CreatePatientTreeDialog from "../components/patientDialogs/CreatePatientTreeDialog";
+import PatientMapSearch from "../components/patientMap/PatientMapSearch";
+import TreatmentRegimenDialog, {
+  type TreatmentRegimenDialogData,
+} from "../components/patientMap/TreatmentRegimenDialog";
 
 type PatientsLocationState = {
   treeId?: string;
@@ -146,6 +150,8 @@ const Patients: React.FC = () => {
   const pendingFocusFlowNodeIdRef = useRef<string | null>(null);
   const focusHighlightTimerRef = useRef<number | null>(null);
   const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
+  const [regimenDialogData, setRegimenDialogData] =
+    useState<TreatmentRegimenDialogData | null>(null);
   const [graphEpoch, setGraphEpoch] = useState(0);
   const [ctx, setCtx] = useState<
     { x: number; y: number; nodeId: string } | null
@@ -215,9 +221,26 @@ const Patients: React.FC = () => {
     setCtx({ x: e.clientX + 2, y: e.clientY - 6, nodeId });
   }, []);  
   
-  const nodeTypes = useMemo(() => ({  
-    custom: (p: any) => <CustomNode {...p} onContextMenu={handleNodeContext} />,
-  }), [handleNodeContext]);
+  const closeRegimenDialog = useCallback(() => {
+    setRegimenDialogData(null);
+  }, []);
+
+  const openRegimenDialog = useCallback((data: TreatmentRegimenDialogData) => {
+    setRegimenDialogData(data);
+  }, []);
+
+  const nodeTypes = useMemo(
+    () => ({
+      custom: (p: any) => (
+        <CustomNode
+          {...p}
+          onContextMenu={handleNodeContext}
+          onOpenRegimenDetails={openRegimenDialog}
+        />
+      ),
+    }),
+    [handleNodeContext, getOverlayContainer, openRegimenDialog]
+  );
   
   // const [selectedRootId, setSelectedRootId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -1004,6 +1027,15 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         </Button>
       )}
 
+      <Box sx={{ mb: overviewEmptyHint ? 2 : 3 }}>
+        <PatientMapSearch
+          disabled={Boolean(overviewEmptyHint) || nodes.length === 0}
+          characteristics={allCharacteristics}
+          drugs={allDrugs}
+          treatments={allTreatments}
+        />
+      </Box>
+
       {/* Legend */}
       {!isOverview && (
         <Box display="flex" gap={1.5} alignItems="center" mb={2}>
@@ -1313,6 +1345,16 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         />
       )}
       {/* ─── end “Add Follow‐up” ─── */}
+
+      <TreatmentRegimenDialog
+        open={regimenDialogData != null}
+        onClose={closeRegimenDialog}
+        treatmentName={regimenDialogData?.treatmentName ?? "Treatment"}
+        treatmentCatalogType={regimenDialogData?.treatmentCatalogType ?? null}
+        regimen={regimenDialogData?.regimen}
+        alternatives={regimenDialogData?.alternatives}
+        container={getOverlayContainer}
+      />
     </Container>
   );
   }

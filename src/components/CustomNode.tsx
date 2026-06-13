@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Handle, Position, useReactFlow, NodeProps } from "reactflow";
-import { Tooltip, useTheme } from "@mui/material";
+import { Tooltip, useTheme, Chip } from "@mui/material";
 import { treeTokens, textOnColor } from "../theme/theme";
-import { formatDrugStrengthUnit } from "../utils/drugFormat";
+import type { TreatmentRegimenDialogData } from "./patientMap/TreatmentRegimenDialog";
 
 const CustomNode = (
   props: NodeProps & {
     onContextMenu: (e: React.MouseEvent, id: string) => void;
+    onOpenRegimenDetails?: (data: TreatmentRegimenDialogData) => void;
   }
 ) => {
   const theme = useTheme();
-  const { id, data: nodeData, onContextMenu } = props;
+  const { id, data: nodeData, onContextMenu, onOpenRegimenDetails } = props;
   const [label, setLabel] = useState(nodeData.label);
   const { setNodes } = useReactFlow();
   const [isEditing, setIsEditing] = useState(false);
@@ -31,6 +32,7 @@ const CustomNode = (
 
   const isOverviewMode = nodeData.isOverviewMode === true;
   const canDrillDown = nodeData.canDrillDown === true;
+  const showRegimenTag = !isOverviewMode && nodeData.type === "treatment";
   const nodeFill = nodeData.color || theme.palette.background.paper;
   const overviewTextColor =
     isOverviewMode && nodeData.color
@@ -143,54 +145,7 @@ const CustomNode = (
 
   const tooltipContent = (() => {
     if (nodeData.type === "treatment") {
-      if (nodeData.alternatives?.length) {
-        const sortedAlternatives = [...nodeData.alternatives].sort(
-          (a: any, b: any) =>
-            (a.priority ?? Number.MAX_SAFE_INTEGER) -
-              (b.priority ?? Number.MAX_SAFE_INTEGER) ||
-            String(a.name).localeCompare(String(b.name))
-        );
-        return (
-          <div>
-            {sortedAlternatives.map((alt: any, i: number) => (
-              <div key={i} style={{ marginBottom: 8 }}>
-                <strong>
-                  {alt.name} (Priority: {alt.priority ?? "?"}, Ratio: {alt.ratio})
-                </strong>
-                {!!alt.regimen?.drugs?.length && (
-                  <ul style={{ paddingLeft: 16, marginTop: 4 }}>
-                    {alt.regimen.drugs.map((d: any, j: number) => (
-                      <li key={j}>
-                        {d.drug.name} –{" "}
-                        {formatDrugStrengthUnit(d.drug.strength, d.drug.unit)}
-                        {d.annual_patient_con != null && (
-                          <> (Consumption: {d.annual_patient_con})</>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-        );
-      }
-
-      if (nodeData.regimen?.drugs?.length) {
-        return (
-          <div>
-            {nodeData.regimen.drugs.map((d: any, i: number) => (
-              <div key={i}>
-                {d.drug.name} – {formatDrugStrengthUnit(d.drug.strength, d.drug.unit)}
-                {d.annual_patient_con != null && (
-                  <> (Consumption: {d.annual_patient_con})</>
-                )}
-              </div>
-            ))}
-          </div>
-        );
-      }
-      return "No drug info available";
+      return nodeData.treatmentCatalogType ?? "Treatment";
     }
 
     if (nodeData.type === "characteristic") {
@@ -248,153 +203,200 @@ const CustomNode = (
     tooltipContent
   );
 
+  const hasTooltip = Boolean(tooltipTitle);
+
+  const nodeCard = (
+    <div
+      ref={containerRef}
+      onContextMenu={(e) => onContextMenu(e, id)}
+      style={containerStyle}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = isFocused
+          ? `${focusRing}, ${hoverShadow}`
+          : hoverShadow;
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = isOverviewMode
+          ? isFocused
+            ? `${focusRing}, ${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`
+            : `${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`
+          : restingShadow;
+      }}
+      onClick={() => {
+        if (!isEditing && nodeData.onClick) nodeData.onClick();
+      }}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        if (nodeData?.depth > 0) setIsEditing(true);
+      }}
+      onBlur={handleBlur}
+      tabIndex={-1}>
+      {hasNotes && !isOverviewMode && (
+        <span
+          title={notesBadgeTitle}
+          style={{
+            position: "absolute",
+            top: isOverviewMode ? 8 : -8,
+            right: isOverviewMode ? 8 : -8,
+            minWidth: 18,
+            height: 18,
+            padding: "0 5px",
+            borderRadius: 9,
+            background: theme.palette.primary.main,
+            color: theme.palette.primary.contrastText,
+            fontSize: "11px",
+            fontWeight: 700,
+            lineHeight: "18px",
+            textAlign: "center",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+            pointerEvents: "none",
+          }}>
+          {refCount > 0 ? refCount : "•"}
+        </span>
+      )}
+      {isEditing ? (
+        <>
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            style={inputStyle}
+            ref={labelInputRef}
+          />
+          <input
+            type="number"
+            value={number}
+            onChange={(e) => setNumber(e.target.value)}
+            style={inputStyle}
+            ref={numberInputRef}
+          />
+        </>
+      ) : (
+        <>
+          {nodeData?.label && <strong>{nodeData.label}</strong>}
+          {catalogStale && (
+            <div
+              style={{
+                color: theme.palette.warning.main,
+                fontSize: "11px",
+                marginTop: 4,
+                lineHeight: 1.2,
+              }}>
+              May differ from catalog
+            </div>
+          )}
+          {(formattedRate !== "" || nodeData?.size !== undefined) && (
+            <div style={{ marginTop: 4 }}>
+              {formattedRate !== "" && (
+                <div style={{ color: theme.palette.text.secondary, fontSize: "12px" }}>
+                  Rate: {formattedRate}
+                </div>
+              )}
+              {nodeData?.size !== undefined && (
+                <div style={{ color: theme.palette.text.secondary, fontSize: "12px", marginTop: 2 }}>
+                  Size: {formattedSize}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="target-top"
+        style={handleStyle}
+      />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="target-right"
+        style={handleStyle}
+      />
+      <Handle
+        type="target"
+        position={Position.Bottom}
+        id="target-bottom"
+        style={handleStyle}
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="target-left"
+        style={handleStyle}
+      />
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="source-top"
+        style={handleStyle}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="source-right"
+        style={handleStyle}
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="source-bottom"
+        style={handleStyle}
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="source-left"
+        style={handleStyle}
+      />
+    </div>
+  );
+
   return (
-    <Tooltip title={tooltipTitle} arrow placement="bottom">
-      <div
-        ref={containerRef}
-        onContextMenu={(e) => onContextMenu(e, id)}
-        style={containerStyle}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLDivElement).style.boxShadow = isFocused
-            ? `${focusRing}, ${hoverShadow}`
-            : hoverShadow;
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLDivElement).style.boxShadow = isOverviewMode
-            ? isFocused
-              ? `${focusRing}, ${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`
-              : `${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`
-            : restingShadow;
-        }}
-        onClick={() => {
-          if (!isEditing && nodeData.onClick) nodeData.onClick();
-        }}
-        onDoubleClick={(e) => {
-          e.preventDefault();
-          if (nodeData?.depth > 0) setIsEditing(true);
-        }}
-        onBlur={handleBlur}
-        tabIndex={-1}>
-        {hasNotes && !isOverviewMode && (
-          <span
-            title={notesBadgeTitle}
-            style={{
-              position: "absolute",
-              top: isOverviewMode ? 8 : -8,
-              right: isOverviewMode ? 8 : -8,
-              minWidth: 18,
-              height: 18,
-              padding: "0 5px",
-              borderRadius: 9,
-              background: theme.palette.primary.main,
-              color: theme.palette.primary.contrastText,
-              fontSize: "11px",
-              fontWeight: 700,
-              lineHeight: "18px",
-              textAlign: "center",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-              pointerEvents: "none",
-            }}>
-            {refCount > 0 ? refCount : "•"}
-          </span>
-        )}
-        {isEditing ? (
-          <>
-            <input
-              type="text"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              style={inputStyle}
-              ref={labelInputRef}
-            />
-            <input
-              type="number"
-              value={number}
-              onChange={(e) => setNumber(e.target.value)}
-              style={inputStyle}
-              ref={numberInputRef}
-            />
-          </>
-        ) : (
-          <>
-            {nodeData?.label && <strong>{nodeData.label}</strong>}
-            {catalogStale && (
-              <div
-                style={{
-                  color: theme.palette.warning.main,
-                  fontSize: "11px",
-                  marginTop: 4,
-                  lineHeight: 1.2,
-                }}>
-                May differ from catalog
-              </div>
-            )}
-            {(formattedRate !== "" || nodeData?.size !== undefined) && (
-              <div style={{ marginTop: 4 }}>
-                {formattedRate !== "" && (
-                  <div style={{ color: theme.palette.text.secondary, fontSize: "12px" }}>
-                    Rate: {formattedRate}
-                  </div>
-                )}
-                {nodeData?.size !== undefined && (
-                  <div style={{ color: theme.palette.text.secondary, fontSize: "12px", marginTop: 2 }}>
-                    Size: {formattedSize}
-                  </div>
-                )}
-              </div>
-            )}
-          </>
-        )}
-        <Handle
-          type="target"
-          position={Position.Top}
-          id="target-top"
-          style={handleStyle}
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+      }}>
+      {hasTooltip ? (
+        <Tooltip title={tooltipTitle} arrow placement="bottom">
+          {nodeCard}
+        </Tooltip>
+      ) : (
+        nodeCard
+      )}
+      {showRegimenTag && (
+        <Chip
+          label="Regimen details"
+          size="small"
+          variant="outlined"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenRegimenDetails?.({
+              treatmentName: nodeData.label ?? "Treatment",
+              treatmentCatalogType: nodeData.treatmentCatalogType ?? null,
+              regimen: nodeData.regimen,
+              alternatives: nodeData.alternatives,
+            });
+          }}
+          sx={{
+            mt: 0.75,
+            height: 22,
+            fontSize: "10px",
+            cursor: "pointer",
+            borderColor: treeTokens.treatment,
+            color: treeTokens.treatment,
+            "&:hover": {
+              bgcolor: "action.hover",
+            },
+          }}
         />
-        <Handle
-          type="target"
-          position={Position.Right}
-          id="target-right"
-          style={handleStyle}
-        />
-        <Handle
-          type="target"
-          position={Position.Bottom}
-          id="target-bottom"
-          style={handleStyle}
-        />
-        <Handle
-          type="target"
-          position={Position.Left}
-          id="target-left"
-          style={handleStyle}
-        />
-        <Handle
-          type="source"
-          position={Position.Top}
-          id="source-top"
-          style={handleStyle}
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="source-right"
-          style={handleStyle}
-        />
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          id="source-bottom"
-          style={handleStyle}
-        />
-        <Handle
-          type="source"
-          position={Position.Left}
-          id="source-left"
-          style={handleStyle}
-        />
-      </div>
-    </Tooltip>
+      )}
+    </div>
   );
 };
 

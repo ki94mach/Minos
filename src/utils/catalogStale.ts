@@ -1,9 +1,23 @@
 /** Compare patient-tree embeds to master catalog lists (no per-id GET). */
 
+export type TreatmentCatalogDetail = {
+  name: string;
+  type: string;
+  regimen?: { drugs?: Array<{ drug?: unknown }> } | null;
+  alternatives?: Array<{
+    _id?: string;
+    name?: string;
+    priority?: number;
+    ratio?: number;
+    regimen?: { drugs?: Array<{ drug?: unknown }> } | null;
+  }>;
+};
+
 export type CatalogMasterSnapshots = {
   characteristics: Map<string, { name: string; type: string }>;
   treatments: Map<string, { name: string; type: string }>;
   drugs: Map<string, { name: string; strength: number | null; unit: string | null }>;
+  treatmentDetails: Map<string, TreatmentCatalogDetail>;
 };
 
 function catalogIdString(id: unknown): string | null {
@@ -42,9 +56,117 @@ function regimenDrugsStale(
   return false;
 }
 
+function regimenHasDrugs(
+  regimen: { drugs?: Array<{ drug?: unknown }> } | null | undefined
+): boolean {
+  return (regimen?.drugs?.length ?? 0) > 0;
+}
+
+function alternativesHaveRegimenDrugs(
+  alternatives: TreatmentCatalogDetail["alternatives"]
+): boolean {
+  if (!Array.isArray(alternatives)) return false;
+  return alternatives.some((alt) => regimenHasDrugs(alt?.regimen));
+}
+
+function treatmentEmbedNeedsMasterDrugData(embedded: {
+  type?: string;
+  regimen?: { drugs?: Array<{ drug?: unknown }> } | null;
+  alternatives?: TreatmentCatalogDetail["alternatives"];
+}): boolean {
+  if (embedded.type === "Alternative") {
+    if (!Array.isArray(embedded.alternatives) || embedded.alternatives.length === 0) {
+      return true;
+    }
+    return !alternativesHaveRegimenDrugs(embedded.alternatives);
+  }
+  if (embedded.type === "Regimen") {
+    return !regimenHasDrugs(embedded.regimen);
+  }
+  return !regimenHasDrugs(embedded.regimen) && !alternativesHaveRegimenDrugs(embedded.alternatives);
+}
+
+function mergeAlternativeRegimensFromMaster(
+  embeddedAlternatives: NonNullable<TreatmentCatalogDetail["alternatives"]>,
+  masterAlternatives: NonNullable<TreatmentCatalogDetail["alternatives"]>
+): NonNullable<TreatmentCatalogDetail["alternatives"]> {
+  const masterById = new Map(
+    masterAlternatives.map((alt) => [String(alt._id), alt])
+  );
+
+  return embeddedAlternatives.map((embeddedAlt) => {
+    if (regimenHasDrugs(embeddedAlt.regimen)) {
+      return embeddedAlt;
+    }
+    const masterAlt = masterById.get(String(embeddedAlt._id));
+    if (!masterAlt?.regimen) {
+      return embeddedAlt;
+    }
+    return {
+      ...embeddedAlt,
+      regimen: masterAlt.regimen,
+    };
+  });
+}
+
+/** Resolve regimen/alternatives for display, falling back to master catalog data. */
+export function resolveTreatmentDisplayPayload(
+  embedded: {
+    _id?: unknown;
+    type?: string;
+    regimen?: { drugs?: Array<{ drug?: unknown }> } | null;
+    alternatives?: TreatmentCatalogDetail["alternatives"];
+  } | null | undefined,
+  treatmentDetails: Map<string, TreatmentCatalogDetail> | undefined
+): {
+  regimen: { drugs?: Array<{ drug?: unknown }> } | null;
+  alternatives: NonNullable<TreatmentCatalogDetail["alternatives"]>;
+} {
+  if (!embedded) {
+    return { regimen: null, alternatives: [] };
+  }
+
+  const master = (() => {
+    const id = catalogIdString(embedded._id);
+    return id && treatmentDetails ? treatmentDetails.get(id) : undefined;
+  })();
+
+  let regimen = embedded.regimen ?? null;
+  let alternatives = embedded.alternatives ?? [];
+
+  if (!master) {
+    return { regimen, alternatives };
+  }
+
+  if (embedded.type === "Regimen" && !regimenHasDrugs(regimen) && master.regimen) {
+    regimen = master.regimen;
+  }
+
+  if (embedded.type === "Alternative") {
+    if (!alternatives.length && master.alternatives?.length) {
+      alternatives = master.alternatives;
+    } else if (alternatives.length && master.alternatives?.length) {
+      alternatives = mergeAlternativeRegimensFromMaster(
+        alternatives,
+        master.alternatives
+      );
+    }
+  } else if (treatmentEmbedNeedsMasterDrugData(embedded) && master.alternatives?.length) {
+    alternatives = master.alternatives;
+  }
+
+  return { regimen, alternatives };
+}
+
 export function buildCatalogMasterSnapshots(
   characteristics: Array<{ _id: string; type: string; name: string }>,
-  treatments: Array<{ _id: string; name: string; type: string }>,
+  treatments: Array<{
+    _id: string;
+    name: string;
+    type: string;
+    regimen?: TreatmentCatalogDetail["regimen"];
+    alternatives?: TreatmentCatalogDetail["alternatives"];
+  }>,
   drugs: Array<{ _id: string; name: string; strength?: number | null; unit?: string | null }>
 ): CatalogMasterSnapshots {
   const characteristicsMap = new Map<string, { name: string; type: string }>();
@@ -53,8 +175,15 @@ export function buildCatalogMasterSnapshots(
   }
 
   const treatmentsMap = new Map<string, { name: string; type: string }>();
+  const treatmentDetails = new Map<string, TreatmentCatalogDetail>();
   for (const t of treatments) {
     treatmentsMap.set(String(t._id), { name: t.name, type: t.type });
+    treatmentDetails.set(String(t._id), {
+      name: t.name,
+      type: t.type,
+      regimen: t.regimen ?? null,
+      alternatives: t.alternatives ?? [],
+    });
   }
 
   const drugsMap = new Map<
@@ -73,6 +202,7 @@ export function buildCatalogMasterSnapshots(
     characteristics: characteristicsMap,
     treatments: treatmentsMap,
     drugs: drugsMap,
+    treatmentDetails,
   };
 }
 
