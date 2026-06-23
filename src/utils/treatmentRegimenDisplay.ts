@@ -12,6 +12,7 @@ export interface RegimenSection {
   kind: "regimen" | "alternative" | "empty";
   title: string;
   priority?: number;
+  evidence_level?: string;
   ratio?: number;
   drugs: RegimenDrugRow[];
   emptyMessage?: string;
@@ -34,6 +35,7 @@ type AlternativePayload = {
   _id?: string;
   name?: string;
   priority?: number;
+  evidence_level?: string;
   ratio?: number;
   regimen?: RegimenPayload;
 };
@@ -99,6 +101,7 @@ export function buildTreatmentRegimenSections(
       kind: "alternative" as const,
       title: alt.name || "Alternative",
       priority: alt.priority,
+      evidence_level: alt.evidence_level,
       ratio: alt.ratio,
       drugs: mapRegimenDrugs(alt.regimen),
     }));

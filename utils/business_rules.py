@@ -57,6 +57,15 @@ def validate_alternative_priorities(priorities: list[int]) -> None:
         if not isinstance(p, int) or p < 1:
             raise ValueError("Priority must be a positive integer")
 
+def normalize_evidence_level(value) -> Optional[str]:
+    """Normalize optional evidence level annotation (strip; empty -> None)."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        value = str(value)
+    stripped = value.strip()
+    return stripped if stripped else None
+
 def normalize_drug_unit(unit: Optional[str]) -> Optional[str]:
     """Normalize drug unit when provided; IU stays uppercase, others lowercase."""
     if unit is None or not str(unit).strip():
@@ -172,11 +181,19 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
         if treatment.type != 'Alternative':
             raise ValueError("Alternatives can only be present for treatment type 'Alternative'")
         db_map = {
-            str(alt._id): (alt.ratio, alt.priority)
+            str(alt._id): (
+                alt.ratio,
+                alt.priority,
+                normalize_evidence_level(getattr(alt, "evidence_level", None)),
+            )
             for alt in treatment.alternatives
         }
         payload_map = {
-            str(alt['_id']): (alt['ratio'], alt['priority'])
+            str(alt['_id']): (
+                alt['ratio'],
+                alt['priority'],
+                normalize_evidence_level(alt.get("evidence_level")),
+            )
             for alt in treatment_data['alternatives']
         }
         if set(db_map) != set(payload_map):
@@ -185,8 +202,8 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
             )
 
         for alt_id in db_map:
-            db_ratio, db_priority = db_map[alt_id]
-            payload_ratio, payload_priority = payload_map[alt_id]
+            db_ratio, db_priority, db_evidence_level = db_map[alt_id]
+            payload_ratio, payload_priority, payload_evidence_level = payload_map[alt_id]
             if payload_ratio != db_ratio:
                 raise ValueError(
                     f"Ratio mismatch for alternative {alt_id}: "
@@ -196,6 +213,11 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
                 raise ValueError(
                     f"Priority mismatch for alternative {alt_id}: "
                     f"{payload_priority} (payload) ≠ {db_priority} (DB)"
+                )
+            if payload_evidence_level != db_evidence_level:
+                raise ValueError(
+                    f"Evidence level mismatch for alternative {alt_id}: "
+                    f"{payload_evidence_level!r} (payload) ≠ {db_evidence_level!r} (DB)"
                 )
     return treatment_data
 
@@ -249,6 +271,11 @@ def validate_and_transform_alternative(alternative_data: dict) -> dict:
     if priority is None:
         raise ValueError("Priority is required for alternative treatments")
     validate_alternative_priorities([priority])
+
+    if "evidence_level" in alternative_data:
+        alternative_data["evidence_level"] = normalize_evidence_level(
+            alternative_data.get("evidence_level")
+        )
 
     if treatment.type not in ('Regimen', 'Treatment'):
         raise ValueError(

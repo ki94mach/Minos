@@ -402,6 +402,7 @@ def _alternative_treatment_from_payload(alt: dict) -> AlternativeTreatment:
         regimen=alt_regimen_doc,
         ratio=alt["ratio"],
         priority=alt["priority"],
+        evidence_level=alt.get("evidence_level"),
     )
 
 @api_blueprint.route('/treatments', methods=['GET'])

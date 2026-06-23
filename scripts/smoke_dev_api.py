@@ -993,6 +993,7 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
             "name": renamed_treatment,
             "priority": 1,
             "ratio": 0.5,
+            "evidence_level": "Ia",
             "regimen": alt_regimen_a,
         },
         {
@@ -1000,6 +1001,7 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
             "name": regimen_b_name,
             "priority": 1,
             "ratio": 0.5,
+            "evidence_level": "IIb",
             "regimen": alt_regimen_b,
         },
     ]
@@ -1104,6 +1106,66 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
         },
     )
     ok("add_node accepts catalog-matching alternative priorities", code == 200, str(alt_node_ok))
+
+    code, alt_evidence_reject = request(
+        "POST",
+        f"/api/patients/{patient_id}/add_node",
+        {
+            "parent_node_id": root_id,
+            "node": {
+                "node_type": "treatment",
+                "rate": 0.1,
+                "size": 100.0,
+                "treatment_data": {
+                    "_id": alt_bundle_id,
+                    "name": alt_bundle_name,
+                    "type": "Alternative",
+                    "alternatives": [
+                        {
+                            **alt_alternatives[0],
+                            "evidence_level": "III",
+                        },
+                        alt_alternatives[1],
+                    ],
+                },
+            },
+        },
+    )
+    ok(
+        "add_node rejects alternative evidence_level mismatch",
+        code == 400,
+        str(alt_evidence_reject),
+    )
+    ok(
+        "add_node evidence_level mismatch error",
+        isinstance(alt_evidence_reject, dict)
+        and "evidence" in (alt_evidence_reject.get("error") or "").lower(),
+        str(alt_evidence_reject),
+    )
+
+    code, alt_evidence_ok = request(
+        "POST",
+        f"/api/patients/{patient_id}/add_node",
+        {
+            "parent_node_id": root_id,
+            "node": {
+                "node_type": "treatment",
+                "rate": 0.1,
+                "size": 100.0,
+                "treatment_data": {
+                    "_id": alt_bundle_id,
+                    "name": alt_bundle_name,
+                    "type": "Alternative",
+                    "alternatives": alt_alternatives,
+                },
+            },
+        },
+    )
+    ok(
+        "add_node accepts catalog-matching alternative evidence levels",
+        code == 200,
+        str(alt_evidence_ok),
+    )
 
     # T9 — add child node
     code, add_resp = request(

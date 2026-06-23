@@ -172,6 +172,7 @@ class AlternativeTreatment(BaseModel):
     regimen: Optional[Regimen] = None
     ratio: float
     priority: int = Field(..., ge=1)
+    evidence_level: Optional[str] = Field(None, max_length=32)
 
     @field_validator('name', mode='after')
     @classmethod
@@ -191,6 +192,14 @@ class AlternativeTreatment(BaseModel):
         validate_alternative_priorities([v])
         return v
 
+    @field_validator('evidence_level', mode='after')
+    @classmethod
+    def normalize_evidence_level(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        stripped = v.strip()
+        return stripped if stripped else None
+
     @model_validator(mode="after")
     def validate_against_database(self) -> "AlternativeTreatment":
         regimen_data = (
@@ -203,6 +212,7 @@ class AlternativeTreatment(BaseModel):
             'regimen': regimen_data,
             'ratio': self.ratio,
             'priority': self.priority,
+            'evidence_level': self.evidence_level,
         }
         validate_and_transform_alternative(alternative_data)
         return self

@@ -537,6 +537,7 @@ def _copy_alternatives(alternatives: Any) -> Optional[list]:
                 regimen=_copy_regimen(alt_regimen) if alt_regimen else None,
                 ratio=_get_field(alt, "ratio"),
                 priority=_get_field(alt, "priority"),
+                evidence_level=_get_field(alt, "evidence_level"),
             )
         )
     return copied

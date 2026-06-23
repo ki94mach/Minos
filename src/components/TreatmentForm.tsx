@@ -30,6 +30,7 @@ interface AlternativeOption {
   name: string;
   ratio: number;
   priority: number;
+  evidence_level?: string;
   regimen?: {
     drugs: DrugWithCon[];
   };
@@ -119,6 +120,9 @@ export default function TreatmentForm({
               ratio: alt.ratio,
               priority: alt.priority,
             };
+            if (alt.evidence_level?.trim()) {
+              entry.evidence_level = alt.evidence_level.trim();
+            }
             if (alt.regimen?.drugs?.length) {
               entry.regimen = {
                 drugs: alt.regimen.drugs.map((d) => ({

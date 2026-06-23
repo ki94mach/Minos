@@ -8,6 +8,7 @@ export type TreatmentCatalogDetail = {
     _id?: string;
     name?: string;
     priority?: number;
+    evidence_level?: string;
     ratio?: number;
     regimen?: { drugs?: Array<{ drug?: unknown }> } | null;
   }>;

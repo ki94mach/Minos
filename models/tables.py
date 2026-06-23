@@ -116,6 +116,7 @@ class AlternativeTreatment(EmbeddedDocument):
     regimen = EmbeddedDocumentField(Regimen, required=False)
     ratio = FloatField(required=True)
     priority = IntField(required=True, min_value=1)
+    evidence_level = StringField(required=False, max_length=32)
 
 
 # Embedded version of a treatment node

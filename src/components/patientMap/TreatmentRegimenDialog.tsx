@@ -26,6 +26,7 @@ export type TreatmentRegimenDialogData = {
   alternatives?: Array<{
     name?: string;
     priority?: number;
+    evidence_level?: string;
     ratio?: number;
     regimen?: { drugs?: unknown[] } | null;
   }>;
@@ -103,8 +104,15 @@ export default function TreatmentRegimenDialog({
                 variant="caption"
                 color="text.secondary"
                 sx={{ display: "block", mb: 1 }}>
-                Priority: {section.priority ?? "—"} · Ratio:{" "}
-                {section.ratio != null ? section.ratio : "—"}
+                {[
+                  `Priority: ${section.priority ?? "—"}`,
+                  section.evidence_level
+                    ? `Evidence: ${section.evidence_level}`
+                    : null,
+                  `Ratio: ${section.ratio != null ? section.ratio : "—"}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </Typography>
             )}
             {section.drugs.length > 0 ? (

@@ -47,6 +47,7 @@ interface Alternative {
     name: string;
     ratio: number;
     priority: number;
+    evidence_level?: string;
     regimen?: {
         drugs: DrugWithCon[];
     };
@@ -88,6 +89,7 @@ const Treatments: React.FC = () => {
     const [alternativeRegimenDrugs, setAlternativeRegimenDrugs] = useState<DrugWithCon[]>([]);
     const [alternativeRatio, setAlternativeRatio] = useState<number>(0);
     const [alternativePriority, setAlternativePriority] = useState<number>(1);
+    const [alternativeEvidenceLevel, setAlternativeEvidenceLevel] = useState("");
     const [alternatives, setAlternatives] = useState<Alternative[]>([]);
     const [draggedAlternativeIndex, setDraggedAlternativeIndex] = useState<number | null>(null);
     const [editingTreatmentId, setEditingTreatmentId] = useState<string | null>(null);
@@ -183,6 +185,10 @@ const Treatments: React.FC = () => {
           ratio: alternativeRatio,
           priority: alternativePriority,
         };
+        const trimmedEvidence = alternativeEvidenceLevel.trim();
+        if (trimmedEvidence) {
+          newAlt.evidence_level = trimmedEvidence;
+        }
         if (selectedRef.regimen) {
           newAlt.regimen = selectedRef.regimen;
         }
@@ -190,6 +196,7 @@ const Treatments: React.FC = () => {
         setAlternatives((prev) => [...prev, newAlt]);
         setSelectedAlternativeRefId("");
         setAlternativeRatio(0);
+        setAlternativeEvidenceLevel("");
       };
 
     const updateAlternativePriority = (altId: string | undefined, value: number) => {
@@ -198,6 +205,23 @@ const Treatments: React.FC = () => {
             prev.map((alt) =>
                 alt._id === altId ? { ...alt, priority: value } : alt
             )
+        );
+    };
+
+    const updateAlternativeEvidenceLevel = (
+        altId: string | undefined,
+        value: string
+    ) => {
+        const trimmed = value.trim();
+        setAlternatives((prev) =>
+            prev.map((alt) => {
+                if (alt._id !== altId) return alt;
+                if (!trimmed) {
+                    const { evidence_level: _removed, ...rest } = alt;
+                    return rest;
+                }
+                return { ...alt, evidence_level: trimmed };
+            })
         );
     };
 
@@ -243,6 +267,9 @@ const Treatments: React.FC = () => {
               ratio: alt.ratio,
               priority: alt.priority,
             };
+            if (alt.evidence_level?.trim()) {
+              entry.evidence_level = alt.evidence_level.trim();
+            }
             if (alt.regimen?.drugs?.length) {
               entry.regimen = {
                 drugs: alt.regimen.drugs.map((item) => ({
@@ -309,6 +336,7 @@ const Treatments: React.FC = () => {
         setSelectedAlternativeRefId("");
         setAlternativeRatio(0);
         setAlternativePriority(1);
+        setAlternativeEvidenceLevel("");
         setDraggedAlternativeIndex(null);
     };
 
@@ -343,6 +371,9 @@ const Treatments: React.FC = () => {
               ratio: alt.ratio,
               priority: alt.priority ?? index + 1,
             };
+            if (alt.evidence_level?.trim()) {
+              sanitized.evidence_level = alt.evidence_level.trim();
+            }
             if (alt.regimen?.drugs?.length) {
               sanitized.regimen = {
                 drugs: alt.regimen.drugs.map((item) => ({
@@ -552,6 +583,14 @@ const Treatments: React.FC = () => {
                       sx={{ minWidth: 120, flex: 1 }}
                     />
                     <TextField
+                      size="small"
+                      label="Evidence Level"
+                      value={alternativeEvidenceLevel}
+                      onChange={(e) => setAlternativeEvidenceLevel(e.target.value)}
+                      inputProps={{ maxLength: 32 }}
+                      sx={{ minWidth: 140, flex: 1 }}
+                    />
+                    <TextField
                       type="number"
                       size="small"
                       label="Ratio (0–1)"
@@ -574,26 +613,49 @@ const Treatments: React.FC = () => {
                         key={extractId(alt._id)}
                         sortable
                         primary={alt.name}
-                        secondary={`Priority ${alt.priority} — Ratio ${alt.ratio}`}
+                        secondary={[
+                          `Priority ${alt.priority}`,
+                          alt.evidence_level
+                            ? `Evidence ${alt.evidence_level}`
+                            : null,
+                          `Ratio ${alt.ratio}`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                         onDragStart={() => setDraggedAlternativeIndex(i)}
                         onDragOver={(event) => event.preventDefault()}
                         onDrop={() => handleAlternativeDrop(i)}
                         onDragEnd={() => setDraggedAlternativeIndex(null)}
                         trailing={
-                          <TextField
-                            type="number"
-                            size="small"
-                            label="Priority"
-                            value={alt.priority}
-                            onChange={(e) =>
-                              updateAlternativePriority(
-                                alt._id,
-                                Number(e.target.value)
-                              )
-                            }
-                            inputProps={{ min: 1, step: 1 }}
-                            sx={{ width: 96 }}
-                          />
+                          <Box sx={{ display: "flex", gap: 1 }}>
+                            <TextField
+                              type="number"
+                              size="small"
+                              label="Priority"
+                              value={alt.priority}
+                              onChange={(e) =>
+                                updateAlternativePriority(
+                                  alt._id,
+                                  Number(e.target.value)
+                                )
+                              }
+                              inputProps={{ min: 1, step: 1 }}
+                              sx={{ width: 96 }}
+                            />
+                            <TextField
+                              size="small"
+                              label="Evidence"
+                              value={alt.evidence_level ?? ""}
+                              onChange={(e) =>
+                                updateAlternativeEvidenceLevel(
+                                  alt._id,
+                                  e.target.value
+                                )
+                              }
+                              inputProps={{ maxLength: 32 }}
+                              sx={{ width: 96 }}
+                            />
+                          </Box>
                         }
                         onRemove={() =>
                           setAlternatives(
@@ -640,7 +702,10 @@ const Treatments: React.FC = () => {
                 : treatment.alternatives
                 ? `Alternatives: ${[...treatment.alternatives]
                     .sort(compareAlternatives)
-                    .map((a) => `${a.name} (P${a.priority ?? "?"})`)
+                    .map((a) => {
+                      const evidence = a.evidence_level ? `, ${a.evidence_level}` : "";
+                      return `${a.name} (P${a.priority ?? "?"}${evidence})`;
+                    })
                     .join(", ")}`
                 : "Basic treatment"
             }
