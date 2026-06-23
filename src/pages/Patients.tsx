@@ -29,7 +29,6 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import { canvasBackground, treeTokens } from "../theme/theme";
 import api from "../api";
-import BackButton from "../components/BackButton";
 import CustomNode from "../components/CustomNode";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Decimal from "decimal.js";
@@ -66,6 +65,7 @@ import {
 } from "../utils/flowLayoutUtils";
 import CreatePatientTreeDialog from "../components/patientDialogs/CreatePatientTreeDialog";
 import PatientMapSearch from "../components/patientMap/PatientMapSearch";
+import PatientMapHeader from "../components/patientMap/PatientMapHeader";
 import TreatmentRegimenDialog, {
   type TreatmentRegimenDialogData,
 } from "../components/patientMap/TreatmentRegimenDialog";
@@ -239,7 +239,7 @@ const Patients: React.FC = () => {
         />
       ),
     }),
-    [handleNodeContext, getOverlayContainer, openRegimenDialog]
+    [handleNodeContext, openRegimenDialog]
   );
   
   // const [selectedRootId, setSelectedRootId] = useState<string | null>(null);
@@ -989,76 +989,54 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   /* ---------------------------------------------------------------------- */
   /*                                  UI                                    */
   /* ---------------------------------------------------------------------- */
+  const treeViewContext = useMemo(() => {
+    if (isOverview || !selectedRootId) return null;
+    const match = debouncedNodes.find(
+      (n) =>
+        String(n.data.docId) === String(selectedRootId) ||
+        String(n.data.catalogId) === String(selectedRootId)
+    );
+    if (!match) return null;
+    return {
+      label: String(match.data.label ?? "Tree"),
+      nodeCount: debouncedNodes.length,
+    };
+  }, [isOverview, selectedRootId, debouncedNodes]);
+
+  const searchDisabled =
+    Boolean(overviewEmptyHint) || debouncedNodes.length === 0;
+  const searchDisabledReason = overviewEmptyHint
+    ? "Create a patient tree to enable search."
+    : debouncedNodes.length === 0
+      ? "Loading patient trees…"
+      : undefined;
+
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <BackButton />
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 2,
-          mb: overviewEmptyHint ? 2 : 4,
-        }}>
-        <Typography variant="h3">Patient Map</Typography>
-        {isOverview && (
-          <Button variant="contained" onClick={() => setCreatePatientDialogOpen(true)}>
-            Create patient tree
-          </Button>
-        )}
-      </Box>
-      {isOverview && overviewEmptyHint && (
-        <Typography color="text.secondary" sx={{ mb: 4 }}>
-          {overviewEmptyHint}
-        </Typography>
-      )}
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <PatientMapHeader
+        isOverview={isOverview}
+        treeLabel={treeViewContext?.label}
+        nodeCount={treeViewContext?.nodeCount}
+        onCreateTree={
+          isOverview ? () => setCreatePatientDialogOpen(true) : undefined
+        }
+        toolbar={
+          <Box sx={{ width: "100%" }}>
+            <PatientMapSearch
+              disabled={searchDisabled}
+              disabledReason={searchDisabledReason}
+              characteristics={allCharacteristics}
+              drugs={allDrugs}
+              treatments={allTreatments}
+            />
+          </Box>
+        }
+      />
       <CreatePatientTreeDialog
         open={createPatientDialogOpen}
         onClose={() => setCreatePatientDialogOpen(false)}
         onCreated={() => drawPatientNodes()}
       />
-      {rootId && (
-        <Button
-          variant="contained"
-          onClick={() => navigate("/patients")}
-          sx={{ mb: 2 }}>
-          Back to All Roots
-        </Button>
-      )}
-
-      <Box sx={{ mb: overviewEmptyHint ? 2 : 3 }}>
-        <PatientMapSearch
-          disabled={Boolean(overviewEmptyHint) || nodes.length === 0}
-          characteristics={allCharacteristics}
-          drugs={allDrugs}
-          treatments={allTreatments}
-        />
-      </Box>
-
-      {/* Legend */}
-      {!isOverview && (
-        <Box display="flex" gap={1.5} alignItems="center" mb={2}>
-          <Chip
-            size="small"
-            label="Characteristic"
-            sx={{
-              bgcolor: "transparent",
-              border: `1px solid ${treeTokens.characteristic}`,
-              color: treeTokens.characteristic,
-            }}
-          />
-          <Chip
-            size="small"
-            label="Treatment"
-            sx={{
-              bgcolor: "transparent",
-              border: `1px solid ${treeTokens.treatment}`,
-              color: treeTokens.treatment,
-            }}
-          />
-        </Box>
-      )}
 
       {/* ===== React Flow Canvas ===== */}
       <Box
@@ -1106,6 +1084,73 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             )}
           </IconButton>
         </Tooltip>
+
+        {!isOverview && (
+          <Box
+            sx={{
+              position: "absolute",
+              bottom: 12,
+              left: 12,
+              zIndex: 10,
+              display: "flex",
+              gap: 1,
+              px: 1.5,
+              py: 1,
+              borderRadius: 2,
+              bgcolor: "rgba(26, 35, 50, 0.85)",
+              border: 1,
+              borderColor: "divider",
+              backdropFilter: "blur(8px)",
+            }}>
+            <Chip
+              size="small"
+              label="Characteristic"
+              sx={{
+                bgcolor: "transparent",
+                border: `1px solid ${treeTokens.characteristic}`,
+                color: treeTokens.characteristic,
+              }}
+            />
+            <Chip
+              size="small"
+              label="Treatment"
+              sx={{
+                bgcolor: "transparent",
+                border: `1px solid ${treeTokens.treatment}`,
+                color: treeTokens.treatment,
+              }}
+            />
+          </Box>
+        )}
+
+        {isOverview && overviewEmptyHint && (
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(15, 20, 25, 0.55)",
+            }}>
+            <Box sx={{ textAlign: "center", maxWidth: 400, px: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                No patient trees yet
+              </Typography>
+              <Typography color="text.secondary" sx={{ mb: 2.5 }}>
+                Patient trees model how populations flow through characteristics
+                and treatments.
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={() => setCreatePatientDialogOpen(true)}>
+                Create patient tree
+              </Button>
+            </Box>
+          </Box>
+        )}
+
         <ReactFlow
           nodes={debouncedNodes}
           edges={debouncedEdges}

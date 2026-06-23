@@ -3,9 +3,11 @@ import {
   Autocomplete,
   Box,
   CircularProgress,
+  InputAdornment,
   TextField,
   Typography,
 } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
 import { useNavigate } from "react-router-dom";
 import { fetchCatalogReferences } from "../catalog/catalogEditSave";
 import { navigatePatientMapSearchResult } from "../../utils/catalogNavigation";
@@ -20,6 +22,7 @@ import PatientMapUsagePickerDialog from "./PatientMapUsagePickerDialog";
 
 type Props = {
   disabled?: boolean;
+  disabledReason?: string;
   characteristics: Array<{ _id: string; type: string; name: string }>;
   drugs: Array<{ _id: string; name: string }>;
   treatments: Array<{ _id: string; name: string; type?: string }>;
@@ -27,6 +30,7 @@ type Props = {
 
 export default function PatientMapSearch({
   disabled = false,
+  disabledReason,
   characteristics,
   drugs,
   treatments,
@@ -112,8 +116,12 @@ export default function PatientMapSearch({
     setPendingSelection(null);
   };
 
+  const displayHelperText = helperText ?? (disabled ? disabledReason : undefined);
+  const isErrorHelper =
+    Boolean(helperText) && helperText !== "Not used in any patient tree.";
+
   return (
-    <Box sx={{ width: "100%", maxWidth: 420, flex: { xs: "1 1 100%", sm: "1 1 320px" } }}>
+    <Box sx={{ flex: "1 1 280px", minWidth: 0 }}>
       <Autocomplete
         disabled={disabled || loading}
         options={filteredOptions}
@@ -149,11 +157,24 @@ export default function PatientMapSearch({
           <TextField
             {...params}
             size="small"
-            label="Search characteristics, drugs, or treatments"
-            helperText={helperText ?? undefined}
-            error={Boolean(helperText)}
+            placeholder="Search characteristics, drugs, or treatments…"
+            helperText={displayHelperText ?? undefined}
+            error={isErrorHelper}
+            FormHelperTextProps={
+              helperText === "Not used in any patient tree."
+                ? { sx: { color: "text.secondary" } }
+                : undefined
+            }
             InputProps={{
               ...params.InputProps,
+              startAdornment: (
+                <>
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" color="action" />
+                  </InputAdornment>
+                  {params.InputProps.startAdornment}
+                </>
+              ),
               endAdornment: (
                 <>
                   {loading ? (
