@@ -1,11 +1,19 @@
 import { Edge } from "reactflow";
 import { treeTokens } from "../theme/theme";
 import { applyDagreLayout } from "./patientTreeUtils";
+import {
+  getOverviewNodeDimensions,
+  OVERVIEW_SEGMENT_SIZE,
+} from "./overviewNodeStyle";
 
 type FlowNode = {
   id: string;
   position: { x: number; y: number };
-  data?: { isOverviewMode?: boolean };
+  data?: {
+    isOverviewMode?: boolean;
+    isTreeRoot?: boolean;
+    charType?: string | null;
+  };
 };
 
 type Side = "top" | "right" | "bottom" | "left";
@@ -17,12 +25,12 @@ const OPPOSITE: Record<Side, Side> = {
   right: "left",
 };
 
-const OVERVIEW_NODE_SIZE = 120;
+const OVERVIEW_NODE_SIZE = OVERVIEW_SEGMENT_SIZE;
 const DUAL_RING_THRESHOLD = 9;
 
 export function getNodeDimensions(node: FlowNode): { width: number; height: number } {
   if (node.data?.isOverviewMode) {
-    return { width: OVERVIEW_NODE_SIZE, height: OVERVIEW_NODE_SIZE };
+    return getOverviewNodeDimensions(node.data);
   }
   return { width: 190, height: 88 };
 }

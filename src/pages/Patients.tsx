@@ -21,13 +21,12 @@ import {
   DialogTitle,
   DialogContent,
   useTheme,
-  Chip,
   IconButton,
   Tooltip,
 } from "@mui/material";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
-import { canvasBackground, treeTokens } from "../theme/theme";
+import { canvasBackground } from "../theme/theme";
 import api from "../api";
 import CustomNode from "../components/CustomNode";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -67,6 +66,7 @@ import {
 import CreatePatientTreeDialog from "../components/patientDialogs/CreatePatientTreeDialog";
 import PatientMapSearch from "../components/patientMap/PatientMapSearch";
 import PatientMapHeader from "../components/patientMap/PatientMapHeader";
+import PatientMapLegend from "../components/patientMap/PatientMapLegend";
 import TreatmentRegimenDialog, {
   type TreatmentRegimenDialogData,
 } from "../components/patientMap/TreatmentRegimenDialog";
@@ -1080,43 +1080,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           </IconButton>
         </Tooltip>
 
-        {!isOverview && (
-          <Box
-            sx={{
-              position: "absolute",
-              bottom: 12,
-              left: 12,
-              zIndex: 10,
-              display: "flex",
-              gap: 1,
-              px: 1.5,
-              py: 1,
-              borderRadius: 2,
-              bgcolor: "rgba(26, 35, 50, 0.85)",
-              border: 1,
-              borderColor: "divider",
-              backdropFilter: "blur(8px)",
-            }}>
-            <Chip
-              size="small"
-              label="Characteristic"
-              sx={{
-                bgcolor: "transparent",
-                border: `1px solid ${treeTokens.characteristic}`,
-                color: treeTokens.characteristic,
-              }}
-            />
-            <Chip
-              size="small"
-              label="Treatment"
-              sx={{
-                bgcolor: "transparent",
-                border: `1px solid ${treeTokens.treatment}`,
-                color: treeTokens.treatment,
-              }}
-            />
-          </Box>
-        )}
+        <PatientMapLegend isOverview={isOverview} />
 
         {isOverview && overviewEmptyHint && (
           <Box

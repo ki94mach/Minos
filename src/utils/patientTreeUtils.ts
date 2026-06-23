@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 import dagre from "dagre";
 import { hashNodeColor } from "../theme/theme";
+import { getOverviewNodeDimensions } from "./overviewNodeStyle";
 
 export function getEmbeddedCharType(node: any): string | undefined {
   return node.characteristic_data?.type ?? node.characteristic_data?.char_type;
@@ -216,8 +217,9 @@ export function applyDagreLayout(nodes: any[], edges: any[]) {
 
   nodes.forEach((n) => {
     const isOverview = n.data?.isOverviewMode === true;
-    const width = isOverview ? 120 : 190;
-    const height = isOverview ? 120 : estimateDrillDownNodeHeight(n.data ?? {});
+    const { width, height } = isOverview
+      ? getOverviewNodeDimensions(n.data)
+      : { width: 190, height: estimateDrillDownNodeHeight(n.data ?? {}) };
     g.setNode(n.id, { width, height });
   });
   edges.forEach((e) => g.setEdge(e.source, e.target));
@@ -227,8 +229,9 @@ export function applyDagreLayout(nodes: any[], edges: any[]) {
   return nodes.map((n) => {
     const { x, y } = g.node(n.id);
     const isOverview = n.data?.isOverviewMode === true;
-    const width = isOverview ? 120 : 190;
-    const height = isOverview ? 120 : estimateDrillDownNodeHeight(n.data ?? {});
+    const { width, height } = isOverview
+      ? getOverviewNodeDimensions(n.data)
+      : { width: 190, height: estimateDrillDownNodeHeight(n.data ?? {}) };
     return {
       ...n,
       position: {

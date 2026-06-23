@@ -7,6 +7,7 @@ export const treeTokens = {
   edgeStrokeWidth: 1.25,
   characteristic: "#38bdf8",
   treatment: "#34d399",
+  primaryIndication: "#a78bfa",
   nodeShadow: "0 4px 14px rgba(0, 0, 0, 0.45)",
   nodeHoverShadow: "0 6px 20px rgba(0, 0, 0, 0.55)",
 };

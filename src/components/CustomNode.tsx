@@ -3,6 +3,16 @@ import { Handle, Position, useReactFlow, NodeProps } from "reactflow";
 import { Tooltip, useTheme, Chip } from "@mui/material";
 import { treeTokens, textOnColor } from "../theme/theme";
 import type { TreatmentRegimenDialogData } from "./patientMap/TreatmentRegimenDialog";
+import {
+  formatOverviewStatsLine,
+  getOverviewNodeDimensions,
+  getOverviewNodeShape,
+  isOverviewPopulationRoot,
+  isOverviewPrimaryIndication,
+  OVERVIEW_PI_BORDER_RADIUS,
+  overviewPrimaryIndicationRing,
+  PRIMARY_INDICATION_CHAR_TYPE,
+} from "../utils/overviewNodeStyle";
 
 const CustomNode = (
   props: NodeProps & {
@@ -33,11 +43,46 @@ const CustomNode = (
   const isOverviewMode = nodeData.isOverviewMode === true;
   const canDrillDown = nodeData.canDrillDown === true;
   const showRegimenTag = !isOverviewMode && nodeData.type === "treatment";
+  const isPopulationRoot = isOverviewPopulationRoot(nodeData);
+  const isPrimaryIndication = isOverviewPrimaryIndication(nodeData);
+  const overviewDims = getOverviewNodeDimensions(nodeData);
+  const overviewShape = getOverviewNodeShape(nodeData);
   const nodeFill = nodeData.color || theme.palette.background.paper;
   const overviewTextColor =
     isOverviewMode && nodeData.color
       ? textOnColor(nodeData.color)
       : theme.palette.text.primary;
+  const metaTextStyle: React.CSSProperties = {
+    fontSize: "12px",
+    ...(isOverviewMode
+      ? {
+          color: overviewTextColor,
+          opacity: 0.9,
+          textShadow:
+            overviewTextColor === "#f8fafc"
+              ? "0 1px 2px rgba(0, 0, 0, 0.4)"
+              : "0 1px 2px rgba(255, 255, 255, 0.45)",
+        }
+      : { color: theme.palette.text.secondary }),
+  };
+  const overviewLabelStyle: React.CSSProperties = {
+    fontSize: 12,
+    lineHeight: 1.2,
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    overflow: "hidden",
+    width: "100%",
+  };
+  const overviewMetaLineStyle: React.CSSProperties = {
+    ...metaTextStyle,
+    fontSize: 11,
+    marginTop: 3,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    width: "100%",
+  };
 
   const baseShadow = treeTokens.nodeShadow;
   const hoverShadow = treeTokens.nodeHoverShadow;
@@ -47,17 +92,38 @@ const CustomNode = (
     ? `${focusRing}, ${baseShadow}`
     : baseShadow;
 
+  const overviewInsetHighlight = "inset 0 0 0 1px rgba(255, 255, 255, 0.1)";
+  const overviewPiRing = overviewPrimaryIndicationRing(treeTokens.primaryIndication);
+  const overviewRestingShadow = isOverviewMode
+    ? isPrimaryIndication
+      ? `${overviewPiRing}, ${baseShadow}, ${overviewInsetHighlight}`
+      : `${baseShadow}, ${overviewInsetHighlight}`
+    : "";
+  const overviewFocusedShadow = isOverviewMode
+    ? isFocused
+      ? `${focusRing}, ${overviewRestingShadow}`
+      : overviewRestingShadow
+    : "";
+  const overviewBorder = isOverviewMode
+    ? isPrimaryIndication
+      ? `3px solid ${treeTokens.primaryIndication}`
+      : isPopulationRoot
+      ? `3px solid color-mix(in srgb, ${borderColor} 70%, white)`
+      : `2px solid color-mix(in srgb, ${borderColor} 70%, white)`
+    : "";
+
   const containerStyle: React.CSSProperties = isOverviewMode
     ? {
         position: "relative",
-        width: "120px",
-        height: "120px",
-        borderRadius: "50%",
+        width: `${overviewDims.width}px`,
+        height: `${overviewDims.height}px`,
+        borderRadius:
+          overviewShape === "roundedSquare"
+            ? `${OVERVIEW_PI_BORDER_RADIUS}px`
+            : "50%",
         background: nodeFill,
-        border: `2px solid color-mix(in srgb, ${borderColor} 70%, white)`,
-        boxShadow: isFocused
-          ? `${focusRing}, ${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`
-          : `${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`,
+        border: overviewBorder,
+        boxShadow: overviewFocusedShadow,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -143,13 +209,26 @@ const CustomNode = (
     fontSize: "13px",
   };
 
-  const tooltipContent = (() => {
+  const formattedSize =
+    nodeData.size !== undefined ? Number(nodeData.size).toLocaleString() : "";
+
+  const formattedRate =
+    nodeData.rate !== undefined
+      ? `${(Number(nodeData.rate) * 100).toLocaleString(undefined, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        })}%`
+      : "";
+
+  const overviewStatsLine = formatOverviewStatsLine(formattedRate, formattedSize);
+
+  const drillDownTooltipContent = (() => {
     if (nodeData.type === "treatment") {
       return nodeData.treatmentCatalogType ?? "Treatment";
     }
 
     if (nodeData.type === "characteristic") {
-      if (nodeData.charType === "Primary Indication") {
+      if (nodeData.charType === PRIMARY_INDICATION_CHAR_TYPE) {
         return (
           <div>
             <div>{nodeData.charType}</div>
@@ -169,16 +248,34 @@ const CustomNode = (
     return "";
   })();
 
-  const formattedSize =
-    nodeData.size !== undefined ? Number(nodeData.size).toLocaleString() : "";
+  const overviewTooltipContent = nodeData.label ? (
+    <div>
+      <div style={{ fontWeight: 600 }}>{nodeData.label}</div>
+      {nodeData.charType && (
+        <div style={{ marginTop: 4 }}>{nodeData.charType}</div>
+      )}
+      {formattedRate !== "" && (
+        <div style={{ marginTop: 4 }}>Rate: {formattedRate}</div>
+      )}
+      {formattedSize !== "" && (
+        <div style={{ marginTop: 4 }}>Size: {formattedSize}</div>
+      )}
+      {nodeData.charType === PRIMARY_INDICATION_CHAR_TYPE &&
+        nodeData.measureType && (
+          <div style={{ marginTop: 4 }}>
+            Measure type: {nodeData.measureType}
+          </div>
+        )}
+      {nodeData.charType === PRIMARY_INDICATION_CHAR_TYPE &&
+        nodeData.measureYears != null && (
+          <div style={{ marginTop: 4 }}>Years: {nodeData.measureYears}</div>
+        )}
+    </div>
+  ) : null;
 
-  const formattedRate =
-    nodeData.rate !== undefined
-      ? `${(Number(nodeData.rate) * 100).toLocaleString(undefined, {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 2,
-        })}%`
-      : "";
+  const tooltipContent = isOverviewMode
+    ? overviewTooltipContent
+    : drillDownTooltipContent;
 
   const refCount =
     typeof nodeData.refCount === "number" ? nodeData.refCount : 0;
@@ -203,7 +300,9 @@ const CustomNode = (
     tooltipContent
   );
 
-  const hasTooltip = Boolean(tooltipTitle);
+  const hasTooltip = isOverviewMode
+    ? Boolean(nodeData.label)
+    : Boolean(tooltipTitle);
 
   const nodeCard = (
     <div
@@ -211,16 +310,24 @@ const CustomNode = (
       onContextMenu={(e) => onContextMenu(e, id)}
       style={containerStyle}
       onMouseEnter={(e) => {
+        if (isOverviewMode) {
+          const ringPrefix = isPrimaryIndication ? `${overviewPiRing}, ` : "";
+          (e.currentTarget as HTMLDivElement).style.boxShadow = isFocused
+            ? `${focusRing}, ${ringPrefix}${hoverShadow}`
+            : `${ringPrefix}${hoverShadow}`;
+          return;
+        }
         (e.currentTarget as HTMLDivElement).style.boxShadow = isFocused
           ? `${focusRing}, ${hoverShadow}`
           : hoverShadow;
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = isOverviewMode
-          ? isFocused
-            ? `${focusRing}, ${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`
-            : `${baseShadow}, inset 0 0 0 1px rgba(255, 255, 255, 0.1)`
-          : restingShadow;
+        if (isOverviewMode) {
+          (e.currentTarget as HTMLDivElement).style.boxShadow =
+            overviewFocusedShadow;
+          return;
+        }
+        (e.currentTarget as HTMLDivElement).style.boxShadow = restingShadow;
       }}
       onClick={() => {
         if (!isEditing && nodeData.onClick) nodeData.onClick();
@@ -273,7 +380,11 @@ const CustomNode = (
         </>
       ) : (
         <>
-          {nodeData?.label && <strong>{nodeData.label}</strong>}
+          {nodeData?.label && (
+            <strong style={isOverviewMode ? overviewLabelStyle : undefined}>
+              {nodeData.label}
+            </strong>
+          )}
           {catalogStale && (
             <div
               style={{
@@ -285,20 +396,23 @@ const CustomNode = (
               May differ from catalog
             </div>
           )}
-          {(formattedRate !== "" || nodeData?.size !== undefined) && (
-            <div style={{ marginTop: 4 }}>
-              {formattedRate !== "" && (
-                <div style={{ color: theme.palette.text.secondary, fontSize: "12px" }}>
-                  Rate: {formattedRate}
-                </div>
-              )}
-              {nodeData?.size !== undefined && (
-                <div style={{ color: theme.palette.text.secondary, fontSize: "12px", marginTop: 2 }}>
-                  Size: {formattedSize}
-                </div>
-              )}
-            </div>
-          )}
+          {(formattedRate !== "" || nodeData?.size !== undefined) &&
+            (isOverviewMode ? (
+              overviewStatsLine !== "" && (
+                <div style={overviewMetaLineStyle}>{overviewStatsLine}</div>
+              )
+            ) : (
+              <div style={{ marginTop: 4 }}>
+                {formattedRate !== "" && (
+                  <div style={metaTextStyle}>Rate: {formattedRate}</div>
+                )}
+                {nodeData?.size !== undefined && (
+                  <div style={{ ...metaTextStyle, marginTop: 2 }}>
+                    Size: {formattedSize}
+                  </div>
+                )}
+              </div>
+            ))}
         </>
       )}
       <Handle
