@@ -300,3 +300,56 @@ export function layoutOverviewPreviewCluster(
   const clusterWidth = Math.max(maxX - minX + 160, 360);
   return { nodes: Array.from(byId.values()), clusterWidth };
 }
+
+const PI_CLUSTER_GAP = 80;
+const PI_CLUSTER_MIN_WIDTH = 360;
+
+/**
+ * Layout PI-only overview nodes for one patient tree in a horizontal row.
+ */
+export function layoutOverviewPrimaryIndicationCluster(
+  allNodes: FlowNode[],
+  piNodeIds: string[],
+  center = { x: 400, y: 280 }
+): OverviewClusterLayoutResult {
+  if (piNodeIds.length === 0) {
+    return { nodes: allNodes, clusterWidth: PI_CLUSTER_MIN_WIDTH };
+  }
+
+  const byId = new Map(
+    allNodes.map((node) => [node.id, { ...node, position: { ...node.position } }])
+  );
+
+  const clusterNodes = piNodeIds
+    .map((id) => byId.get(id))
+    .filter((node): node is FlowNode => node != null);
+
+  if (clusterNodes.length === 0) {
+    return { nodes: allNodes, clusterWidth: PI_CLUSTER_MIN_WIDTH };
+  }
+
+  let totalWidth = 0;
+  const dimensions = clusterNodes.map((node) => {
+    const dim = getNodeDimensions(node);
+    totalWidth += dim.width;
+    return dim;
+  });
+  totalWidth += PI_CLUSTER_GAP * Math.max(clusterNodes.length - 1, 0);
+
+  let cursorX = center.x - totalWidth / 2;
+
+  clusterNodes.forEach((node, index) => {
+    const dim = dimensions[index];
+    byId.set(node.id, {
+      ...node,
+      position: {
+        x: cursorX,
+        y: center.y - dim.height / 2,
+      },
+    });
+    cursorX += dim.width + PI_CLUSTER_GAP;
+  });
+
+  const clusterWidth = Math.max(totalWidth + 160, PI_CLUSTER_MIN_WIDTH);
+  return { nodes: Array.from(byId.values()), clusterWidth };
+}

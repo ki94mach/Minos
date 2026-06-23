@@ -270,6 +270,11 @@ const CustomNode = (
         nodeData.measureYears != null && (
           <div style={{ marginTop: 4 }}>Years: {nodeData.measureYears}</div>
         )}
+      {nodeData.overviewPopulationLabel && (
+        <div style={{ marginTop: 4, opacity: 0.85 }}>
+          {nodeData.overviewPopulationLabel}
+        </div>
+      )}
     </div>
   ) : null;
 
@@ -384,6 +389,22 @@ const CustomNode = (
             <strong style={isOverviewMode ? overviewLabelStyle : undefined}>
               {nodeData.label}
             </strong>
+          )}
+          {isOverviewMode && nodeData.overviewPopulationLabel && (
+            <div
+              style={{
+                fontSize: "10px",
+                fontWeight: 500,
+                opacity: 0.8,
+                marginTop: 2,
+                lineHeight: 1.2,
+                maxWidth: "100%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}>
+              {nodeData.overviewPopulationLabel}
+            </div>
           )}
           {catalogStale && (
             <div

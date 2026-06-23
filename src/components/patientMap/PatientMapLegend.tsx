@@ -10,10 +10,12 @@ import {
 const legendPanelSx = {
   position: "absolute" as const,
   bottom: 12,
-  left: 12,
+  right: 12,
+  left: "auto",
   zIndex: 10,
   display: "flex",
   flexWrap: "wrap" as const,
+  justifyContent: "flex-end",
   gap: 1,
   px: 1.5,
   py: 1,
@@ -22,7 +24,7 @@ const legendPanelSx = {
   border: 1,
   borderColor: "divider",
   backdropFilter: "blur(8px)",
-  maxWidth: "calc(100% - 24px)",
+  maxWidth: "calc(100% - 80px)",
 };
 
 type LegendSwatchProps = {
@@ -92,11 +94,43 @@ function LegendChip({ label, swatch, labelColor }: LegendChipProps) {
 
 type PatientMapLegendProps = {
   isOverview: boolean;
+  isPrimaryIndicationOverview?: boolean;
 };
 
 const DRILL_CARD_BG = "rgba(26, 35, 50, 0.95)";
 
-function OverviewLegend() {
+function PrimaryIndicationOnlyLegend() {
+  const piBorder = `2px solid ${treeTokens.primaryIndication}`;
+  const piRing = overviewPrimaryIndicationRing(treeTokens.primaryIndication);
+  const piSwatchRadius = `${Math.round(
+    (OVERVIEW_PI_BORDER_RADIUS / OVERVIEW_SEGMENT_SIZE) * 16
+  )}px`;
+
+  return (
+    <LegendChip
+      label="Primary Indication"
+      labelColor={treeTokens.primaryIndication}
+      swatch={
+        <LegendSwatch
+          size={16}
+          borderRadius={piSwatchRadius}
+          border={piBorder}
+          boxShadow={piRing}
+        />
+      }
+    />
+  );
+}
+
+function OverviewLegend({
+  isPrimaryIndicationOverview,
+}: {
+  isPrimaryIndicationOverview: boolean;
+}) {
+  if (isPrimaryIndicationOverview) {
+    return <PrimaryIndicationOnlyLegend />;
+  }
+
   const characteristicBorder = `2px solid ${treeTokens.characteristic}`;
   const piBorder = `2px solid ${treeTokens.primaryIndication}`;
   const piRing = overviewPrimaryIndicationRing(treeTokens.primaryIndication);
@@ -180,10 +214,19 @@ function DrillDownLegend() {
   );
 }
 
-export default function PatientMapLegend({ isOverview }: PatientMapLegendProps) {
+export default function PatientMapLegend({
+  isOverview,
+  isPrimaryIndicationOverview = false,
+}: PatientMapLegendProps) {
   return (
     <Box sx={legendPanelSx}>
-      {isOverview ? <OverviewLegend /> : <DrillDownLegend />}
+      {isOverview ? (
+        <OverviewLegend
+          isPrimaryIndicationOverview={isPrimaryIndicationOverview}
+        />
+      ) : (
+        <DrillDownLegend />
+      )}
     </Box>
   );
 }

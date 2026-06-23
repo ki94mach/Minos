@@ -41,7 +41,7 @@ import AddCharacteristicDialog from "../components/patientDialogs/AddCharacteris
 import AddTreatmentDialog from "../components/patientDialogs/AddTreatmentDialog";
 import AddFollowupDialog from "../components/patientDialogs/AddFollowupDialog";
 import { buildCatalogMasterSnapshots } from "../utils/catalogStale";
-import { buildFlowNodes } from "../utils/buildFlowNodes";
+import { buildFlowNodes, collectPrimaryIndicationOverviewNodes } from "../utils/buildFlowNodes";
 import {
   getUniqueCharId,
   getEmbeddedCharType,
@@ -53,6 +53,7 @@ import {
   patientIdFromOverviewFlowNodeId,
   resolveOverviewFocusFlowNodeId,
   listPatientsWithPopulationRoot,
+  type OverviewViewMode,
 } from "../utils/patientTreeUtils";
 import { API_ENDPOINTS } from "../api/endpoints";
 import { asApiList } from "../api/parseApiList";
@@ -62,11 +63,13 @@ import {
   filterEdgesForNodes,
   keepReachableNodes,
   layoutOverviewPreviewCluster,
+  layoutOverviewPrimaryIndicationCluster,
 } from "../utils/flowLayoutUtils";
 import CreatePatientTreeDialog from "../components/patientDialogs/CreatePatientTreeDialog";
 import PatientMapSearch from "../components/patientMap/PatientMapSearch";
 import PatientMapHeader from "../components/patientMap/PatientMapHeader";
 import PatientMapLegend from "../components/patientMap/PatientMapLegend";
+import OverviewViewToggle from "../components/patientMap/OverviewViewToggle";
 import TreatmentRegimenDialog, {
   type TreatmentRegimenDialogData,
 } from "../components/patientMap/TreatmentRegimenDialog";
@@ -145,6 +148,8 @@ const Patients: React.FC = () => {
   const [nodeDetailsData, setNodeDetailsData] = useState<NodeDetailsModalData | null>(null);
   const [nodeDetailsReadOnly, setNodeDetailsReadOnly] = useState(false);
   const [overviewEmptyHint, setOverviewEmptyHint] = useState<string | null>(null);
+  const [isPrimaryIndicationOverview, setIsPrimaryIndicationOverview] =
+    useState(false);
   const [createPatientDialogOpen, setCreatePatientDialogOpen] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
@@ -654,9 +659,15 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   ]);
 
   useEffect(() => {
+    if (!isOverview) {
+      setIsPrimaryIndicationOverview(false);
+    }
+  }, [isOverview]);
+
+  useEffect(() => {
        drawPatientNodes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload graph when route root changes
-    }, [selectedRootId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload graph when route root or overview view changes
+    }, [selectedRootId, isPrimaryIndicationOverview]);
 
   useEffect(() => {
     Promise.all([
@@ -821,6 +832,9 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
          * 1) Set up global DFS registries for this draw
          * ────────────────────────────────────────────────── */
         const isOverviewMode = selectedRootId === null;
+        const overviewViewMode: OverviewViewMode = isPrimaryIndicationOverview
+          ? "primaryIndication"
+          : "path";
         const nodesById = new Map<string, any>();
         const edges: Edge[] = [];
         const edgeSet = new Set<string>();
@@ -835,6 +849,22 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           allTreatments,
           allDrugs
         );
+
+        const flowDeps = {
+          selectedRootId,
+          isOverviewMode,
+          overviewViewMode,
+          edgeSet,
+          nodesById,
+          edges,
+          hashColor,
+          getUniqueCharId,
+          navigate,
+          depthLimit,
+          catalogMasters,
+        };
+
+        const piClusterNodeIds: string[][] = [];
 
         // ──────────────────────────────────────────────────
         // 3) Kick off DFS for each root
@@ -857,6 +887,17 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             console.warn("⚠️ No patientId found for rootNode", rootNode);
           }
 
+          if (isOverviewMode && overviewViewMode === "primaryIndication") {
+            const piIds = collectPrimaryIndicationOverviewNodes(
+              rootNode,
+              patientId,
+              rootSizeDecimal,
+              flowDeps
+            );
+            piClusterNodeIds.push(piIds);
+            return;
+          }
+
           buildFlowNodes(
             rootNode,
             0,
@@ -867,21 +908,24 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             hashColor(getUniqueCharId(rootNode)),
             patientId,
             null,
-            {
-              selectedRootId,
-              isOverviewMode,
-              edgeSet,
-              nodesById,
-              edges,
-              hashColor,
-              getUniqueCharId,
-              navigate,
-              depthLimit,
-              catalogMasters,
-            }
+            flowDeps
           );
 
         });
+
+        if (isOverviewMode && overviewViewMode === "primaryIndication") {
+          const totalPiNodes = piClusterNodeIds.reduce(
+            (sum, ids) => sum + ids.length,
+            0
+          );
+          if (totalPiNodes === 0) {
+            setOverviewEmptyHint(
+              "No Primary Indication nodes yet. Switch off Primary Indication View to see full tree previews."
+            );
+            applyFlowGraph([], []);
+            return;
+          }
+        }
 
         let finalNodes = Array.from(nodesById.values()).map((node) => {
           const fallbackTreeId =
@@ -900,7 +944,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         let routedEdges = assignEdgeHandles(finalNodes, edges);
 
         // Overview scopes nodes per patient tree; orphans can linger after delete.
-        if (isOverviewMode) {
+        if (isOverviewMode && overviewViewMode === "path") {
           const overviewRootIds = roots.map((rootNode: any) =>
             overviewNodeDocId(rootNode)
           );
@@ -910,6 +954,19 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
         if (selectedRootId) {
           finalNodes = applyDagreLayout(finalNodes, routedEdges);
+        } else if (isOverviewMode && overviewViewMode === "primaryIndication") {
+          let offsetX = 360;
+          piClusterNodeIds.forEach((piIds) => {
+            if (piIds.length === 0) return;
+            const { nodes: laidOut, clusterWidth } =
+              layoutOverviewPrimaryIndicationCluster(finalNodes, piIds, {
+                x: offsetX,
+                y: 320,
+              });
+            finalNodes = laidOut;
+            offsetX += clusterWidth;
+          });
+          routedEdges = [];
         } else {
           let offsetX = 360;
           roots.forEach((rootNode: any, idx: number) => {
@@ -980,10 +1037,16 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
   const searchDisabled =
     Boolean(overviewEmptyHint) || debouncedNodes.length === 0;
   const searchDisabledReason = overviewEmptyHint
-    ? "Create a patient tree to enable search."
+    ? isPrimaryIndicationOverview
+      ? "No Primary Indication nodes in overview."
+      : "Create a patient tree to enable search."
     : debouncedNodes.length === 0
       ? "Loading patient trees…"
       : undefined;
+
+  const isPiOverviewEmpty =
+    isPrimaryIndicationOverview &&
+    Boolean(overviewEmptyHint?.includes("Primary Indication"));
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -995,14 +1058,30 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           isOverview ? () => setCreatePatientDialogOpen(true) : undefined
         }
         toolbar={
-          <Box sx={{ width: "100%" }}>
-            <PatientMapSearch
-              disabled={searchDisabled}
-              disabledReason={searchDisabledReason}
-              characteristics={allCharacteristics}
-              drugs={allDrugs}
-              treatments={allTreatments}
-            />
+          <Box
+            sx={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 2,
+              flexWrap: "wrap",
+            }}>
+            <Box sx={{ flex: 1, minWidth: 240 }}>
+              <PatientMapSearch
+                disabled={searchDisabled}
+                disabledReason={searchDisabledReason}
+                characteristics={allCharacteristics}
+                drugs={allDrugs}
+                treatments={allTreatments}
+              />
+            </Box>
+            {isOverview && (
+              <OverviewViewToggle
+                checked={isPrimaryIndicationOverview}
+                onChange={setIsPrimaryIndicationOverview}
+              />
+            )}
           </Box>
         }
       />
@@ -1059,7 +1138,10 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           </IconButton>
         </Tooltip>
 
-        <PatientMapLegend isOverview={isOverview} />
+        <PatientMapLegend
+          isOverview={isOverview}
+          isPrimaryIndicationOverview={isPrimaryIndicationOverview}
+        />
 
         {isOverview && overviewEmptyHint && (
           <Box
@@ -1074,17 +1156,22 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             }}>
             <Box sx={{ textAlign: "center", maxWidth: 400, px: 3 }}>
               <Typography variant="h6" gutterBottom>
-                No patient trees yet
+                {isPiOverviewEmpty
+                  ? "No Primary Indication nodes"
+                  : "No patient trees yet"}
               </Typography>
               <Typography color="text.secondary" sx={{ mb: 2.5 }}>
-                Patient trees model how populations flow through characteristics
-                and treatments.
+                {isPiOverviewEmpty
+                  ? overviewEmptyHint
+                  : "Patient trees model how populations flow through characteristics and treatments."}
               </Typography>
-              <Button
-                variant="contained"
-                onClick={() => setCreatePatientDialogOpen(true)}>
-                Create patient tree
-              </Button>
+              {!isPiOverviewEmpty && (
+                <Button
+                  variant="contained"
+                  onClick={() => setCreatePatientDialogOpen(true)}>
+                  Create patient tree
+                </Button>
+              )}
             </Box>
           </Box>
         )}

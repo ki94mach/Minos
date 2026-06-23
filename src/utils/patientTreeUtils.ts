@@ -21,6 +21,12 @@ export function isPopulationNode(node: any): boolean {
   return getEmbeddedCharType(node) === "Population";
 }
 
+export type OverviewViewMode = "path" | "primaryIndication";
+
+export function shouldIncludeInPrimaryIndicationOverview(node: any): boolean {
+  return isPrimaryIndicationNode(node);
+}
+
 /**
  * Overview preview visibility:
  * - Population is always shown
