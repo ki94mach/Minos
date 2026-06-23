@@ -13,7 +13,7 @@ import {
   getOverviewPreviewChildren,
   isPopulationNode,
   isPrimaryIndicationNode,
-  overviewFlowNodeId,
+  overviewNodeDocId,
   shouldIncludeInOverviewPreview,
 } from "./patientTreeUtils";
 
@@ -30,7 +30,6 @@ export function buildFlowNodes(
   deps: {
     selectedRootId: string | null;
     isOverviewMode: boolean;
-    visited: Set<string>;
     edgeSet: Set<string>;
     nodesById: Map<string, any>;
     edges: Edge[];
@@ -45,7 +44,6 @@ export function buildFlowNodes(
   const {
     selectedRootId,
     isOverviewMode,
-    visited,
     edgeSet,
     nodesById,
     edges,
@@ -74,47 +72,10 @@ export function buildFlowNodes(
     node._id?.$oid ||
     node._id;
 
-  // Overview: one React-Flow node per catalog entity within each patient tree.
-  // Drill-down: one node per tree instance.
-  const flowNodeId = isOverviewMode
-    ? overviewFlowNodeId(treeId, catalogId)
-    : node._id?.$oid || node._id;
+  const flowNodeId = overviewNodeDocId(node);
 
   const thisCharType = getEmbeddedCharType(node) ?? null;
   const childParentIsPopulation = isOverviewMode && isPopulationNode(node);
-
-  // ──────────────────────────────────────────────────
-  // Overview only: merge duplicate catalog ids within the same patient tree.
-  if (isOverviewMode && visited.has(flowNodeId)) {
-    if (parentId) {
-      const edgeId = `${parentId}->${flowNodeId}`;
-      if (!edgeSet.has(edgeId)) {
-        edges.push(makePatientTreeEdge(parentId, flowNodeId, edgeId));
-        edgeSet.add(edgeId);
-      }
-    }
-
-    getOverviewPreviewChildren(node).forEach((child: any, i: number) =>
-      buildFlowNodes(
-        child,
-        depth + 1,
-        i,
-        flowNodeId,
-        new Decimal(parentSize).times(node.rate ?? 1),
-        (node.children || []).length,
-        inheritedColor,
-        treeId,
-        thisCharType,
-        deps,
-        childParentIsPopulation
-      )
-    );
-    return;
-  }
-
-  if (isOverviewMode) {
-    visited.add(flowNodeId);
-  }
 
   // Drill-in URL uses catalog id; skip unrelated roots at depth 0.
   if (selectedRootId && depth === 0 && catalogId !== selectedRootId) {

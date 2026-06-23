@@ -92,6 +92,28 @@ export function patientIdFromOverviewFlowNodeId(flowNodeId: string): string | nu
   return sep > 0 ? flowNodeId.slice(0, sep) : null;
 }
 
+export function overviewNodeDocId(node: any): string {
+  return String(node._id?.$oid || node._id);
+}
+
+/** Resolve legacy `treeId:catalogId` focus targets to a document-based flow node id. */
+export function resolveOverviewFocusFlowNodeId(
+  focusOverviewNodeId: string,
+  nodes: { id: string; data?: { treeId?: string; catalogId?: string } }[]
+): string {
+  const patientId = patientIdFromOverviewFlowNodeId(focusOverviewNodeId);
+  if (!patientId) {
+    return focusOverviewNodeId;
+  }
+  const catalogId = focusOverviewNodeId.slice(focusOverviewNodeId.indexOf(":") + 1);
+  const match = nodes.find(
+    (node) =>
+      String(node.data?.treeId) === String(patientId) &&
+      String(node.data?.catalogId) === String(catalogId)
+  );
+  return match?.id ?? focusOverviewNodeId;
+}
+
 /** Patient documents whose embedded tree root is this population catalog entry. */
 export function listPatientsWithPopulationRoot(
   patients: any[],

@@ -50,8 +50,9 @@ import {
   calculateSizeFromTree,
   hashColor,
   applyDagreLayout,
-  overviewFlowNodeId,
+  overviewNodeDocId,
   patientIdFromOverviewFlowNodeId,
+  resolveOverviewFocusFlowNodeId,
   listPatientsWithPopulationRoot,
 } from "../utils/patientTreeUtils";
 import { API_ENDPOINTS } from "../api/endpoints";
@@ -810,14 +811,12 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
          * 1) Set up global DFS registries for this draw
          * ────────────────────────────────────────────────── */
         const isOverviewMode = selectedRootId === null;
-        const visited = new Set<string>();
         const nodesById = new Map<string, any>();
         const edges: Edge[] = [];
         const edgeSet = new Set<string>();
         
         /* ──────────────────────────────────────────────────
-         * 2) DFS: overview merges by catalog id; drill-down uses
-         *    each tree node’s document _id so duplicates stay distinct.
+         * 2) DFS: each tree node uses its document _id as the flow id.
          * ────────────────────────────────────────────────── */
         
 
@@ -892,7 +891,6 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
             {
               selectedRootId,
               isOverviewMode,
-              visited,
               edgeSet,
               nodesById,
               edges,
@@ -924,11 +922,9 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
         // Overview scopes nodes per patient tree; orphans can linger after delete.
         if (isOverviewMode) {
-          const overviewRootIds = roots.map((rootNode: any, idx: number) => {
-            const pid =
-              parsedPatients[idx]?._id?.$oid || parsedPatients[idx]?._id;
-            return overviewFlowNodeId(pid, getUniqueCharId(rootNode));
-          });
+          const overviewRootIds = roots.map((rootNode: any) =>
+            overviewNodeDocId(rootNode)
+          );
           finalNodes = keepReachableNodes(finalNodes, routedEdges, overviewRootIds);
           routedEdges = filterEdgesForNodes(finalNodes, routedEdges);
         }
@@ -938,12 +934,7 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         } else {
           let offsetX = 360;
           roots.forEach((rootNode: any, idx: number) => {
-            const pid =
-              parsedPatients[idx]?._id?.$oid || parsedPatients[idx]?._id;
-            const rootUniqueId = overviewFlowNodeId(
-              pid,
-              getUniqueCharId(rootNode)
-            );
+            const rootUniqueId = overviewNodeDocId(rootNode);
             const { nodes: laidOut, clusterWidth } = layoutOverviewPreviewCluster(
               finalNodes,
               routedEdges,
@@ -959,8 +950,12 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
         let focusFlowNodeId: string | null = null;
         if (focusOverviewNodeId) {
+          const resolvedFocusId = resolveOverviewFocusFlowNodeId(
+            focusOverviewNodeId,
+            finalNodes
+          );
           finalNodes = finalNodes.map((node) => {
-            const isFocused = node.id === focusOverviewNodeId;
+            const isFocused = node.id === resolvedFocusId;
             if (isFocused) focusFlowNodeId = node.id;
             return isFocused
               ? { ...node, data: { ...node.data, isFocused: true } }
