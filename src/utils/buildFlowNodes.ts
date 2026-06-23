@@ -77,20 +77,13 @@ export function buildFlowNodes(
   const thisCharType = getEmbeddedCharType(node) ?? null;
   const childParentIsPopulation = isOverviewMode && isPopulationNode(node);
 
-  // Drill-in URL uses catalog id; skip unrelated roots at depth 0.
-  if (selectedRootId && depth === 0 && catalogId !== selectedRootId) {
-    return;
-  }
-
   // ──────────────────────────────────────────────────
   // E) Compute “rawSize” based on whether this is a top‐level root or a descendant:
 
   const nodeRate = node.rate ?? 1;
 
   let rawSize: Decimal;
-  if (depth === 0 && selectedRootId) {
-    rawSize = parentSize;
-  } else if (parentId == null) {
+  if (parentId == null) {
     rawSize = new Decimal(
       Number.isFinite(parentSize)
         ? parentSize

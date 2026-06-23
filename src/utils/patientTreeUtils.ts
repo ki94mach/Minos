@@ -135,28 +135,50 @@ function nodeDocId(node: any): string | undefined {
   return id != null ? String(id) : undefined;
 }
 
-export function findNodeById(node: any, id: string): any | null {
-  const thisId = getUniqueCharId(node);
-  if (thisId === id) return node;
-  // 1) Check if this node is a “characteristic” and if so, compare its characteristic_data._id
+function nodeMatchesId(node: any, id: string): boolean {
+  if (getUniqueCharId(node) === id) return true;
   const charId =
     node.characteristic_data?._id?.$oid || node.characteristic_data?._id;
-  // 2) Otherwise, if it’s a “treatment,” compare its treatment_data._id
   const treatId = node.treatment_data?._id?.$oid || node.treatment_data?._id;
-  // 3) Finally, compare the node’s own document _id
-  const nodeDocId = node._id?.$oid || node._id;
+  const docId = node._id?.$oid || node._id;
+  return id === charId || id === treatId || id === docId;
+}
 
-  if (id === charId || id === treatId || id === nodeDocId) {
-    return node;
+/** Root-to-target chain inclusive; null when target is not in this tree. */
+export function findPathToNode(root: any, targetId: string): any[] | null {
+  if (nodeMatchesId(root, targetId)) return [root];
+  for (const child of root.children || []) {
+    const childPath = findPathToNode(child, targetId);
+    if (childPath) return [root, ...childPath];
   }
-  // 4) If no match yet, recurse into children (if any)
+  return null;
+}
+
+/**
+ * Drill-down view: population root through ancestors on the target path only,
+ * with the target's full descendant subtree. Sibling branches are omitted.
+ */
+export function buildDrillDownViewTree(
+  root: any,
+  targetId: string
+): any | null {
+  const path = findPathToNode(root, targetId);
+  if (!path || path.length === 0) return null;
+
+  let pruned = path[path.length - 1];
+  for (let i = path.length - 2; i >= 0; i--) {
+    pruned = { ...path[i], children: [pruned] };
+  }
+  return pruned;
+}
+
+export function findNodeById(node: any, id: string): any | null {
+  if (nodeMatchesId(node, id)) return node;
   if (!node.children) return null;
   for (const child of node.children) {
     const found = findNodeById(child, id);
     if (found) return found;
   }
-
-  // 5) No match in this subtree
   return null;
 }
 

@@ -45,8 +45,8 @@ import { buildFlowNodes } from "../utils/buildFlowNodes";
 import {
   getUniqueCharId,
   getEmbeddedCharType,
+  buildDrillDownViewTree,
   findNodeById,
-  calculateSizeFromTree,
   hashColor,
   applyDagreLayout,
   overviewNodeDocId,
@@ -775,27 +775,37 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         }
 
         if (selectedRootId && drillTreeId) {
-          // 1) Find the single patient document whose _id === drillTreeId
           const patientDoc = parsedPatients.find((p: any) => {
             const pid = p._id?.$oid || p._id;
             return pid === drillTreeId;
           });
           if (patientDoc) {
-            // 2) Inside that one patient, locate the clicked node (selectedRootId)
-            const subTree = findNodeById(patientDoc.tree, selectedRootId);
+            const drillViewRoot = buildDrillDownViewTree(
+              patientDoc.tree,
+              selectedRootId
+            );
             const correctPatient = parsedPatients.find((p: any) =>
               findNodeById(p.tree, selectedRootId)
             );
 
             truePatientId = correctPatient?._id?.$oid || correctPatient?._id;
-            
-            if (subTree) {
-              roots = [subTree];
-            } else {
-              roots = [];
-            }
+
+            roots = drillViewRoot ? [drillViewRoot] : [];
           } else {
             roots = [];
+          }
+        } else if (selectedRootId) {
+          const fallbackPatient = parsedPatients.find((p: any) =>
+            findNodeById(p.tree, selectedRootId)
+          );
+          if (fallbackPatient) {
+            truePatientId =
+              fallbackPatient._id?.$oid || fallbackPatient._id || "";
+            const drillViewRoot = buildDrillDownViewTree(
+              fallbackPatient.tree,
+              selectedRootId
+            );
+            roots = drillViewRoot ? [drillViewRoot] : [];
           }
         } else {
           // Overview: show every patient’s full top‐level tree
@@ -828,56 +838,25 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
         // ──────────────────────────────────────────────────
         // 3) Kick off DFS for each root
-        roots.forEach((rootNode: any, idx: number) => {     
-          const patientId =
-            parsedPatients[idx]?._id?.$oid || parsedPatients[idx]?._id;     
+        roots.forEach((rootNode: any, idx: number) => {
           if (!rootNode) {
             console.warn(`⚠️ rootNode at index ${idx} is undefined`);
             return;
           }
 
-          let rootSizeDecimal: Decimal;
-          // const patientId = treeIdMap.get(getUniqueCharId(rootNode)) as string;
-          if (selectedRootId && !truePatientId) {
-            const fallbackPatient = parsedPatients.find((p: any) =>
-              findNodeById(p.tree, selectedRootId)
-            );
-            truePatientId =
-              fallbackPatient?._id?.$oid || fallbackPatient?._id || "";
-          }
-          
-          
-          // const patientId = selectedRootId
-          //   ? truePatientId ?? ""
-          //   : treeIdMap.get(getUniqueCharId(rootNode)) ?? "";
+          const patientId =
+            selectedRootId && truePatientId
+              ? truePatientId
+              : parsedPatients[idx]?._id?.$oid || parsedPatients[idx]?._id;
+
+          let rootSizeDecimal = new Decimal(
+            typeof rootNode.size === "number" ? rootNode.size : 1
+          );
 
           if (!patientId) {
             console.warn("⚠️ No patientId found for rootNode", rootNode);
           }
 
-          if (selectedRootId) {
-            // (A) Find the patient doc whose `tree` contains the clicked node
-            const patientObj = parsedPatients.find((p: any) =>
-              !!findNodeById(p.tree, selectedRootId)
-            );
-            if (!patientObj) {
-              console.warn(
-                "[drawPatientNodes] clicked node not found in any patient tree."
-              );
-              rootSizeDecimal = new Decimal(1);
-            } else {
-              // (B) Run our new Decimal-based DFS
-              const accDecimal = calculateSizeFromTree(patientObj.tree, selectedRootId);
-              rootSizeDecimal = accDecimal ?? new Decimal(1);
-            }
-            
-          } else {
-            // Overview mode: use the top‐level node.size
-            rootSizeDecimal = new Decimal(
-              typeof rootNode.size === "number" ? rootNode.size : 1
-            );
-          }
-    
           buildFlowNodes(
             rootNode,
             0,
