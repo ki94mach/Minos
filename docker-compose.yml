@@ -1,0 +1,30 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    env_file: .env
+    ports:
+      - "5000:5000"
+    volumes:
+      - minos_uploads:/app/var/uploads
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless_stepped
+  
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+      args:
+        REACT_APP_API_URL: http://REPLACE_WITH_SERVER_IP:5000
+        REACT_APP_USE_MINOS_AUTH: "false"
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    restart: unless_stepped
+
+volumes:
+  minos_uploads:
+    driver: local
