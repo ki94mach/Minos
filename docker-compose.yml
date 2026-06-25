@@ -1,3 +1,11 @@
+# Minos Docker — single public port (80): nginx serves SPA and proxies /api to Gunicorn.
+#
+# Setup: docs/DEPLOY-DOCKER.md  |  Env files: docs/ENV.md
+# 1. cp .env.docker.example .env  (set MINOS_PUBLIC_ORIGIN to http://YOUR_SERVER_IP)
+# 2. docker compose build --no-cache && docker compose up -d
+#
+# API listens on 127.0.0.1:5000 (not exposed to LAN). Open firewall port 80 only.
+
 services:
   api:
     build:
@@ -8,20 +16,22 @@ services:
     volumes:
       - minos_uploads:/app/var/uploads
     restart: unless-stopped
-  
+
   web:
     build:
       context: .
       dockerfile: docker/web/Dockerfile
       args:
-        REACT_APP_API_URL: http://localhost:5000
+        REACT_APP_API_URL: ${MINOS_PUBLIC_ORIGIN:-http://localhost}
         REACT_APP_USE_MINOS_AUTH: "false"
+        REACT_APP_ALLOW_LOCALHOST_API: ${REACT_APP_ALLOW_LOCALHOST_API:-false}
     ports:
-      - "80:80"
+      - "0.0.0.0:80:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - api
     restart: unless-stopped
 
 volumes:
   minos_uploads:
-    driver: local

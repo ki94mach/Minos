@@ -43,6 +43,7 @@ ENV/
 !.env.example
 !.env.development
 !.env.production.example
+!.env.docker.example
 *.pem
 *.key
 *.p12
