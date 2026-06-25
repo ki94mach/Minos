@@ -1,0 +1,198 @@
+create treatment-alternative:
+{
+    "name": "osteoporesis Alternative Treatment",
+    "type": "Alternative",
+    "alternatives": [
+        {
+            "_id": "67d05523af3304f08c7e9fb1",
+            "name": "Denosumab Treatment",
+            "regimen": {
+                "drugs": [
+                    {
+                        "drug": {
+                            "_id": "67d020989e8a82122fb0332b",
+                            "name": "Denosumab",
+                            "strength": 120,
+                            "unit": "mg"
+                        },
+                        "annual_patient_con": 13
+                    }
+                ]
+            },
+            "ratio": 0.5
+        },
+        {
+            "_id": "67d05539af3304f08c7e9fb2",
+            "name": "zoledronic Acid Treatment",
+            "regimen": {
+                "drugs": [
+                    {
+                        "drug": {
+                            "_id": "67d0209d9e8a82122fb0332c",
+                            "name": "Zoledronic Acid",
+                            "strength": 4,
+                            "unit": "mg"
+                        },
+                        "annual_patient_con": 13
+                    }
+                ]
+            },
+            "ratio": 0.5
+        }
+    ]
+}
+
+------------------------------------------------------
+create treatment-regimen:
+{
+    "name": "osteoporosis",
+    "type": "Regimen",
+    "regimen": {
+        "drugs": [
+            {
+                "drug": {
+                    "_id": "67d020989e8a82122fb0332b",
+                    "name": "Denosumab",
+                    "strength": 120,
+                    "unit": "mg"
+                },
+                "annual_patient_con": 100
+            }
+        ]
+    }
+}
+
+------------------------------------------------------
+add_node: alternative treatment:
+{
+    "parent_node_id": "680d119fc7f16200be35c9a7",
+    "node": {
+        "node_type": "treatment",
+        "rate": 0.001,
+        "size": 1800,
+        "treatment_data": {
+            "_id": "6807aecea8db16ac73315742",
+            "type": "Alternative",
+            "name": "Carboplatin Doublet Alternatives",
+            "alternatives": [
+                {
+                    "id": "68063710d38ae2ffc1588d12",
+                    "name": "Carboplatin + Gemcitabine Regimen",
+                    "regimen": {
+                        "drugs": [
+                            {
+                                "drug": {
+                                    "id": "67d0207b9e8a82122fb03327",
+                                    "name": "Carboplatin",
+                                    "strength": 450,
+                                    "unit": "mg"
+                                },
+                                "annual_patient_con": 100
+                            },
+                            {
+                                "drug": {
+                                    "id": "67d020809e8a82122fb03328",
+                                    "name": "Gemcitabine",
+                                    "strength": 1,
+                                    "unit": "g"
+                                },
+                                "annual_patient_con": 100
+                            }
+                        ]
+                    },
+                    "ratio": 0.5
+                },
+                {
+                    "id": "6806811e0275b5071e431ce0",
+                    "name": "Carboplatin + Paclitaxel Regimen",
+                    "regimen": {
+                        "drugs": [
+                            {
+                                "drug": {
+                                    "id": "67d0207b9e8a82122fb03327",
+                                    "name": "Carboplatin",
+                                    "strength": 450,
+                                    "unit": "mg"
+                                },
+                                "annual_patient_con": 100
+                            },
+                            {
+                                "drug": {
+                                    "id": "67d020869e8a82122fb03329",
+                                    "name": "Paclitaxel",
+                                    "strength": 100,
+                                    "unit": "mg"
+                                },
+                                "annual_patient_con": 100
+                            }
+                        ]
+                    },
+                    "ratio": 0.5
+                }
+            ]
+        }
+    }
+}
+------------------------------------------------------
+add_node: char -> 1.treatment-regimen
+                   2. char
+
+{
+    "parent_node_id": "6810cc812f1bb407f4b03957",
+    "node": {
+        "node_type": "characteristic",
+        "rate": 0.001,
+        "size": 1.8,
+        "characteristic_data": {
+            "_id": "67d01f899e8a82122fb0331d",
+            "char_type": "Metastasis",
+            "name": "Bone Metastasis"
+        },
+        "children": [
+            {
+                "node_type": "treatment",
+                "rate": 1,
+                "size": 100,
+                "treatment_data": {
+                    "_id": "67d023479e8a82122fb0332f",
+                    "name": "Carboplatin with Paclitaxel",
+                    "type": "Regimen",
+                    "regimen": {
+                        "drugs": [
+                            {
+                                "drug": {
+                                    "_id": "67d0207b9e8a82122fb03327",
+                                    "name": "Carboplatin",
+                                    "strength": 450,
+                                    "unit": "mg"
+                                },
+                                "annual_patient_con": 15
+                            },
+                            {
+                                "drug": {
+                                    "_id": "67d020869e8a82122fb03329",
+                                    "name": "Paclitaxel",
+                                    "strength": 100,
+                                    "unit": "mg"
+                                },
+                                "annual_patient_con": 20
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "node_type": "characteristic",
+                "rate": 1,
+                "size": 100,
+                "characteristic_data":{
+                    "_id": "67d0200a9e8a82122fb03325",
+                    "char_type": "type",
+                    "name": "local"
+
+                }
+            }
+        ]
+    }
+}
+------------------------------------------------------
