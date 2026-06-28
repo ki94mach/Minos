@@ -4,7 +4,8 @@
 # 1. cp .env.docker.example .env  (set MINOS_PUBLIC_ORIGIN to http://YOUR_SERVER_IP)
 # 2. docker compose build --no-cache && docker compose up -d
 #
-# API listens on 127.0.0.1:5000 (not exposed to LAN). Open firewall port 80 only.
+# API uses GUNICORN_BIND=0.0.0.0 so the web container can reach :5000 via
+# host.docker.internal. Block LAN access to :5000 with ufw (see DEPLOY-DOCKER.md).
 
 services:
   api:

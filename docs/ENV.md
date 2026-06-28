@@ -82,7 +82,8 @@ Frontend: `.env.development` → `REACT_APP_API_URL=http://localhost:5000`
 | `FLASK_ENV` | `development` |
 | `AUTH_DISABLED` | `true` |
 | `MONGO_URI` / `REDIS_HOST` | `127.0.0.1` (Mongo/Redis on VM host) |
-| `GUNICORN_BIND` | `127.0.0.1` (API not on LAN; nginx on :80) |
+| `GUNICORN_BIND` | `0.0.0.0` (web container proxy; block LAN :5000 with ufw) |
+| `MAIL_*` | Required placeholders — see `.env.docker.example` |
 | `BEHIND_PROXY` | `true` |
 
 Users open **`http://SERVER_IP/home`**. API is proxied at **`http://SERVER_IP/api/...`**.
