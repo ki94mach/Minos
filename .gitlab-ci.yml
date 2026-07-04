@@ -1,20 +1,16 @@
 stages:
-  - diagnostics
   - test
   - build
 
 # Target the shared Windows shell runner (gitlab-runner-windows, tag: shell-win).
-# Run the runner-diagnostics job first if Python/Node commands fail.
-# Python is resolved by scripts/ci-python.ps1; if none is on the runner it bootstraps
-# a project-local embeddable Python under .ci/python (cached, no admin/Nexus changes).
-# Optional CI/CD overrides: PYTHON_PATH, PYTHON_VERSION, PYTHON_EMBED_URL, GET_PIP_URL.
+# Jobs run on the runner host; Python and Node must be installed there.
+# Orchid Nexus mirrors — same as docker/api/Dockerfile and docker/web/Dockerfile.
 variables:
   PIP_INDEX_URL: "https://nexus.orchidpharmed.com/repository/pip-proxy/simple"
   PIP_TRUSTED_HOST: "nexus.orchidpharmed.com"
   NPM_CONFIG_REGISTRY: "https://nexus.orchidpharmed.com/repository/npm-proxy/"
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/.cache/npm"
-  PYTHON_VERSION: "3.12.6"
 
 default:
   tags:
@@ -25,37 +21,15 @@ cache:
   paths:
     - .cache/pip
     - .cache/npm
-    - .ci/python
     - node_modules/
-
-runner-diagnostics:
-  stage: diagnostics
-  rules:
-    - when: always
-  script:
-    - powershell -ExecutionPolicy Bypass -File scripts/ci-runner-diagnostics.ps1
-  artifacts:
-    when: always
-    paths:
-      - runner-diagnostics.txt
-    expire_in: 1 week
-  allow_failure: true
-
-.backend_python: &backend_python
-  - Remove-Item -ErrorAction SilentlyContinue coverage.xml, report.xml, .ci-python-path
-  - powershell -ExecutionPolicy Bypass -File scripts/ci-runner-diagnostics.ps1 -Quick
-  - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1
-  - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1 -m pip install --upgrade pip
-  - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1 -m pip install -r requirements.txt -r requirements-dev.txt
 
 backend-tests:
   stage: test
-  needs:
-    - job: runner-diagnostics
-      artifacts: false
-  before_script: *backend_python
+  before_script:
+    - python -m pip install --no-cache-dir --upgrade pip
+    - python -m pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
   script:
-    - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1 -m pytest --cov=utils --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=report.xml
+    - python -m pytest --cov=utils --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=report.xml
   coverage: '/TOTAL.*\s+(\d+%)$/'
   artifacts:
     when: always
@@ -71,9 +45,6 @@ backend-tests:
 
 frontend-tests:
   stage: test
-  needs:
-    - job: runner-diagnostics
-      artifacts: false
   variables:
     NODE_ENV: development
     CI: "true"
@@ -103,9 +74,9 @@ spa-build:
     REACT_APP_SSO_LOGOUT_URL: https://idp.example.com/logout
   before_script:
     - npm ci
-    - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1 -m pip install python-dotenv
+    - python -m pip install --no-cache-dir python-dotenv
   script:
-    - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1 scripts/audit-production-env.py
+    - python scripts/audit-production-env.py
     - npm run build
   artifacts:
     paths:

@@ -77,9 +77,6 @@ htmlcov/
 flask_session/
 
 # Frontend-specific
-.ci/
-.ci-python-path
-runner-diagnostics.txt
 /node_modules
 /.pnp
 .pnp.js
