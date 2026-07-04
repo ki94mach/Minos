@@ -5,14 +5,16 @@ stages:
 
 # Target the shared Windows shell runner (gitlab-runner-windows, tag: shell-win).
 # Run the runner-diagnostics job first if Python/Node commands fail.
-# Python is resolved by scripts/ci-python.ps1 (override with CI variable PYTHON_PATH).
-# Orchid Nexus mirrors — same as docker/api/Dockerfile and docker/web/Dockerfile.
+# Python is resolved by scripts/ci-python.ps1; if none is on the runner it bootstraps
+# a project-local embeddable Python under .ci/python (cached, no admin/Nexus changes).
+# Optional CI/CD overrides: PYTHON_PATH, PYTHON_VERSION, PYTHON_EMBED_URL, GET_PIP_URL.
 variables:
   PIP_INDEX_URL: "https://nexus.orchidpharmed.com/repository/pip-proxy/simple"
   PIP_TRUSTED_HOST: "nexus.orchidpharmed.com"
   NPM_CONFIG_REGISTRY: "https://nexus.orchidpharmed.com/repository/npm-proxy/"
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/.cache/npm"
+  PYTHON_VERSION: "3.12.6"
 
 default:
   tags:
@@ -23,6 +25,7 @@ cache:
   paths:
     - .cache/pip
     - .cache/npm
+    - .ci/python
     - node_modules/
 
 runner-diagnostics:
@@ -42,8 +45,8 @@ runner-diagnostics:
   - Remove-Item -ErrorAction SilentlyContinue coverage.xml, report.xml, .ci-python-path
   - powershell -ExecutionPolicy Bypass -File scripts/ci-runner-diagnostics.ps1 -Quick
   - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1
-  - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1 -m pip install --no-cache-dir --upgrade pip
-  - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1 -m pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+  - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1 -m pip install --upgrade pip
+  - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1 -m pip install -r requirements.txt -r requirements-dev.txt
 
 backend-tests:
   stage: test
@@ -100,7 +103,7 @@ spa-build:
     REACT_APP_SSO_LOGOUT_URL: https://idp.example.com/logout
   before_script:
     - npm ci
-    - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1 -m pip install --no-cache-dir python-dotenv
+    - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1 -m pip install python-dotenv
   script:
     - powershell -ExecutionPolicy Bypass -File scripts/ci-python.ps1 scripts/audit-production-env.py
     - npm run build

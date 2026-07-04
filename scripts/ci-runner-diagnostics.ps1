@@ -5,6 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
+. "$PSScriptRoot/ci-python-common.ps1"
 $Root = Split-Path -Parent $PSScriptRoot
 $LogPath = Join-Path $Root 'runner-diagnostics.txt'
 $lines = New-Object System.Collections.Generic.List[string]
@@ -119,24 +120,19 @@ foreach ($path in $candidates) {
 Write-Diag ''
 
 if (-not $Quick) {
-    Write-Diag '--- Python installs under Program Files / AppData (depth 5) ---'
-    $searchRoots = @(
-        $env:ProgramFiles,
-        ${env:ProgramFiles(x86)},
-        "$env:LOCALAPPDATA\Programs\Python"
-    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
-
-    $found = @()
-    foreach ($root in $searchRoots) {
-        $found += Get-ChildItem -LiteralPath $root -Filter python.exe -Recurse -Depth 5 -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -notmatch 'WindowsApps|Microsoft\\WindowsApps' }
-    }
+    Write-Diag '--- Python installs under Program Files / AppData / Chocolatey (depth 5) ---'
+    $found = Get-CiPythonCandidatePaths
     if ($found.Count -eq 0) {
         Write-Diag 'No python.exe found in standard install trees'
     }
     else {
-        foreach ($item in ($found | Sort-Object FullName -Unique)) {
-            Write-Diag "FOUND -> $($item.FullName)"
+        foreach ($path in ($found | Sort-Object -Unique)) {
+            if (Test-IsSuitableCiPythonPath $path) {
+                Write-Diag "SUITABLE -> $path"
+            }
+            else {
+                Write-Diag "UNSUITABLE (bundled app Python) -> $path"
+            }
         }
     }
     Write-Diag ''
@@ -186,38 +182,38 @@ foreach ($probe in @(
 Write-Diag ''
 
 Write-Diag '--- ci-python.ps1 resolver ---'
-$resolved = $null
-try {
-    Remove-Item -LiteralPath (Join-Path $Root '.ci-python-path') -ErrorAction SilentlyContinue
-    & (Join-Path $PSScriptRoot 'ci-python.ps1') 2>&1 | ForEach-Object { Write-Diag $_ }
-    $pathFile = Join-Path $Root '.ci-python-path'
-    if (Test-Path -LiteralPath $pathFile) {
-        $resolved = (Get-Content -LiteralPath $pathFile -Raw).Trim()
-        Write-Diag "Resolver selected: $resolved"
-    }
-    else {
-        Write-Diag 'Resolver did not create .ci-python-path'
-    }
+$resolved = Resolve-CiPythonPath
+$bootstrapped = Get-CiBootstrappedPythonExe
+if ($resolved) {
+    Write-Diag "Resolver would use: $resolved"
+    Write-CiPythonVersion -PythonPath $resolved
 }
-catch {
-    Write-Diag "Resolver error: $($_.Exception.Message)"
+elseif ($bootstrapped -and (Test-Path -LiteralPath $bootstrapped)) {
+    Write-Diag "Bootstrapped Python cached at: $bootstrapped"
+    Write-CiPythonVersion -PythonPath $bootstrapped
+}
+else {
+    Write-Diag 'No Python available yet; backend-tests will bootstrap .ci/python automatically'
 }
 Write-Diag ''
 
 Write-Diag '=== Recommendation ==='
-if ($resolved) {
-    Write-Diag "Use scripts/ci-python.ps1 (already resolves to: $resolved)"
-    if (-not $env:PYTHON_PATH) {
-        Write-Diag "Optional: set CI/CD variable PYTHON_PATH=$resolved for faster, explicit resolution"
-    }
+if ($resolved -or ($bootstrapped -and (Test-Path -LiteralPath $bootstrapped))) {
+    $path = if ($resolved) { $resolved } else { $bootstrapped }
+    Write-Diag "Python for CI: $path"
 }
 else {
-    Write-Diag 'Python was not found. Choose one fix:'
-    Write-Diag '1. Install Python 3.12+ for all users on OP-N2S-APP-SRV, add to system PATH, restart gitlab-runner service'
-    Write-Diag '2. Set GitLab CI/CD variable PYTHON_PATH to the full path of python.exe from the search results above'
-    Write-Diag '3. Until Python exists, backend-tests and spa-build cannot run on shell-win'
+    Write-Diag 'No suitable system Python for CI on this runner.'
+    Write-Diag ''
+    Write-Diag 'CI will bootstrap a project-local Python under .ci/python on first backend job.'
+    Write-Diag 'That copy is cached between pipelines; no runner admin or Nexus changes are required.'
+    Write-Diag ''
+    Write-Diag 'If bootstrap fails (download blocked), set GitLab CI/CD variables you can edit:'
+    Write-Diag '  PYTHON_EMBED_URL, GET_PIP_URL, or PYTHON_PATH'
+    Write-Diag ''
+    Write-Diag 'Optional admin fix: choco install python312 -y && Restart-Service gitlab-runner'
+    Write-Diag 'frontend-tests can run now (Node v20.11.1 is available).'
 }
-Write-Diag 'Node/npm appear usable if node --version succeeded above (required for frontend-tests).'
 Write-Diag '=== End diagnostics ==='
 
 Set-Content -LiteralPath $LogPath -Value ($lines -join [Environment]::NewLine) -Encoding UTF8
