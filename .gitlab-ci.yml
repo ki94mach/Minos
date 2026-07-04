@@ -3,7 +3,8 @@ stages:
   - build
 
 # Target the shared Windows shell runner (gitlab-runner-windows, tag: shell-win).
-# Jobs run on the runner host; Python and Node must be installed there.
+# Jobs run on the runner host; Node must be on PATH. Python is invoked via `py -3`
+# (Windows launcher) because `python` is not on PATH for the GitLab Runner service.
 # Orchid Nexus mirrors — same as docker/api/Dockerfile and docker/web/Dockerfile.
 variables:
   PIP_INDEX_URL: "https://nexus.orchidpharmed.com/repository/pip-proxy/simple"
@@ -26,10 +27,12 @@ cache:
 backend-tests:
   stage: test
   before_script:
-    - python -m pip install --no-cache-dir --upgrade pip
-    - python -m pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+    - py -3 --version
+    - Remove-Item -ErrorAction SilentlyContinue coverage.xml, report.xml
+    - py -3 -m pip install --no-cache-dir --upgrade pip
+    - py -3 -m pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
   script:
-    - python -m pytest --cov=utils --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=report.xml
+    - py -3 -m pytest --cov=utils --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=report.xml
   coverage: '/TOTAL.*\s+(\d+%)$/'
   artifacts:
     when: always
@@ -74,9 +77,9 @@ spa-build:
     REACT_APP_SSO_LOGOUT_URL: https://idp.example.com/logout
   before_script:
     - npm ci
-    - python -m pip install --no-cache-dir python-dotenv
+    - py -3 -m pip install --no-cache-dir python-dotenv
   script:
-    - python scripts/audit-production-env.py
+    - py -3 scripts/audit-production-env.py
     - npm run build
   artifacts:
     paths:
