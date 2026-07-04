@@ -29,11 +29,7 @@ backend-tests:
     - python -m pip install --no-cache-dir --upgrade pip
     - python -m pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
   script:
-    - pytest
-      --cov=utils
-      --cov-report=term-missing
-      --cov-report=xml:coverage.xml
-      --junitxml=report.xml
+    - python -m pytest --cov=utils --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=report.xml
   coverage: '/TOTAL.*\s+(\d+%)$/'
   artifacts:
     when: always
