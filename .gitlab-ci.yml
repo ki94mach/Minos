@@ -1,0 +1,89 @@
+stages:
+  - test
+  - build
+
+# Orchid Nexus mirrors — same as docker/api/Dockerfile and docker/web/Dockerfile.
+# Docker Hub pulls use docker.orchidpharmed.com via the runner's daemon.json registry-mirrors.
+variables:
+  PIP_INDEX_URL: "https://nexus.orchidpharmed.com/repository/pip-proxy/simple"
+  PIP_TRUSTED_HOST: "nexus.orchidpharmed.com"
+  NPM_CONFIG_REGISTRY: "https://nexus.orchidpharmed.com/repository/npm-proxy/"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/.cache/npm"
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - .cache/pip
+    - .cache/npm
+    - node_modules/
+
+backend-tests:
+  stage: test
+  image: python:3.12-slim
+  before_script:
+    - pip install --no-cache-dir --upgrade pip
+    - pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+  script:
+    - pytest
+      --cov=utils
+      --cov-report=term-missing
+      --cov-report=xml:coverage.xml
+      --junitxml=report.xml
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.xml
+      - report.xml
+    expire_in: 1 week
+
+frontend-tests:
+  stage: test
+  image: node:20
+  before_script:
+    - export NODE_ENV=development
+    - npm ci
+  script:
+    - CI=true npm test -- --coverage --watchAll=false
+  artifacts:
+    when: always
+    paths:
+      - coverage/
+    expire_in: 1 week
+
+spa-build:
+  stage: build
+  image: node:20
+  needs:
+    - backend-tests
+    - frontend-tests
+  before_script:
+    - export NODE_ENV=development
+    - npm ci
+    - apt-get update && apt-get install -y python3 python3-pip
+    - pip3 install --no-cache-dir --break-system-packages python-dotenv
+  script:
+    - |
+      FLASK_ENV=production \
+      SSO_ISSUER=https://idp.example.com/realms/minos \
+      SSO_AUDIENCE=minos-api \
+      SSO_JWKS_URL=https://idp.example.com/realms/minos/protocol/openid-connect/certs \
+      python3 scripts/audit-production-env.py
+    - |
+      REACT_APP_API_URL=${REACT_APP_API_URL:-https://api.example.com} \
+      REACT_APP_SSO_LOGIN_URL=${REACT_APP_SSO_LOGIN_URL:-https://idp.example.com/login} \
+      REACT_APP_SSO_LOGOUT_URL=${REACT_APP_SSO_LOGOUT_URL:-https://idp.example.com/logout} \
+      npm run build
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"

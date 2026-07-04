@@ -82,6 +82,3 @@ flask_session/
 .pnp.js
 /coverage
 /build
-
-# Test files
-tests/
