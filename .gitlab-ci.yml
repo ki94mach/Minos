@@ -2,14 +2,19 @@ stages:
   - test
   - build
 
+# Target the shared Windows shell runner (gitlab-runner-windows, tag: shell-win).
+# Jobs run on the runner host; Python and Node must be installed there.
 # Orchid Nexus mirrors — same as docker/api/Dockerfile and docker/web/Dockerfile.
-# Docker Hub pulls use docker.orchidpharmed.com via the runner's daemon.json registry-mirrors.
 variables:
   PIP_INDEX_URL: "https://nexus.orchidpharmed.com/repository/pip-proxy/simple"
   PIP_TRUSTED_HOST: "nexus.orchidpharmed.com"
   NPM_CONFIG_REGISTRY: "https://nexus.orchidpharmed.com/repository/npm-proxy/"
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/.cache/npm"
+
+default:
+  tags:
+    - shell-win
 
 cache:
   key: "$CI_COMMIT_REF_SLUG"
@@ -20,10 +25,9 @@ cache:
 
 backend-tests:
   stage: test
-  image: python:3.12-slim
   before_script:
-    - pip install --no-cache-dir --upgrade pip
-    - pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+    - python -m pip install --no-cache-dir --upgrade pip
+    - python -m pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
   script:
     - pytest
       --cov=utils
@@ -45,12 +49,13 @@ backend-tests:
 
 frontend-tests:
   stage: test
-  image: node:20
+  variables:
+    NODE_ENV: development
+    CI: "true"
   before_script:
-    - export NODE_ENV=development
     - npm ci
   script:
-    - CI=true npm test -- --coverage --watchAll=false
+    - npm test -- --coverage --watchAll=false
   artifacts:
     when: always
     paths:
@@ -59,27 +64,24 @@ frontend-tests:
 
 spa-build:
   stage: build
-  image: node:20
   needs:
     - backend-tests
     - frontend-tests
+  variables:
+    NODE_ENV: development
+    FLASK_ENV: production
+    SSO_ISSUER: https://idp.example.com/realms/minos
+    SSO_AUDIENCE: minos-api
+    SSO_JWKS_URL: https://idp.example.com/realms/minos/protocol/openid-connect/certs
+    REACT_APP_API_URL: https://api.example.com
+    REACT_APP_SSO_LOGIN_URL: https://idp.example.com/login
+    REACT_APP_SSO_LOGOUT_URL: https://idp.example.com/logout
   before_script:
-    - export NODE_ENV=development
     - npm ci
-    - apt-get update && apt-get install -y python3 python3-pip
-    - pip3 install --no-cache-dir --break-system-packages python-dotenv
+    - python -m pip install --no-cache-dir python-dotenv
   script:
-    - |
-      FLASK_ENV=production \
-      SSO_ISSUER=https://idp.example.com/realms/minos \
-      SSO_AUDIENCE=minos-api \
-      SSO_JWKS_URL=https://idp.example.com/realms/minos/protocol/openid-connect/certs \
-      python3 scripts/audit-production-env.py
-    - |
-      REACT_APP_API_URL=${REACT_APP_API_URL:-https://api.example.com} \
-      REACT_APP_SSO_LOGIN_URL=${REACT_APP_SSO_LOGIN_URL:-https://idp.example.com/login} \
-      REACT_APP_SSO_LOGOUT_URL=${REACT_APP_SSO_LOGOUT_URL:-https://idp.example.com/logout} \
-      npm run build
+    - python scripts/audit-production-env.py
+    - npm run build
   artifacts:
     paths:
       - build/
