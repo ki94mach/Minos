@@ -57,8 +57,35 @@ interface Treatment {
     _id: string;
     name: string;
     type: string;
+    priority?: number;
+    evidence_level?: string;
     regimen?: { drugs: DrugWithCon[] };
     alternatives?: Alternative[];
+}
+
+function formatCatalogMetadata(treatment: Treatment): string | null {
+    const parts: string[] = [];
+    if (treatment.priority != null) {
+        parts.push(`P${treatment.priority}`);
+    }
+    if (treatment.evidence_level?.trim()) {
+        parts.push(`Evidence ${treatment.evidence_level.trim()}`);
+    }
+    return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function appendCatalogMetadata(
+    payload: Record<string, unknown>,
+    priority: number,
+    evidenceLevel: string
+) {
+    if (Number.isInteger(priority) && priority >= 1) {
+        payload.priority = priority;
+    }
+    const trimmedEvidence = evidenceLevel.trim();
+    if (trimmedEvidence) {
+        payload.evidence_level = trimmedEvidence;
+    }
 }
 
 function compareAlternatives(a: Alternative, b: Alternative): number {
@@ -81,6 +108,8 @@ const Treatments: React.FC = () => {
 
     const [name, setName] = useState("");
     const [treatmentType, setTreatmentType] = useState("Treatment");
+    const [catalogPriority, setCatalogPriority] = useState<number>(1);
+    const [catalogEvidenceLevel, setCatalogEvidenceLevel] = useState("");
 
     const [selectedDrugId, setSelectedDrugId] = useState("");
     const [annualConsumption, setAnnualConsumption] = useState<number | "">("");
@@ -154,8 +183,10 @@ const Treatments: React.FC = () => {
     );
 
     useEffect(() => {
-        setAlternativePriority(nextAlternativePriority(alternatives));
-    }, [alternatives]);
+        if (!selectedAlternativeRefId) {
+            setAlternativePriority(nextAlternativePriority(alternatives));
+        }
+    }, [alternatives, selectedAlternativeRefId]);
 
     const addAlternative = () => {
         if (!selectedAlternativeRefId || alternativeRatio <= 0 || alternativeRatio > 1) {
@@ -246,7 +277,7 @@ const Treatments: React.FC = () => {
           name: name,
           type: treatmentType,
         };
-      
+
         if (treatmentType === "Regimen") {
           if (regimenDrugs.length === 0) return alert("Add at least one drug to the regimen.");
           payload.regimen = {
@@ -258,6 +289,9 @@ const Treatments: React.FC = () => {
               annual_patient_con: item.annual_patient_con,
             })),
           };
+          appendCatalogMetadata(payload, catalogPriority, catalogEvidenceLevel);
+        } else if (treatmentType === "Treatment") {
+          appendCatalogMetadata(payload, catalogPriority, catalogEvidenceLevel);
         } else if (treatmentType === "Alternative") {
           if (alternatives.length === 0) return alert("Add at least one alternative.");
           payload.alternatives = alternatives.map((alt) => {
@@ -329,6 +363,8 @@ const Treatments: React.FC = () => {
     const resetForm = () => {
         setName("");
         setTreatmentType("Treatment");
+        setCatalogPriority(1);
+        setCatalogEvidenceLevel("");
         setRegimenDrugs([]);
         setAlternatives([]);
         setAlternativeRegimenDrugs([]);
@@ -351,6 +387,8 @@ const Treatments: React.FC = () => {
         setEditingTreatmentId(treatment._id);
         setName(treatment.name);
         setTreatmentType(treatment.type);
+        setCatalogPriority(treatment.priority ?? 1);
+        setCatalogEvidenceLevel(treatment.evidence_level?.trim() ?? "");
       
         const extractDrugId = (id: unknown): string => extractId(id);
 
@@ -466,13 +504,56 @@ const Treatments: React.FC = () => {
             </Grid>
 
             {treatmentType === "Treatment" && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                Basic treatment — no regimen or alternatives required.
-              </Typography>
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Basic treatment — no regimen or alternatives required.
+                </Typography>
+                <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                  <TextField
+                    type="number"
+                    size="small"
+                    label="Priority"
+                    value={catalogPriority}
+                    onChange={(e) => setCatalogPriority(Number(e.target.value))}
+                    inputProps={{ min: 1, step: 1 }}
+                    sx={{ minWidth: 120, flex: 1 }}
+                  />
+                  <TextField
+                    size="small"
+                    label="Evidence Level"
+                    value={catalogEvidenceLevel}
+                    onChange={(e) => setCatalogEvidenceLevel(e.target.value)}
+                    inputProps={{ maxLength: 32 }}
+                    sx={{ minWidth: 140, flex: 1 }}
+                  />
+                </Box>
+              </Box>
             )}
 
             {treatmentType === "Regimen" && (
               <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={catalogFormSectionTitleSx}>
+                  Regimen options
+                </Typography>
+                <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 2 }}>
+                  <TextField
+                    type="number"
+                    size="small"
+                    label="Priority"
+                    value={catalogPriority}
+                    onChange={(e) => setCatalogPriority(Number(e.target.value))}
+                    inputProps={{ min: 1, step: 1 }}
+                    sx={{ minWidth: 120, flex: 1 }}
+                  />
+                  <TextField
+                    size="small"
+                    label="Evidence Level"
+                    value={catalogEvidenceLevel}
+                    onChange={(e) => setCatalogEvidenceLevel(e.target.value)}
+                    inputProps={{ maxLength: 32 }}
+                    sx={{ minWidth: 140, flex: 1 }}
+                  />
+                </Box>
                 <Typography variant="subtitle2" sx={catalogFormSectionTitleSx}>
                   Regimen drugs
                 </Typography>
@@ -559,9 +640,17 @@ const Treatments: React.FC = () => {
                         (r) => r._id === selectedAlternativeRefId
                       ) || null
                     }
-                    onChange={(_event, newValue) =>
-                      setSelectedAlternativeRefId(newValue ? newValue._id : "")
-                    }
+                    onChange={(_event, newValue) => {
+                      setSelectedAlternativeRefId(newValue ? newValue._id : "");
+                      if (newValue?.priority != null) {
+                        setAlternativePriority(newValue.priority);
+                      } else {
+                        setAlternativePriority(nextAlternativePriority(alternatives));
+                      }
+                      setAlternativeEvidenceLevel(
+                        newValue?.evidence_level?.trim() ?? ""
+                      );
+                    }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
@@ -696,9 +785,14 @@ const Treatments: React.FC = () => {
             primary={`${treatment.name} (${treatment.type})`}
             secondary={
               treatment.regimen
-                ? `Drugs: ${treatment.regimen.drugs
-                    .map((d) => d.drug.name)
-                    .join(", ")}`
+                ? [
+                    `Drugs: ${treatment.regimen.drugs
+                      .map((d) => d.drug.name)
+                      .join(", ")}`,
+                    formatCatalogMetadata(treatment),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
                 : treatment.alternatives
                 ? `Alternatives: ${[...treatment.alternatives]
                     .sort(compareAlternatives)
@@ -707,7 +801,7 @@ const Treatments: React.FC = () => {
                       return `${a.name} (P${a.priority ?? "?"}${evidence})`;
                     })
                     .join(", ")}`
-                : "Basic treatment"
+                : formatCatalogMetadata(treatment) ?? "Basic treatment"
             }
             onEdit={() => handleEdit(treatment)}
             onDelete={() => handleDelete(treatment._id)}

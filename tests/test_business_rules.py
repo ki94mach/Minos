@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from bson import ObjectId
@@ -15,6 +16,7 @@ from utils.business_rules import (
     remove_node_subtree,
     validate_alternative_priorities,
     validate_alternative_ratios_sum,
+    validate_and_transform_treatment_embedded,
     validate_followup_treatment_parentage,
     validate_non_empty,
     validate_optional_string,
@@ -177,3 +179,77 @@ class TestRemoveNodeSubtree:
     def test_returns_false_when_not_found(self) -> None:
         root = _node(children=[_node()])
         assert remove_node_subtree(root, ObjectId()) is False
+
+
+class TestValidateAndTransformTreatmentEmbeddedMetadata:
+    def _mock_treatment(self, **overrides):
+        defaults = {
+            "id": ObjectId(),
+            "name": "Test Regimen",
+            "type": "Regimen",
+            "priority": None,
+            "evidence_level": None,
+            "regimen": None,
+            "alternatives": None,
+        }
+        defaults.update(overrides)
+        return SimpleNamespace(**defaults)
+
+    @patch("models.treatment.driver.TreatmentDriver")
+    def test_legacy_regimen_without_metadata_ok(self, mock_driver) -> None:
+        treatment = self._mock_treatment()
+        mock_driver.find.return_value.first.return_value = treatment
+
+        result = validate_and_transform_treatment_embedded(
+            {
+                "_id": str(treatment.id),
+                "name": treatment.name,
+                "type": treatment.type,
+            }
+        )
+        assert result["name"] == treatment.name
+
+    @patch("models.treatment.driver.TreatmentDriver")
+    def test_regimen_metadata_must_match_catalog(self, mock_driver) -> None:
+        treatment = self._mock_treatment(priority=1, evidence_level="Ia")
+        mock_driver.find.return_value.first.return_value = treatment
+
+        validate_and_transform_treatment_embedded(
+            {
+                "_id": str(treatment.id),
+                "name": treatment.name,
+                "type": treatment.type,
+                "priority": 1,
+                "evidence_level": "Ia",
+            }
+        )
+
+    @patch("models.treatment.driver.TreatmentDriver")
+    def test_regimen_priority_mismatch_raises(self, mock_driver) -> None:
+        treatment = self._mock_treatment(priority=1)
+        mock_driver.find.return_value.first.return_value = treatment
+
+        with pytest.raises(ValueError, match="Priority mismatch"):
+            validate_and_transform_treatment_embedded(
+                {
+                    "_id": str(treatment.id),
+                    "name": treatment.name,
+                    "type": treatment.type,
+                    "priority": 2,
+                }
+            )
+
+    @patch("models.treatment.driver.TreatmentDriver")
+    def test_regimen_evidence_mismatch_raises(self, mock_driver) -> None:
+        treatment = self._mock_treatment(evidence_level="Ia")
+        mock_driver.find.return_value.first.return_value = treatment
+
+        with pytest.raises(ValueError, match="Evidence level mismatch"):
+            validate_and_transform_treatment_embedded(
+                {
+                    "_id": str(treatment.id),
+                    "name": treatment.name,
+                    "type": treatment.type,
+                    "evidence_level": "IIb",
+                }
+            )

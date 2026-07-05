@@ -40,6 +40,8 @@ export interface TreatmentOption {
   _id: string;
   name: string;
   type: "Regimen" | "Treatment" | "Alternative";
+  priority?: number;
+  evidence_level?: string;
   regimen?: {
     drugs: DrugWithCon[];
   };
@@ -135,19 +137,29 @@ export default function TreatmentForm({
           })
         : undefined;
 
+    const treatmentData: Record<string, unknown> = {
+        _id: selected._id,
+        name: selected.name,
+        type: selected.type,
+      };
+    if (selected.priority != null) {
+      treatmentData.priority = selected.priority;
+    }
+    if (selected.evidence_level?.trim()) {
+      treatmentData.evidence_level = selected.evidence_level.trim();
+    }
+    if (selected.type === "Regimen" && fixedRegimen) {
+      treatmentData.regimen = fixedRegimen;
+    }
+    if (fixedAlternatives) {
+      treatmentData.alternatives = fixedAlternatives;
+    }
+
     const node = {
       node_type: "treatment",
       rate,
       size,
-      treatment_data: {
-        _id: selected._id,
-        name: selected.name,
-        type: selected.type,
-        ...(selected.type === "Regimen" && fixedRegimen
-          ? { regimen: fixedRegimen }
-          : {}),
-        ...(fixedAlternatives ? { alternatives: fixedAlternatives } : {}),
-      },
+      treatment_data: treatmentData,
     };
 
     const payload = {

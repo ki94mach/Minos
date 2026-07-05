@@ -152,7 +152,29 @@ def validate_and_transform_treatment_embedded(treatment_data: dict) -> dict:
         raise ValueError("Name does not match the database record")
     if treatment_data.get('type') != treatment.type:
         raise ValueError("Type does not match the database record")
-    
+
+    if treatment.type in ('Regimen', 'Treatment'):
+        db_priority = getattr(treatment, 'priority', None)
+        db_evidence_level = normalize_evidence_level(
+            getattr(treatment, 'evidence_level', None)
+        )
+        if db_priority is not None:
+            payload_priority = treatment_data.get('priority')
+            if payload_priority != db_priority:
+                raise ValueError(
+                    f"Priority mismatch: {payload_priority} (payload) "
+                    f"≠ {db_priority} (DB)"
+                )
+        if db_evidence_level is not None:
+            payload_evidence_level = normalize_evidence_level(
+                treatment_data.get('evidence_level')
+            )
+            if payload_evidence_level != db_evidence_level:
+                raise ValueError(
+                    f"Evidence level mismatch: {payload_evidence_level!r} (payload) "
+                    f"≠ {db_evidence_level!r} (DB)"
+                )
+
     if treatment_data.get('regimen'):
         if treatment.type != 'Regimen':
             raise ValueError("Regimen can only be present for treatment type 'Regimen'")

@@ -551,6 +551,8 @@ def treatment_embedded_from_master(master: Treatment) -> TreatmentEmbedded:
         type=master.type,
         regimen=_copy_regimen(master.regimen),
         alternatives=_copy_alternatives(master.alternatives),
+        priority=_get_field(master, "priority"),
+        evidence_level=_get_field(master, "evidence_level"),
     )
 
 

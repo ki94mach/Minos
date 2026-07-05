@@ -25,6 +25,7 @@ from utils.business_rules import (
     validate_and_transform_alternative,
     validate_alternative_ratios_sum,
     validate_alternative_priorities,
+    normalize_evidence_level,
 )
 
 ALLOWED_TREATMENT_TYPES = ['Treatment', 'Regimen', 'Alternative']
@@ -159,8 +160,44 @@ class TreatmentDrugItem(BaseModel):
 
 class Regimen(BaseModel):
     drugs: List[TreatmentDrugItem]
-    
 
+
+def _validate_catalog_treatment_metadata(
+    treatment_type: str,
+    priority: Optional[int],
+    evidence_level: Optional[str],
+) -> None:
+    """Priority and evidence_level are only valid on Regimen and Treatment catalog items."""
+    if treatment_type == "Alternative":
+        if priority is not None:
+            raise ValueError(
+                "Priority is only allowed for Regimen and Treatment types"
+            )
+        if evidence_level is not None:
+            raise ValueError(
+                "Evidence level is only allowed for Regimen and Treatment types"
+            )
+    elif treatment_type in ("Regimen", "Treatment"):
+        if priority is not None:
+            validate_alternative_priorities([priority])
+    elif priority is not None or evidence_level is not None:
+        raise ValueError(
+            f"Priority and evidence level are not valid for type {treatment_type!r}"
+        )
+
+
+def _optional_priority_validator(v: Any) -> Optional[int]:
+    if v is None:
+        return None
+    if isinstance(v, bool) or not isinstance(v, int):
+        raise ValueError("Priority must be a positive integer")
+    return v
+
+
+def _optional_evidence_level_validator(v: Optional[str]) -> Optional[str]:
+    return normalize_evidence_level(v)
+
+    
 # For nested models in Alternative treatments
 class AlternativeTreatment(BaseModel):
     model_config = ConfigDict(
@@ -222,6 +259,8 @@ class TreatmentCreate(BaseModel):
     type: str
     regimen: Optional[Regimen] = None
     alternatives: Optional[List[AlternativeTreatment]] = None
+    priority: Optional[int] = Field(None, ge=1)
+    evidence_level: Optional[str] = Field(None, max_length=32)
 
     @field_validator('name', mode='after')
     @classmethod
@@ -234,6 +273,23 @@ class TreatmentCreate(BaseModel):
         if v not in ALLOWED_TREATMENT_TYPES:
             raise ValueError(f'Type must be one of {ALLOWED_TREATMENT_TYPES}')
         return v
+
+    @field_validator('priority', mode='before')
+    @classmethod
+    def validate_optional_priority(cls, v: Any) -> Optional[int]:
+        return _optional_priority_validator(v)
+
+    @field_validator('evidence_level', mode='after')
+    @classmethod
+    def validate_optional_evidence_level(cls, v: Optional[str]) -> Optional[str]:
+        return _optional_evidence_level_validator(v)
+
+    @model_validator(mode='after')
+    def validate_catalog_metadata(self) -> "TreatmentCreate":
+        _validate_catalog_treatment_metadata(
+            self.type, self.priority, self.evidence_level
+        )
+        return self
     
     @field_validator('regimen', mode='after')
     @classmethod
@@ -289,6 +345,8 @@ class TreatmentUpdate(BaseModel):
     type: Optional[str]
     regimen: Optional[Regimen] = None
     alternatives: Optional[List[AlternativeTreatment]] = None
+    priority: Optional[int] = Field(None, ge=1)
+    evidence_level: Optional[str] = Field(None, max_length=32)
 
     @field_validator('name', mode='after')
     @classmethod
@@ -308,6 +366,26 @@ class TreatmentUpdate(BaseModel):
             if v not in ALLOWED_TREATMENT_TYPES:
                 raise ValueError(f'Type must be one of {ALLOWED_TREATMENT_TYPES}')
         return v
+
+    @field_validator('priority', mode='before')
+    @classmethod
+    def validate_optional_priority(cls, v: Any) -> Optional[int]:
+        return _optional_priority_validator(v)
+
+    @field_validator('evidence_level', mode='after')
+    @classmethod
+    def validate_optional_evidence_level(cls, v: Optional[str]) -> Optional[str]:
+        return _optional_evidence_level_validator(v)
+
+    @model_validator(mode='after')
+    def validate_catalog_metadata(self) -> "TreatmentUpdate":
+        if self.type is not None:
+            _validate_catalog_treatment_metadata(
+                self.type, self.priority, self.evidence_level
+            )
+        elif self.type is None and self.priority is not None:
+            validate_alternative_priorities([self.priority])
+        return self
 
     @field_validator('regimen', mode='after')
     @classmethod
@@ -458,6 +536,8 @@ class TreatmentData(BaseModel):
     type: str
     regimen: Optional[Regimen] = None
     alternatives: Optional[List[AlternativeTreatment]] = None
+    priority: Optional[int] = Field(None, ge=1)
+    evidence_level: Optional[str] = Field(None, max_length=32)
 
     @field_validator('name', mode='after')
     @classmethod
@@ -472,6 +552,16 @@ class TreatmentData(BaseModel):
                 f'Type must be one of {ALLOWED_TREATMENT_TYPES}'
                 )
         return v
+
+    @field_validator('priority', mode='before')
+    @classmethod
+    def validate_optional_priority(cls, v: Any) -> Optional[int]:
+        return _optional_priority_validator(v)
+
+    @field_validator('evidence_level', mode='after')
+    @classmethod
+    def validate_optional_evidence_level(cls, v: Optional[str]) -> Optional[str]:
+        return _optional_evidence_level_validator(v)
 
     # @field_validator('regimen', mode='after')
     # @classmethod
@@ -528,7 +618,9 @@ class TreatmentData(BaseModel):
             'alternatives': [
                 alt.model_dump(by_alias=True)
                 for alt in self.alternatives]
-                if self.alternatives else None
+                if self.alternatives else None,
+            'priority': self.priority,
+            'evidence_level': self.evidence_level,
         }
         validate_and_transform_treatment_embedded(treatment_data)
         return self

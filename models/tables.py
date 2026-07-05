@@ -126,6 +126,8 @@ class TreatmentEmbedded(EmbeddedDocument):
     type = StringField(required=True, choices=['Treatment', 'Regimen', 'Alternative'])
     regimen = EmbeddedDocumentField(Regimen, required=False)
     alternatives = ListField(EmbeddedDocumentField(AlternativeTreatment), required=False)
+    priority = IntField(required=False, min_value=1)
+    evidence_level = StringField(required=False, max_length=32)
 
 
 # Embedded version of a followup node
@@ -164,6 +166,8 @@ class Treatment(Document):
     type = StringField(required=True, choices=['Treatment', 'Regimen', 'Alternative'])
     regimen = EmbeddedDocumentField(Regimen, required=False)
     alternatives = ListField(EmbeddedDocumentField(AlternativeTreatment), required=False)
+    priority = IntField(required=False, min_value=1)
+    evidence_level = StringField(required=False, max_length=32)
 
     # Field to store computed hash value.
     treatment_hash = StringField(required=True, unique=True)

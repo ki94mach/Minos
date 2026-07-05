@@ -550,6 +550,8 @@ def create_treatment(validated_data: TreatmentCreate):
             type=treatment_type,
             regimen=regimen_doc,
             alternatives=alts_docs,
+            priority=payload.get("priority"),
+            evidence_level=payload.get("evidence_level"),
             treatment_hash=treatment_hash
         )
 
@@ -584,6 +586,8 @@ def update_treatment(validated_data, treatment_id):
             or validated_data.type is not None
             or validated_data.regimen is not None
             or validated_data.alternatives is not None
+            or validated_data.priority is not None
+            or validated_data.evidence_level is not None
         )
         if not had_update:
             return jsonify({
@@ -596,6 +600,15 @@ def update_treatment(validated_data, treatment_id):
 
         def apply_master() -> None:
             payload = validated_data.model_dump(by_alias=True, exclude_none=True)
+            effective_type = validated_data.type or treatment.type
+            if (
+                validated_data.priority is not None
+                or validated_data.evidence_level is not None
+            ) and effective_type == "Alternative":
+                raise ValueError(
+                    "Priority and evidence level are only allowed for "
+                    "Regimen and Treatment types"
+                )
             if validated_data.name is not None:
                 treatment.name = payload["name"]
             if validated_data.type is not None:
@@ -603,12 +616,23 @@ def update_treatment(validated_data, treatment_id):
             if validated_data.regimen is not None:
                 treatment.regimen = Regimen(**payload["regimen"])
                 treatment.alternatives = []
+                treatment.priority = None
+                treatment.evidence_level = None
             elif validated_data.alternatives is not None:
                 treatment.alternatives = [
                     AlternativeTreatment(**alt)
                     for alt in payload["alternatives"]
                 ]
                 treatment.regimen = None
+                treatment.priority = None
+                treatment.evidence_level = None
+            if validated_data.priority is not None:
+                treatment.priority = payload["priority"]
+            if validated_data.evidence_level is not None:
+                treatment.evidence_level = payload.get("evidence_level")
+            if validated_data.type == "Alternative":
+                treatment.priority = None
+                treatment.evidence_level = None
             hash_input = (
                 treatment.name
                 + treatment.type
@@ -633,6 +657,8 @@ def update_treatment(validated_data, treatment_id):
                 ]
             else:
                 treatment.alternatives = []
+            treatment.priority = snapshot.get('priority')
+            treatment.evidence_level = snapshot.get('evidence_level')
             treatment.treatment_hash = snapshot['treatment_hash']
             TreatmentDriver.update(treatment)
 

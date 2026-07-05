@@ -47,6 +47,8 @@ create treatment-regimen:
 {
     "name": "osteoporosis",
     "type": "Regimen",
+    "priority": 1,
+    "evidence_level": "Ia",
     "regimen": {
         "drugs": [
             {
@@ -60,6 +62,15 @@ create treatment-regimen:
             }
         ]
     }
+}
+
+------------------------------------------------------
+create treatment-basic:
+{
+    "name": "Watch and wait",
+    "type": "Treatment",
+    "priority": 2,
+    "evidence_level": "III"
 }
 
 ------------------------------------------------------

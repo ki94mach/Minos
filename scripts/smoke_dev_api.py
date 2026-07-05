@@ -957,6 +957,8 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
         {
             "name": regimen_b_name,
             "type": "Regimen",
+            "priority": 2,
+            "evidence_level": "Ib",
             "regimen": alt_regimen_b,
         },
     )
@@ -974,7 +976,12 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
     code, basic_treat_resp = request(
         "POST",
         "/api/treatments",
-        {"name": basic_treat_name, "type": "Treatment"},
+        {
+            "name": basic_treat_name,
+            "type": "Treatment",
+            "priority": 3,
+            "evidence_level": "III",
+        },
     )
     ok("catalog create basic treatment", code == 201, str(basic_treat_resp))
     basic_treat_id = (
@@ -985,6 +992,31 @@ def _run_smoke_tests(resources: SmokeRunResources) -> None:
     ok("basic treatment id", bool(basic_treat_id))
     if basic_treat_id:
         resources.treatment_ids.append(str(basic_treat_id))
+
+    code, treatments_list = request("GET", "/api/treatments")
+    ok("catalog list treatments after metadata create", code == 200, str(treatments_list))
+    regimen_b_catalog = None
+    basic_treat_catalog = None
+    if isinstance(treatments_list, list):
+        for item in treatments_list:
+            if str(item.get("_id")) == str(regimen_b_id):
+                regimen_b_catalog = item
+            if str(item.get("_id")) == str(basic_treat_id):
+                basic_treat_catalog = item
+    ok(
+        "regimen catalog stores priority and evidence_level",
+        isinstance(regimen_b_catalog, dict)
+        and regimen_b_catalog.get("priority") == 2
+        and regimen_b_catalog.get("evidence_level") == "Ib",
+        str(regimen_b_catalog),
+    )
+    ok(
+        "basic treatment catalog stores priority and evidence_level",
+        isinstance(basic_treat_catalog, dict)
+        and basic_treat_catalog.get("priority") == 3
+        and basic_treat_catalog.get("evidence_level") == "III",
+        str(basic_treat_catalog),
+    )
 
     alt_bundle_name = f"{PREFIX}-Alt-Bundle"
     alt_alternatives = [
