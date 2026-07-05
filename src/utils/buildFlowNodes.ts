@@ -55,6 +55,7 @@ function addOverviewFlowNode(
     deps;
   const catalogId = getNodeCatalogId(node);
   const flowNodeId = overviewNodeDocId(node);
+  const docId = String(node._id?.$oid || node._id);
   const charType = getEmbeddedCharType(node) ?? null;
   const canDrillDown = canDrillDownPatientNode(node, isOverviewMode, null);
 
@@ -104,8 +105,12 @@ function addOverviewFlowNode(
         overviewPopulationLabel: options?.overviewPopulationLabel,
         onClick: canDrillDown
           ? () =>
-              navigate(`/patients/${catalogId}`, {
-                state: { color: hashColor(catalogId), treeId },
+              navigate(`/patients/${docId}`, {
+                state: {
+                  color: hashColor(catalogId),
+                  treeId,
+                  focusNodeDocId: docId,
+                },
               })
           : undefined,
       },
@@ -239,6 +244,7 @@ export function buildFlowNodes(
   const catalogId = getNodeCatalogId(node);
 
   const flowNodeId = overviewNodeDocId(node);
+  const docId = String(node._id?.$oid || node._id);
 
   const thisCharType = getEmbeddedCharType(node) ?? null;
 
@@ -316,8 +322,12 @@ export function buildFlowNodes(
         catalogStale: isPatientNodeCatalogStale(node, deps.catalogMasters),
         onClick: canDrillDown
           ? () =>
-              navigate(`/patients/${catalogId}`, {
-                state: { color: hashColor(catalogId), treeId: treeId },
+              navigate(`/patients/${docId}`, {
+                state: {
+                  color: hashColor(catalogId),
+                  treeId,
+                  focusNodeDocId: docId,
+                },
               })
           : undefined,
       },

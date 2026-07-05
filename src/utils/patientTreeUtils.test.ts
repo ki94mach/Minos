@@ -1,7 +1,10 @@
 import {
   buildDrillDownViewTree,
   canDrillDownPatientNode,
+  findNodeByDocId,
+  findNodeById,
   findPathToNode,
+  getDrillTargetId,
   getOverviewPreviewChildren,
   getUniqueCharId,
   isPopulationNode,
@@ -20,6 +23,19 @@ function charNode(
   return {
     _id: id,
     characteristic_data: { _id: id, char_type: charType },
+    children,
+  };
+}
+
+function treeNode(
+  docId: string,
+  catalogId: string,
+  charType: string,
+  children: any[] = []
+) {
+  return {
+    _id: docId,
+    characteristic_data: { _id: catalogId, char_type: charType },
     children,
   };
 }
@@ -157,5 +173,60 @@ describe("buildDrillDownViewTree", () => {
     expect(pruned.children).toHaveLength(1);
     expect(pruned.children[0].children).toHaveLength(1);
     expect(pruned.children[0].children[0]._id).toBe("target");
+  });
+
+  it("drills to the correct instance when catalog id is duplicated", () => {
+    const pi1 = treeNode("doc-pi-1", "catalog-ra", "Primary Indication");
+    const pi2 = treeNode("doc-pi-2", "catalog-ra", "Primary Indication");
+    const branchA = treeNode("doc-a", "catalog-a", "Stage", [pi1]);
+    const branchB = treeNode("doc-b", "catalog-b", "Stage", [pi2]);
+    const root = treeNode("doc-root", "catalog-pop", "Population", [
+      branchA,
+      branchB,
+    ]);
+
+    const pruned = buildDrillDownViewTree(root, "doc-pi-2");
+    expect(pruned).not.toBeNull();
+    expect(pruned.children).toHaveLength(1);
+    expect(pruned.children[0]._id).toBe("doc-b");
+    expect(pruned.children[0].children[0]._id).toBe("doc-pi-2");
+  });
+});
+
+describe("getDrillTargetId", () => {
+  it("prefers focusNodeDocId over URL param", () => {
+    expect(getDrillTargetId("catalog-id", "doc-id")).toBe("doc-id");
+  });
+
+  it("falls back to URL param when focus is absent", () => {
+    expect(getDrillTargetId("catalog-id", undefined)).toBe("catalog-id");
+  });
+});
+
+describe("findNodeByDocId", () => {
+  it("returns the exact node instance by document id", () => {
+    const pi1 = treeNode("doc-pi-1", "catalog-ra", "Primary Indication");
+    const pi2 = treeNode("doc-pi-2", "catalog-ra", "Primary Indication");
+    const root = treeNode("doc-root", "catalog-pop", "Population", [pi1, pi2]);
+
+    expect(findNodeByDocId(root, "doc-pi-2")?._id).toBe("doc-pi-2");
+  });
+
+  it("does not match by catalog id alone", () => {
+    const pi1 = treeNode("doc-pi-1", "catalog-ra", "Primary Indication");
+    const pi2 = treeNode("doc-pi-2", "catalog-ra", "Primary Indication");
+    const root = treeNode("doc-root", "catalog-pop", "Population", [pi1, pi2]);
+
+    expect(findNodeByDocId(root, "catalog-ra")).toBeNull();
+  });
+});
+
+describe("findNodeById with duplicate catalog", () => {
+  it("returns the first catalog match via DFS", () => {
+    const pi1 = treeNode("doc-pi-1", "catalog-ra", "Primary Indication");
+    const pi2 = treeNode("doc-pi-2", "catalog-ra", "Primary Indication");
+    const root = treeNode("doc-root", "catalog-pop", "Population", [pi1, pi2]);
+
+    expect(findNodeById(root, "catalog-ra")?._id).toBe("doc-pi-1");
   });
 });

@@ -119,6 +119,30 @@ function nodeDocId(node: any): string | undefined {
   return id != null ? String(id) : undefined;
 }
 
+/** Prefer explicit focus doc id over URL param for unambiguous drill targets. */
+export function getDrillTargetId(
+  urlRootId: string | null,
+  focusNodeDocId?: string
+): string | null {
+  return focusNodeDocId ?? urlRootId;
+}
+
+/** Find a tree node by embedded document _id only (not catalog reference). */
+export function findNodeByDocId(node: any, docId: string): any | null {
+  if (nodeDocId(node) === String(docId)) return node;
+  if (!node.children) return null;
+  for (const child of node.children) {
+    const found = findNodeByDocId(child, docId);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Find drill target by document id first, then legacy catalog/id match. */
+export function findDrillTargetInTree(root: any, targetId: string): any | null {
+  return findNodeByDocId(root, targetId) ?? findNodeById(root, targetId);
+}
+
 function nodeMatchesId(node: any, id: string): boolean {
   if (getUniqueCharId(node) === id) return true;
   const charId =

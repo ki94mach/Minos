@@ -46,7 +46,9 @@ import {
   getUniqueCharId,
   getEmbeddedCharType,
   buildDrillDownViewTree,
+  findDrillTargetInTree,
   findNodeById,
+  getDrillTargetId,
   hashColor,
   applyDagreLayout,
   overviewNodeDocId,
@@ -709,16 +711,19 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
       return;
     }
 
-    const clickedId = node.data.catalogId ?? node.id;
+    const docId = node.data.docId ?? node.id;
     const whichTree = node.data.treeId;
-          if (!whichTree) {
-            // If somehow treeId was missing, you could fetch patients and do findNodeById to recover it.
-            alert("Error: no treeId found for this node.");
-            return;
-          }
-          navigate(`/patients/${clickedId}`, {
-            state: { color: node.data.color, treeId: whichTree },
-          });
+    if (!whichTree) {
+      alert("Error: no treeId found for this node.");
+      return;
+    }
+    navigate(`/patients/${docId}`, {
+      state: {
+        color: node.data.color,
+        treeId: whichTree,
+        focusNodeDocId: String(docId),
+      },
+    });
   };
   
 
@@ -743,12 +748,20 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
 
         setOverviewEmptyHint(null);
 
-        if (selectedRootId) {
-          const drillPatient = parsedPatients.find((p: any) =>
-            findNodeById(p.tree, selectedRootId)
-          );
+        const drillTreeId = navState.treeId as string | undefined;
+        const drillTargetId = getDrillTargetId(selectedRootId, focusNodeDocId);
+
+        if (selectedRootId && drillTargetId) {
+          const drillPatient = drillTreeId
+            ? parsedPatients.find((p: any) => {
+                const pid = p._id?.$oid || p._id;
+                return String(pid) === String(drillTreeId);
+              })
+            : parsedPatients.find((p: any) =>
+                findDrillTargetInTree(p.tree, drillTargetId)
+              );
           const drillTarget = drillPatient
-            ? findNodeById(drillPatient.tree, selectedRootId)
+            ? findDrillTargetInTree(drillPatient.tree, drillTargetId)
             : null;
           const drillCharType = drillTarget
             ? getEmbeddedCharType(drillTarget)
@@ -766,26 +779,24 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
         }
 
         // Choose either all roots (overview) or the single drilled‐in root:
-        // const roots = selectedRootId
-        //   ? parsedPatients
-        //       .map((p: any) => findNodeById(p.tree, selectedRootId))
-        //       .filter((n: any) => n != null)
-        //   : parsedPatients.map((p: any) => p.tree);
-
-        const drillTreeId = navState.treeId as string | undefined;
 
         let roots: any[] = [];
         let truePatientId: string | undefined;
 
-        if (selectedRootId && !truePatientId) {
-          const fallbackPatient = parsedPatients.find((p: any) =>
-            findNodeById(p.tree, selectedRootId)
-          );
+        if (selectedRootId && drillTargetId && !truePatientId) {
+          const fallbackPatient = drillTreeId
+            ? parsedPatients.find((p: any) => {
+                const pid = p._id?.$oid || p._id;
+                return String(pid) === String(drillTreeId);
+              })
+            : parsedPatients.find((p: any) =>
+                findDrillTargetInTree(p.tree, drillTargetId)
+              );
           truePatientId =
             fallbackPatient?._id?.$oid || fallbackPatient?._id || "";
         }
 
-        if (selectedRootId && drillTreeId) {
+        if (selectedRootId && drillTargetId && drillTreeId) {
           const patientDoc = parsedPatients.find((p: any) => {
             const pid = p._id?.$oid || p._id;
             return pid === drillTreeId;
@@ -793,28 +804,23 @@ const [newNodeType, setNewNodeType] = useState< "characteristic" | "treatment" |
           if (patientDoc) {
             const drillViewRoot = buildDrillDownViewTree(
               patientDoc.tree,
-              selectedRootId
+              drillTargetId
             );
-            const correctPatient = parsedPatients.find((p: any) =>
-              findNodeById(p.tree, selectedRootId)
-            );
-
-            truePatientId = correctPatient?._id?.$oid || correctPatient?._id;
-
+            truePatientId = patientDoc._id?.$oid || patientDoc._id;
             roots = drillViewRoot ? [drillViewRoot] : [];
           } else {
             roots = [];
           }
-        } else if (selectedRootId) {
+        } else if (selectedRootId && drillTargetId) {
           const fallbackPatient = parsedPatients.find((p: any) =>
-            findNodeById(p.tree, selectedRootId)
+            findDrillTargetInTree(p.tree, drillTargetId)
           );
           if (fallbackPatient) {
             truePatientId =
               fallbackPatient._id?.$oid || fallbackPatient._id || "";
             const drillViewRoot = buildDrillDownViewTree(
               fallbackPatient.tree,
-              selectedRootId
+              drillTargetId
             );
             roots = drillViewRoot ? [drillViewRoot] : [];
           }

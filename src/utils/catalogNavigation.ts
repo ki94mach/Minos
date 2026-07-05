@@ -53,7 +53,7 @@ export function buildCatalogNavigationTarget(
 
   if (group.pi_catalog_id) {
     return {
-      path: `/patients/${group.pi_catalog_id}`,
+      path: `/patients/${usage.node_id}`,
       state: {
         treeId,
         focusNodeDocId: usage.node_id,
@@ -63,7 +63,7 @@ export function buildCatalogNavigationTarget(
   }
 
   return {
-    path: `/patients/${group.population_catalog_id}`,
+    path: `/patients/${usage.node_id}`,
     state: {
       treeId,
       focusNodeDocId: usage.node_id,
@@ -82,15 +82,17 @@ export function navigateToCatalogUsage(
   navigate(path, { state });
 }
 
-/** Drill into a PI subtree without focusing a specific node. */
+/** Drill into a PI subtree; pass nodeDocId when targeting a specific instance. */
 export function buildPrimaryIndicationDrillTarget(
   group: CatalogUsageGroup,
-  piCatalogId: string
+  piCatalogId: string,
+  nodeDocId?: string
 ): CatalogNavigationTarget {
   return {
-    path: `/patients/${piCatalogId}`,
+    path: `/patients/${nodeDocId ?? piCatalogId}`,
     state: {
       treeId: group.patient_id,
+      ...(nodeDocId ? { focusNodeDocId: nodeDocId } : {}),
       color: hashNodeColor(piCatalogId),
     },
   };
@@ -105,7 +107,7 @@ export function resolvePatientMapSearchNavigation(
     selection.kind === "characteristic" &&
     selection.characteristicType === PRIMARY_INDICATION_TYPE
   ) {
-    return buildPrimaryIndicationDrillTarget(group, selection.id);
+    return buildCatalogNavigationTarget(group, usage);
   }
 
   if (
