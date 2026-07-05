@@ -58,14 +58,13 @@ describe("subtreeContainsPrimaryIndication", () => {
 });
 
 describe("shouldIncludeInOverviewPreview", () => {
-  it("always includes Population nodes", () => {
+  it("includes any node in the preview walk", () => {
     const pop = charNode("pop-1", "Population");
-    expect(shouldIncludeInOverviewPreview(pop, false)).toBe(true);
-  });
-
-  it("includes direct children of Population", () => {
     const child = charNode("child-1", "Stage");
-    expect(shouldIncludeInOverviewPreview(child, true)).toBe(true);
+    const grandchild = charNode("gc-1", "Comorbidity");
+    expect(shouldIncludeInOverviewPreview(pop)).toBe(true);
+    expect(shouldIncludeInOverviewPreview(child)).toBe(true);
+    expect(shouldIncludeInOverviewPreview(grandchild)).toBe(true);
   });
 });
 
@@ -75,6 +74,14 @@ describe("getOverviewPreviewChildren", () => {
     const c2 = charNode("c2", "Stage");
     const pop = charNode("pop-1", "Population", [c1, c2]);
     expect(getOverviewPreviewChildren(pop)).toEqual([c1, c2]);
+  });
+
+  it("returns all children for intermediate nodes", () => {
+    const pi = charNode("pi-1", "Primary Indication");
+    const mid = charNode("mid-1", "Stage", [pi]);
+    const grandchild = charNode("gc-1", "Comorbidity");
+    const child = charNode("child-1", "Stage", [mid, grandchild]);
+    expect(getOverviewPreviewChildren(child)).toEqual([mid, grandchild]);
   });
 
   it("returns no children for Primary Indication node", () => {

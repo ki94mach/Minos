@@ -11,7 +11,6 @@ import {
   canDrillDownPatientNode,
   getEmbeddedCharType,
   getOverviewPreviewChildren,
-  isPopulationNode,
   isPrimaryIndicationNode,
   overviewNodeDocId,
   shouldIncludeInOverviewPreview,
@@ -208,8 +207,7 @@ export function buildFlowNodes(
   inheritedColor: string,
   treeId: string,
   parentCharType: string | null = null,
-  deps: BuildFlowNodesDeps,
-  parentIsPopulation = false
+  deps: BuildFlowNodesDeps
 ): void {
   const {
     selectedRootId,
@@ -232,7 +230,7 @@ export function buildFlowNodes(
   if (
     isOverviewMode &&
     overviewViewMode === "path" &&
-    !shouldIncludeInOverviewPreview(node, parentIsPopulation)
+    !shouldIncludeInOverviewPreview(node)
   ) {
     return;
   }
@@ -243,7 +241,6 @@ export function buildFlowNodes(
   const flowNodeId = overviewNodeDocId(node);
 
   const thisCharType = getEmbeddedCharType(node) ?? null;
-  const childParentIsPopulation = isOverviewMode && isPopulationNode(node);
 
   // ──────────────────────────────────────────────────
   // E) Compute “rawSize” based on whether this is a top‐level root or a descendant:
@@ -357,8 +354,7 @@ export function buildFlowNodes(
       inheritedColor,
       treeId,
       charType ?? null,
-      deps,
-      childParentIsPopulation
+      deps
     )
   );
 }

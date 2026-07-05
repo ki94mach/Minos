@@ -29,41 +29,19 @@ export function shouldIncludeInPrimaryIndicationOverview(node: any): boolean {
 
 /**
  * Overview preview visibility:
- * - Population is always shown
- * - Every direct Population child is always shown
- * - On branches that reach a PI, show intermediates and stop at PI
- * - Nothing below PI
+ * - Show every branch from Population down to Primary Indication (inclusive)
+ * - Nothing below Primary Indication
  */
-export function shouldIncludeInOverviewPreview(
-  node: any,
-  parentIsPopulation: boolean
-): boolean {
-  if (isPopulationNode(node)) return true;
-  if (parentIsPopulation) return true;
-  if (isPrimaryIndicationNode(node)) return true;
-  return subtreeContainsPrimaryIndication(node);
+export function shouldIncludeInOverviewPreview(_node: any): boolean {
+  return true;
 }
 
 /** Children to recurse into when building the overview preview graph. */
 export function getOverviewPreviewChildren(node: any): any[] {
-  const children = node.children || [];
-  if (children.length === 0) return [];
-
-  if (isPopulationNode(node)) {
-    return children;
-  }
-
   if (isPrimaryIndicationNode(node)) {
     return [];
   }
-
-  if (subtreeContainsPrimaryIndication(node)) {
-    return children.filter((child: any) =>
-      shouldIncludeInOverviewPreview(child, false)
-    );
-  }
-
-  return [];
+  return node.children || [];
 }
 
 /** Overview drill-down: any visible Primary Indication node. */
